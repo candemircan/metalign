@@ -1,0 +1,16 @@
+[project]
+name = "metarep"
+version = "0.0.1"
+dependencies = ["torch", "seaborn", "fastcore", "einops", "torchvision"]
+
+[project.optional-dependencies]
+dev = ["pytest", "pre-commit", "ruff","notebook"]
+linux = ["flash-attn; sys_platform == 'linux'", "vllm; sys_platform == 'linux'", "xformers; sys_platform == 'linux'"]
+
+[tool.setuptools]
+py-modules = ["metarep"]
+
+[tool.ruff]
+line-length = 200
+lint.ignore = ["E731", "E501", "E701", "E702", "F403"]
+lint.extend-select = ["I"]
