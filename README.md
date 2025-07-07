@@ -12,23 +12,11 @@ For setup, you need to do the following things:
     git clone https://github.com/candemircan/metarep.git
     ```
 
-2. Install the local packages
+2. Run the setup script. This requires either `curl` or `wget` to be present on your system. If you don't have either, build a virtual environment manually and install the local package.
     ```bash
     cd metarep
+    bash setup.sh
     ```
-
-    If you have uv installed, run the following command:
-    ```bash
-    uv pip install .
-    ```
-
-    Otherwise, use pip:
-    ```bash
-    pip install .
-    ```
-
-
-Note: This project is using Python version 3.12
 
 ## Folder Structure
 

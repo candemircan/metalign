@@ -1,10 +1,10 @@
 [project]
 name = "metarep"
 version = "0.0.1"
-dependencies = ["torch", "seaborn", "fastcore", "einops", "torchvision"]
+dependencies = ["torch", "seaborn", "fastcore", "einops", "torchvision", "scikit-learn"]
 
 [project.optional-dependencies]
-dev = ["pytest", "pre-commit", "ruff","notebook"]
+dev = ["pytest", "pre-commit", "ruff","notebook", "wandb"]
 linux = ["flash-attn; sys_platform == 'linux'", "vllm; sys_platform == 'linux'", "xformers; sys_platform == 'linux'"]
 
 [tool.setuptools]
