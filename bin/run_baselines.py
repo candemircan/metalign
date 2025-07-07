@@ -14,14 +14,19 @@ from metarep.constants import NUM_THINGS_CATEGORIES
 
 @call_parse
 def main(
-    backbone: str = "dinov2_vitb14_reg",
-    force: bool = False,
-    n_splits: int = 10,
+    backbone: str = "dinov2_vitb14_reg", # backbones from which the representations are taken. different token types will be concatenated
+    force: bool = False, # if True, overwrite existing files, otherwise skip if the file already exists
+    n_splits: int = 10, # number of splits for cross-validation
 ):
+    """
+    Do linear modelling of hebart_features ~ model_representations with cross-validation.
+    Vary the train-test split ratio, and save R2 scores for each dimension and split ratio.
+    The results are saved in data/baselines/{backbone}_baselines.csv.
+    """
     "Run baseline linear model benchmarks with cross-validation"
     baseline_path = Path("data/baselines")
     baseline_path.mkdir(parents=True, exist_ok=True)
-    save_name = baseline_path / f"{backbone}_baselines.csv"
+    save_name = baseline_path / f"{backbone}.csv"
     if save_name.exists() and not force:
         print(f"File {save_name} already exists. Use --force to overwrite.")
         return
