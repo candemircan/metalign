@@ -17,7 +17,7 @@ from .rope import apply_rotary_emb, precompute_freqs_cis
 @dataclass
 class TransformerConfig:
     input_size: int = 2304
-    embedding: bool = False
+    embedding: bool = True
     hidden_size: int = 768
     num_attention_heads: int = 8
     intermediate_size: int = 2304
