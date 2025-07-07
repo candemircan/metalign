@@ -43,14 +43,13 @@ def main(
     X = np.hstack([representations[key] for key in representations.keys()])[img_idx]
     Y = np.loadtxt("data/external/spose_embedding_66d_sorted.txt")
 
-    results = dict(dimension=[], r2_mean=[], r2_std=[], train_ratio=[], estimator=[])
+    results = dict(dimension=[], r2=[], train_ratio=[], estimator=[], fold=[])
     estimator = BayesianRidge()
     for dimension in tqdm(range(Y.shape[1])):
         y = Y[:, dimension]
         for train_ratio in tqdm(np.logspace(-1.2, -0.01, 10), desc=f"Dimension {dimension}", leave=False):
             cv = ShuffleSplit(n_splits=n_splits, train_size=train_ratio, random_state=1234)
-            scores = []
-            for train_idx, test_idx in cv.split(X):
+            for fold_idx, (train_idx, test_idx) in enumerate(cv.split(X)):
                 X_train, X_test = X[train_idx], X[test_idx]
                 y_train, y_test = y[train_idx], y[test_idx]
 
@@ -60,13 +59,13 @@ def main(
 
                 estimator.fit(X_train, y_train)
                 y_pred = estimator.predict(X_test)
-                scores.append(r2_score(y_test, y_pred))
+                score = r2_score(y_test, y_pred)
 
-            results["dimension"].append(dimension)
-            results["r2_mean"].append(np.mean(scores))
-            results["r2_std"].append(np.std(scores))
-            results["train_ratio"].append(train_ratio)
-            results["estimator"].append(estimator.__class__.__name__)
+                results["dimension"].append(dimension)
+                results["r2"].append(score)
+                results["train_ratio"].append(train_ratio)
+                results["estimator"].append(estimator.__class__.__name__)
+                results["fold"].append(fold_idx)
 
     df = pd.DataFrame(results)
     df.to_csv(save_name, index=False)
