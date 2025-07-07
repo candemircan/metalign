@@ -1,13 +1,7 @@
 import pytest
 import torch
 
-from metarep.model import (
-    MLP,
-    SelfAttention,
-    Transformer,
-    TransformerBlock,
-    TransformerConfig,
-)
+from metarep.model import MLP, SelfAttention, Transformer, TransformerBlock, TransformerConfig
 from metarep.rope import precompute_freqs_cis
 
 

@@ -8,6 +8,7 @@ from metarep.model import Transformer, TransformerConfig
 def main(
     backbone: str = "dinov2_vitb14_reg", # backbone from which the representations are extracted. the name must match data/backbone_reps/{backbone}.npz
     input_type: str = "all", # can be one of "all", "cls", "register", "patch". If "all", all representations are concatenated. "registers" is possible only if the model is trained with registers.
+    wandb_name: str = "metarep", # name of the wandb project. Used to log the model.
     embedding: bool_arg = True, # whether to use an embedding layer at the beginning of the model
     hidden_size: int = 768, # hidden size of the transformer model. if this is different from the input size, an embedding layer must be used
     num_attention_heads: int = 8, # number of attention heads in the transformer model
