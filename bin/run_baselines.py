@@ -3,13 +3,14 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from fastcore.script import call_parse
+from sklearn.decomposition import PCA
 from sklearn.linear_model import BayesianRidge
 from sklearn.metrics import r2_score
 from sklearn.model_selection import ShuffleSplit
 from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
 
-from metarep.constants import NUM_THINGS_CATEGORIES
+from metarep.data import prepare_things_spose
 
 
 @call_parse
@@ -17,36 +18,28 @@ def main(
     backbone: str = "dinov2_vitb14_reg", # backbones from which the representations are taken. different token types will be concatenated
     force: bool = False, # if True, overwrite existing files, otherwise skip if the file already exists
     n_splits: int = 10, # number of splits for cross-validation
+    n_components: int = None # number of components to use for dimensionality reduction. If None, use the original data.
 ):
     """
     Do linear modelling of hebart_features ~ model_representations with cross-validation.
     Vary the train-test split ratio, and save R2 scores for each dimension and split ratio.
     The results are saved in data/baselines/{backbone}_baselines.csv.
     """
-    "Run baseline linear model benchmarks with cross-validation"
     baseline_path = Path("data/baselines")
     baseline_path.mkdir(parents=True, exist_ok=True)
-    save_name = baseline_path / f"{backbone}.csv"
+    n_components_str = f"_pca{n_components}" if n_components is not None else ""
+    save_name = baseline_path / f"{backbone}{n_components_str}.csv"
     if save_name.exists() and not force:
         print(f"File {save_name} already exists. Use --force to overwrite.")
         return
 
-    img_names = sorted(Path("data/external/THINGS").glob("*/*.jpg"))
-    unique_ids = [line.strip() for line in open("data/external/unique_id.txt", "r")]
-
-    assert all(img_name.parent.name in unique_ids for img_name in img_names), "Not all parent folders in img_names are in unique_ids"
-
-    img_idx = []
-    parent_name_list = [img_name.parent.name for img_name in img_names]
-    for unique_id in unique_ids:
-        img_idx.append(parent_name_list.index(unique_id))
-
-    assert 0 in img_idx, "The first image must be in there"
-    assert len(img_idx) == NUM_THINGS_CATEGORIES,  f"Expected {NUM_THINGS_CATEGORIES} categories, found {len(img_idx)}"
-
     representations = np.load(f"data/backbone_reps/{backbone}.npz")
-    X = np.hstack([representations[key] for key in representations.keys()])[img_idx]
-    Y = np.loadtxt("data/external/spose_embedding_66d_sorted.txt")
+    X, Y = prepare_things_spose(representations=representations, return_tensors="np")
+
+    if n_components is not None:
+        pca = PCA(n_components=n_components)
+        X = pca.fit_transform(X)
+
 
     results = dict(dimension=[], r2=[], train_ratio=[], estimator=[], fold=[])
     estimator = BayesianRidge()

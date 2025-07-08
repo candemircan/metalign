@@ -14,7 +14,7 @@ def config():
         num_attention_heads=4,
         intermediate_size=256,
         num_layers=2,
-        max_position_embeddings=64,
+        sequence_length=64,
         embedding=True,
     )
 
@@ -35,7 +35,7 @@ def test_self_attention(config: TransformerConfig):
     )
     x = torch.randn(2, 10, config.hidden_size)
     head_dim = config.hidden_size // config.num_attention_heads
-    freqs_cis = precompute_freqs_cis(head_dim, config.max_position_embeddings)
+    freqs_cis = precompute_freqs_cis(head_dim, config.sequence_length)
     seq_len = x.shape[1]
     output = attention(x, freqs_cis=freqs_cis[:seq_len])
     assert output.shape == x.shape
@@ -49,7 +49,7 @@ def test_transformer_block(config: TransformerConfig):
     )
     x = torch.randn(2, 10, config.hidden_size)
     head_dim = config.hidden_size // config.num_attention_heads
-    freqs_cis = precompute_freqs_cis(head_dim, config.max_position_embeddings)
+    freqs_cis = precompute_freqs_cis(head_dim, config.sequence_length)
     seq_len = x.shape[1]
     output = block(x, freqs_cis=freqs_cis[:seq_len])
     assert output.shape == x.shape

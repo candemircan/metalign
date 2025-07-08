@@ -16,7 +16,7 @@ from .rope import apply_rotary_emb, precompute_freqs_cis
 
 @dataclass
 class TransformerConfig:
-    input_size: int = 2304
+    input_size: int = 1536
     embedding: bool = True
     hidden_size: int = 768
     num_attention_heads: int = 8
@@ -24,9 +24,11 @@ class TransformerConfig:
     num_layers: int = 6
     hidden_act: str = "gelu"
     bias: bool = False
-    attention_dropout: float = 0.0
-    max_position_embeddings: int = 1024
+    logit_bias: bool = True
+    attention_dropout: float = 0.1
+    sequence_length: int = 100
     name: Optional[str] = None
+    num_components: Optional[int] = None  # Number of components for PCA, just for logging purposes
 
 
 class MLP(nn.Module):
@@ -71,13 +73,13 @@ class SelfAttention(nn.Module):
 class TransformerBlock(nn.Module):
     def __init__(self, hidden_size: int, num_attention_heads: int, intermediate_size: int, hidden_act: str, bias: bool = False, attention_dropout: float = 0.0):
         super().__init__()
-        self.attn = SelfAttention(hidden_size, num_attention_heads, bias=bias, attention_dropout=attention_dropout)
+        self.self_attn = SelfAttention(hidden_size, num_attention_heads, bias=bias, attention_dropout=attention_dropout)
         self.mlp = MLP(hidden_size, intermediate_size, hidden_act, bias=bias)
         self.ln1 = nn.LayerNorm(hidden_size)
         self.ln2 = nn.LayerNorm(hidden_size)
 
     def forward(self, x: torch.Tensor, freqs_cis: torch.Tensor) -> torch.Tensor:
-        attn_output = self.attn(self.ln1(x), freqs_cis=freqs_cis)
+        attn_output = self.self_attn(self.ln1(x), freqs_cis=freqs_cis)
         x = x + attn_output
         x = x + self.mlp(self.ln2(x))
         return x
@@ -89,7 +91,7 @@ class Transformer(torch.nn.Module):
         self.config = config
 
         # rope stuff
-        freqs_cis = precompute_freqs_cis(config.hidden_size // config.num_attention_heads, config.max_position_embeddings)        
+        freqs_cis = precompute_freqs_cis(config.hidden_size // config.num_attention_heads, config.sequence_length)        
         self.register_buffer("freqs_cis", freqs_cis)
         
         if not config.embedding and config.input_size != config.hidden_size: raise ValueError(f"Input size {config.input_size} must match hidden size {config.hidden_size} when embedding is False.")
@@ -106,8 +108,8 @@ class Transformer(torch.nn.Module):
                 attention_dropout=config.attention_dropout
             ) for _ in range(config.num_layers)
         ])
-        self.ln = nn.LayerNorm(config.hidden_size)
-        self.linear_head = nn.Linear(config.hidden_size,1, bias=config.bias)
+        self.final_ln = nn.LayerNorm(config.hidden_size)
+        self.linear_head = nn.Linear(config.hidden_size,1, bias=config.logit_bias)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.embedding(x)
@@ -115,4 +117,4 @@ class Transformer(torch.nn.Module):
         freqs_cis = self.freqs_cis[:seq_len]
         for layer in self.layers:
             x = layer(x,freqs_cis)
-        return self.linear_head(self.ln(x))
+        return self.linear_head(self.final_ln(x))
