@@ -1,3 +1,5 @@
+#TODO: no need for epochs, just steps
+#TODO: checkpointing
 import math
 
 import numpy as np
@@ -30,7 +32,7 @@ def main(
     embedding: bool = False, # whether to use an embedding layer at the beginning of the model
     hidden_size: int = 768, # hidden size of the transformer model. if this is different from the input size, an embedding layer must be used
     num_attention_heads: int = 12, # number of attention heads in the transformer model
-    intermediate_size: int = 1536, # size of the intermediate layer in the MLP of the transformer model
+    intermediate_size: int = 3072, # size of the intermediate layer in the MLP of the transformer model
     num_layers: int = 6, # number of transformer layers
     hidden_act: str = "gelu", # activation function for the MLP in the transformer model
     bias: bool = False, # whether to use bias in the linear layers of the transformer model
@@ -61,6 +63,15 @@ def main(
     representations = np.load(f"data/backbone_reps/{backbone}.npz")
     if input_type != "all": representations = {input_type: representations[input_type]}
     data = ThingsFunctionLearning(representations=representations)
+    
+    if easy_mode:
+        total_images = len(data)
+        train_size = int(0.8 * total_images)
+        indices = torch.randperm(total_images)
+        train_indices = indices[:train_size]
+        eval_indices = indices[train_size:]
+    else:
+        train_indices = eval_indices = None
     if num_components is not None:
         pca = PCA(n_components=num_components)
         data.X = torch.from_numpy(pca.fit_transform(data.X)).to(torch.float32)
@@ -138,7 +149,11 @@ def main(
         model.train()
         for step in tqdm(range(steps_per_epoch), desc="Steps", leave=False):
             
-            indices = torch.randint(0, len(data), (batch_size, config.sequence_length))
+            if easy_mode:
+                batch_indices = torch.randint(0, len(train_indices), (batch_size, config.sequence_length))
+                indices = train_indices[batch_indices]
+            else:
+                indices = torch.randint(0, len(data), (batch_size, config.sequence_length))
             dims = torch.randint(3, max_latent, (batch_size,)) if not easy_mode else torch.full((batch_size,), easy_mode_dim)
 
             batch_x = data.X[indices].to(device)
@@ -180,10 +195,8 @@ def main(
                 scheduler.step()
             
             log_data = {"train_loss": loss.item(), "train_r2": r2.item()}
-            if scheduler:
-                log_data["lr"] = scheduler.get_last_lr()[0]
-            else:
-                log_data["lr"] = lr
+            if scheduler: log_data["lr"] = scheduler.get_last_lr()[0]
+            else: log_data["lr"] = lr
             wandb.log(log_data)
 
         # Evaluation
@@ -195,7 +208,11 @@ def main(
         with torch.no_grad():
             for _ in range(num_eval_steps):
                 seq_len = np.random.randint(3, config.sequence_length)
-                indices = torch.randint(0, len(data), (batch_size, seq_len))
+                if easy_mode:
+                    batch_indices = torch.randint(0, len(eval_indices), (batch_size, seq_len))
+                    indices = eval_indices[batch_indices]
+                else:
+                    indices = torch.randint(0, len(data), (batch_size, seq_len))
                 
                 dim = np.random.choice(eval_dims)
 
