@@ -17,9 +17,6 @@ from metarep.model import Transformer, TransformerConfig
 
 
 def r2_score(y_true, y_pred):
-    """
-    Computes the R-squared (coefficient of determination) regression score.
-    """
     ss_res = torch.sum((y_true - y_pred) ** 2)
     ss_tot = torch.sum((y_true - y_true.mean()) ** 2)
     return 1 - ss_res / ss_tot
@@ -97,7 +94,6 @@ def main(
             attention_dropout=attention_dropout,
             sequence_length=sequence_length,
             name=name,
-            num_components=num_components
         )
 
     model = Transformer(config)

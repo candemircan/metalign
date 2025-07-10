@@ -1,10 +1,10 @@
 [project]
 name = "metarep"
 version = "0.0.1"
-dependencies = ["torch", "seaborn", "fastcore", "einops", "torchvision", "scikit-learn"]
+dependencies = ["torch", "seaborn", "fastcore", "einops", "torchvision", "scikit-learn", "vit_prisma @ git+https://github.com/Prisma-Multimodal/ViT-Prisma.git", "h5py", "wandb", "shiny"]
 
 [project.optional-dependencies]
-dev = ["pytest", "pre-commit", "ruff","notebook", "wandb"]
+dev = ["pytest", "pre-commit", "ruff","notebook"]
 linux = ["flash-attn; sys_platform == 'linux'", "vllm; sys_platform == 'linux'", "xformers; sys_platform == 'linux'"]
 
 [tool.setuptools]

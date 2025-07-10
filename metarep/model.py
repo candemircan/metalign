@@ -28,7 +28,6 @@ class TransformerConfig:
     attention_dropout: float = 0.1
     sequence_length: int = 100
     name: Optional[str] = None
-    num_components: Optional[int] = None  # Number of components for PCA, just for logging purposes
 
 
 class MLP(nn.Module):
