@@ -13,13 +13,9 @@ from tqdm import tqdm, trange
 
 import wandb
 from metarep.data import ThingsFunctionLearning
+from metarep.metrics import r2_score
 from metarep.model import Transformer, TransformerConfig
 
-
-def r2_score(y_true, y_pred):
-    ss_res = torch.sum((y_true - y_pred) ** 2)
-    ss_tot = torch.sum((y_true - y_true.mean()) ** 2)
-    return 1 - ss_res / ss_tot
 
 @call_parse
 def main(

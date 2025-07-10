@@ -1,11 +1,12 @@
 """
-common datasets used throughout the project
+common datasets and processing utils  used throughout the project
 """
 
-__all__ = ["prepare_things_spose", "Things", "ThingsFunctionLearning"]
+__all__ = ["prepare_things_spose", "Things", "ThingsFunctionLearning", "h5_to_numpy"]
 
 from pathlib import Path
 
+import h5py
 import numpy as np
 import torch
 from PIL import Image
@@ -13,6 +14,65 @@ from torch.utils.data import Dataset
 
 from .constants import NUM_THINGS_CATEGORIES, NUM_THINGS_IMAGES
 from .transforms import image_transform
+
+
+def h5_to_numpy(model_name: str = "sparse-autoencoder-clip-b-32-sae-vanilla-x64-layer-11-hook_resid_post-l1-1e-05", # model name, meant to match the name of the HF repo (without the org)
+                data_root: Path = Path("data/sae"), # where you keep your SAE activations
+                min_nonzero: int = 0 # minimum number of non-zero activations per column to keep it in the final array
+                ) -> np.ndarray:
+    """
+    Convert SAE activations from h5 file to numpy array.
+
+    Activations are sparse over observations, but the space is very high dimensional.
+    To save disk space, only non-zero activations and their indices are stored in the h5 file.
+    Here, we convert the h5 file to a numpy array, filling in the zeros for the missing indices.
+    If a column is all zeros, it is removed from the final array. Also, if a column has less than `min_nonzero` non-zero activations, it is removed from the final array.
+
+    The original h5 file is expected to be in the format:
+    ```
+    {
+        "0": {
+            "activations": [...], # the activations for the first image
+            "indices": [...] # the indices of the non-zero activations
+        },
+        "1": {
+            "activations": [...], # the activations for the second image
+            "indices": [...] # the indices of the non-zero activations
+        },
+        ...
+    }
+    ```
+
+    The ordering is based on `sorted("data/external/THINGS/*/*jpg)`
+    """
+
+    file_path = data_root / f"{model_name}.h5"
+
+    sae_h5 = h5py.File(file_path, 'r')
+    indices = []
+    for k in sae_h5.keys():
+        indices.extend(sae_h5[k]["indices"][:].tolist())
+
+    num_cols = max(indices) + 1
+    activations = np.zeros((len(sae_h5), num_cols), dtype=np.float32)
+
+    for img in range(len(sae_h5)):
+        img_id = str(img)
+        h5_activations = sae_h5[img_id]["activations"][:]
+        indices = sae_h5[img_id]["indices"][:]
+        filler_activations = np.zeros(num_cols, dtype=np.float32)
+        filler_activations[indices] = h5_activations
+        activations[img, :] = filler_activations
+
+    sae_h5.close()
+    activations = activations[:, (activations.mean(0) != 0)]
+
+    # remove columns with less than min_nonzero non-zero activations
+    non_zero_counts = np.count_nonzero(activations, axis=0)
+    activations = activations[:, non_zero_counts >= min_nonzero]
+    
+    return activations
+
 
 
 def prepare_things_spose(

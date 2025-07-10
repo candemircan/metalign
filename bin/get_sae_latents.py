@@ -58,8 +58,10 @@ def main(
             _, cache = model.run_with_cache(images, names_filter=sae.cfg.hook_point)
             hook_point_activation = cache[sae.cfg.hook_point].to(device)
 
-            # 0 is the input of the SAE of the returned tuple, 1 is the feature activations
-            feature_acts = sae.encode(hook_point_activation[:,0,:])[1] 
+            # 0 is the CLS token
+            raw_acts = hook_point_activation[:, 0, :]
+            # the first of the tuple is the input to the SAE, the second is the feature activations
+            feature_acts = sae.encode(raw_acts)[1] 
 
             # Find non-zero activations for the entire batch
             nonzero_mask = feature_acts != 0
@@ -84,8 +86,9 @@ def main(
                 
                 indices_data = split_indices[i].cpu().numpy() if torch.is_tensor(split_indices[i]) else split_indices[i]
                 activations_data = split_activations[i].cpu().numpy() if torch.is_tensor(split_activations[i]) else split_activations[i]
+                raw_data = raw_acts[i].cpu().numpy()
 
                 f.create_dataset(f'{global_image_index}/indices', data=indices_data)
                 f.create_dataset(f'{global_image_index}/activations', data=activations_data)
-
+                f.create_dataset(f'{global_image_index}/raw', data=raw_data)
             image_offset += feature_acts.shape[0]
