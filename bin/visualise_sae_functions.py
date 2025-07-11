@@ -72,10 +72,28 @@ def save_annotation(feature_dim, description):
     annotation_path.parent.mkdir(parents=True, exist_ok=True)
     annotation_path.write_text(description)
 
-model_name = "sparse-autoencoder-clip-b-32-sae-vanilla-x64-layer-11-hook_resid_post-l1-1e-05"
-min_nonzero = 1000 
+#things_model_name = "things_sae-top_k-64-cls_only-layer_11-hook_resid_post"
+#coco_model_name = "coco_sae-top_k-64-cls_only-layer_11-hook_resid_post"
+min_nonzero = 100 
+
+# no filtering initially because we need to concat them
+#things_features = h5_to_numpy(model_name=things_model_name, min_nonzero=0)
+#coco_features = h5_to_numpy(model_name=coco_model_name, min_nonzero=0)
+
+model_name = "sae-top_k-64-cls_only-layer_11-hook_resid_pos"
+# concat features
+#features = np.concatenate([things_features, coco_features], axis=0)
+# filter features for min_nonzero, such that any column has at least `min_nonzero` non-zero values
+#non_zero_counts = np.count_nonzero(features, axis=0)
+#features = features[:, non_zero_counts >= min_nonzero]
+
+
+#things_image_paths = sorted(glob("data/external/THINGS/*/*jpg"))
+#coco_image_paths = sorted(glob("data/external/coco/train2017/*.jpg"))
+#image_paths = things_image_paths + coco_image_paths
+image_paths = sorted(glob("data/external/THINGS/*/*jpg"))  # Adjust this path as needed
+model_name = "things_sae-top_k-64-cls_only-layer_11-hook_resid_post"
 features = h5_to_numpy(model_name=model_name, min_nonzero=min_nonzero)
-image_paths = sorted(glob("data/external/THINGS/*/*jpg"))
 
 if len(image_paths) != features.shape[0]: print(f"Warning: {len(image_paths)} images but {features.shape[0]} feature rows")
 
@@ -126,7 +144,7 @@ def server(input, output, session):
         data = get_feature_data()
         fraction_zeros = data['n_zeros'] / data['total']
         fraction_above_threshold = data['n_above_threshold'] / data['total']
-        return f"Feature {input.feature_dim()} of {features.shape[1]} total features\n{data['n_zeros']} images ({fraction_zeros:.1%}) have value 0\n {data['n_above_threshold']} images ({fraction_above_threshold:.1%}) above threshold {input.threshold()}"
+        return f"Feature {input.feature_dim()} of {features.shape[1]} total features. {data['n_zeros']} images ({fraction_zeros:.1%}) have value 0. {data['n_above_threshold']} images ({fraction_above_threshold:.1%}) above threshold {input.threshold()}"
     
     @render.ui
     def current_annotation():

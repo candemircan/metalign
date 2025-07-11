@@ -13,23 +13,26 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from vit_prisma.models.model_loader import load_hooked_model
 from vit_prisma.sae import SparseAutoencoder
-from vit_prisma.transforms import get_clip_val_transforms
 
-from metarep.data import Things
+from metarep.data import Coco, Things
 
 warnings.filterwarnings("ignore", module="kaleido") # idk what this is, but it is annoying
 _ = torch.set_grad_enabled(False) 
 
 @call_parse
 def main(
-    repo_id: str = "Prisma-Multimodal/sparse-autoencoder-clip-b-32-sae-vanilla-x64-layer-11-hook_resid_post-l1-1e-05", # the repo ID of the SAE model on Hugging Face Hub
-    batch_size: int = 64, # the batch size to use for processing images
+    dataset: str, # dataset to use, either "things" or "coco"
+    repo_id: str = "Prisma-Multimodal/sae-top_k-64-cls_only-layer_11-hook_resid_post", # the repo ID of the SAE model on Hugging Face Hub
+    batch_size: int = 256, # the batch size to use for processing images
     force: bool = False, # if True, remove the existing h5 file and remake one
 ):
     
+    if dataset not in ["things", "coco"]:
+        raise ValueError("Dataset must be either 'things' or 'coco'.")
+    
     dir_path = Path("data/sae")
     dir_path.mkdir(parents=True, exist_ok=True)
-    file_path = dir_path / f"{repo_id.split('/')[-1]}.h5"
+    file_path = dir_path / f"{dataset}_{repo_id.split('/')[-1]}.h5"
 
     if file_path.exists() and force: os.remove(file_path)
     elif file_path.exists() and not force:
@@ -47,13 +50,12 @@ def main(
     sae.eval()
 
     # data
-    things = Things()
-    things.transform = get_clip_val_transforms()
-    things_loader = DataLoader(things, batch_size=batch_size, shuffle=False, num_workers=4)
+    dataset = Things() if dataset == "things" else Coco()
+    dataset_loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4)
     
     image_offset = 0
     with h5py.File(file_path, 'w') as f:
-        for batch in tqdm(things_loader, desc="Processing images"):
+        for batch in tqdm(dataset_loader, desc="Processing images"):
             images = batch.to(device)
             _, cache = model.run_with_cache(images, names_filter=sae.cfg.hook_point)
             hook_point_activation = cache[sae.cfg.hook_point].to(device)

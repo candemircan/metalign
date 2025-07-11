@@ -16,6 +16,7 @@ from metarep.data import prepare_things_spose
 @call_parse
 def main(
     backbone: str = "dinov2_vitb14_reg", # backbones from which the representations are taken. different token types will be concatenated
+    tokens: str = "all", # which tokens to use. if all, all tokens will be concatenated. otherwise needs to be one of cls, patch, or register (if avail)
     force: bool = False, # if True, overwrite existing files, otherwise skip if the file already exists
     n_splits: int = 10, # number of splits for cross-validation
     n_components: int = None # number of components to use for dimensionality reduction. If None, use the original data.
@@ -28,13 +29,14 @@ def main(
     baseline_path = Path("data/baselines")
     baseline_path.mkdir(parents=True, exist_ok=True)
     n_components_str = f"_pca{n_components}" if n_components is not None else ""
-    save_name = baseline_path / f"{backbone}{n_components_str}.csv"
+    tokens_str = f"_{tokens}" if tokens != "all" else ""
+    save_name = baseline_path / f"{backbone}{n_components_str}{tokens_str}.csv"
     if save_name.exists() and not force:
         print(f"File {save_name} already exists. Use --force to overwrite.")
         return
 
     representations = np.load(f"data/backbone_reps/{backbone}.npz")
-    X, Y = prepare_things_spose(representations=representations, return_tensors="np")
+    X, Y = prepare_things_spose(representations=representations, return_tensors="np", tokens=tokens)
 
     if n_components is not None:
         pca = PCA(n_components=n_components)
