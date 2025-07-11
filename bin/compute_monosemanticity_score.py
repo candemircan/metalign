@@ -14,7 +14,7 @@ def main(
     data_root: Path = Path("data/sae"),  # where you keep your SAE activations
     min_nonzero: int = 0,  # minimum number of non-zero activations per column to keep it in the final array
     raw_only: bool = False, # if True, compute the monosemanticity score for the neurons in the raw activations
-    batch_size: int = 512,  # batch size for processing similarity matrix to reduce memory usage
+    batch_size: int = 26107,  # batch size for processing similarity matrix to reduce memory usage
     force: bool = False  # if True, overwrite existing files
 ):
     """
