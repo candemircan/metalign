@@ -44,7 +44,7 @@ def image_transform(
 
 
 
-def h5_to_numpy(model_name: str = "sparse-autoencoder-clip-b-32-sae-vanilla-x64-layer-11-hook_resid_post-l1-1e-05", # model name, meant to match the name of the HF repo (without the org)
+def h5_to_numpy(model_name: str = "things_sae-top_k-64-cls_only-layer_11-hook_resid_post", # model name, meant to match the name of the HF repo (without the org)
                 data_root: Path = Path("data/sae"), # where you keep your SAE activations
                 min_nonzero: int = 1, # minimum number of non-zero activations per column to keep it in the final array. The default is such that any column that is all 0s is removed.
                 ) -> np.ndarray:
