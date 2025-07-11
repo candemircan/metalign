@@ -18,6 +18,13 @@ For setup, you need to do the following things:
     bash setup.sh
     ```
 
+3. The project uses a lot of external data, which is not committed to the repository. You can download the data by running the following script:
+    ```bash
+    bash bin/get_data.sh
+    ```
+
+This requires `wget`.
+
 ## Folder Structure
 
 ```bash
