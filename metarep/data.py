@@ -2,18 +2,40 @@
 common datasets and processing utils  used throughout the project
 """
 
-__all__ = ["prepare_things_spose", "Things", "ThingsFunctionLearning", "h5_to_numpy"]
+__all__ = ["prepare_things_spose", "Things", "ThingsFunctionLearning", "h5_to_numpy", "image_transform"]
 
 from pathlib import Path
+from typing import Sequence
 
 import h5py
 import numpy as np
 import torch
 from PIL import Image
 from torch.utils.data import Dataset
+from torchvision import transforms
 
-from .constants import NUM_THINGS_CATEGORIES, NUM_THINGS_IMAGES
-from .transforms import image_transform
+from .constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD, NUM_THINGS_CATEGORIES, NUM_THINGS_IMAGES
+
+
+def image_transform(
+    *,
+    resize_size: int = 256,
+    interpolation=transforms.InterpolationMode.BICUBIC,
+    crop_size: int = 224,
+    mean: Sequence[float] = IMAGENET_DEFAULT_MEAN,
+    std: Sequence[float] = IMAGENET_DEFAULT_STD,
+) -> transforms.Compose:
+    """
+    transform pipeline for images, including resizing, cropping, normalization, and conversion to tensor.
+    standard iamgenet stuff, adapted from [here](https://github.com/facebookresearch/dinov2/blob/592541c8d842042bb5ab29a49433f73b544522d5/dinov2/data/transforms.py)
+    """
+    transforms_list = [
+        transforms.Resize(resize_size, interpolation=interpolation),
+        transforms.CenterCrop(crop_size),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=mean, std=std),
+    ]
+    return transforms.Compose(transforms_list)
 
 
 def h5_to_numpy(model_name: str = "sparse-autoencoder-clip-b-32-sae-vanilla-x64-layer-11-hook_resid_post-l1-1e-05", # model name, meant to match the name of the HF repo (without the org)
