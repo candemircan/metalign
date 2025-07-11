@@ -12,4 +12,7 @@ figure.dpi: 300
 savefig.dpi: 300
 
 # Font family configuration
-font.family: Roboto
+font.family: sans-serif
+
+# Specify a list of fonts for the 'sans-serif' generic family, in order of preference
+font.sans-serif: Roboto, DejaVu Sans, Bitstream Vera Sans, Computer Modern Sans Serif, Arial, Liberation Sans, Helvetica
