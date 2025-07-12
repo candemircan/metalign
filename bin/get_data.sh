@@ -32,3 +32,4 @@ if [ ! -d "data/external/coco" ]; then
     wget -O data/external/coco.zip http://images.cocodataset.org/zips/train2017.zip
     unzip data/external/coco.zip -d data/external/coco
     rm data/external/coco.zip
+fi
