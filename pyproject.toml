@@ -4,7 +4,7 @@ version = "0.0.1"
 dependencies = ["torch", "seaborn", "fastcore", "einops", "torchvision", "scikit-learn", "vit_prisma @ git+https://github.com/Prisma-Multimodal/ViT-Prisma.git", "h5py", "wandb", "shiny", "nnsight"]
 
 [project.optional-dependencies]
-dev = ["pytest", "pre-commit", "ruff","notebook"]
+dev = ["pytest", "pre-commit", "ruff","notebook", "jupyter-cache"]
 linux = ["flash-attn; sys_platform == 'linux'", "vllm; sys_platform == 'linux'", "xformers; sys_platform == 'linux'"]
 
 [tool.setuptools]

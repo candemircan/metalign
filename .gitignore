@@ -161,3 +161,6 @@ example*
 .github/instructions
 wandb
 checkpoints
+*ipynb
+/.quarto/
+.jupyter_cache

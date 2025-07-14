@@ -1,0 +1,134 @@
+# Data Distribution for THINGS
+
+A big part of why things will work or not work in this project is down to the similarity of functions with each other. I mean both how diverse the training distribution is, but also how similar the test functions are to the training functions. Here, I try to understand some of this.
+
+```{python}
+import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import pairwise_distances
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from tqdm import tqdm
+
+from metarep.data import prepare_things_spose
+
+num_positive = 50
+np.random.seed(1234)
+
+```
+
+## Quantifying Problem Similarity
+
+Simply train a linear classifier from the dino embeddings to every single SPoSE dimension seperately, and save the weight vectors for each problem. There's probably a better way to do this, but for now, it's good.
+
+We assign the top `num_positive` instances from a given dimension to the positive label, and we get the bottom `num_positive` entries for the negative class. 
+
+```{python}
+pipeline  = make_pipeline(
+    StandardScaler(),
+    LogisticRegression(max_iter=1000, random_state=1234, n_jobs=1)
+)
+X, Y = prepare_things_spose(np.load("data/backbone_reps/dinov2_vitb14_reg.npz"), return_tensors="np")
+# do the same as above but with spose targets
+weights = []
+for og_id in tqdm(range(Y.shape[1])):
+    # get row ids of the top num_positive activations for this column
+    top_ids = np.argsort(Y[:, og_id])[-num_positive:]
+    # get row ids of the bottom num_positive activations
+    bottom_ids = np.argsort(Y[:, og_id])[:num_positive]
+
+    X_sub = X[np.concatenate([top_ids, bottom_ids])]
+    y_sub = np.concatenate([np.ones(num_positive), np.zeros(num_positive)])
+
+    # fit the model
+    pipeline.fit(X_sub, y_sub)
+    # get the weights of the model
+    weights.append(pipeline.named_steps['logisticregression'].coef_[0])
+
+
+```
+
+
+Then, compute the pairwise similarity of the weight vectors.
+
+```{python}
+weights = np.array(weights)
+cosine_weights = 1 - pairwise_distances(weights, metric='cosine')
+cosine_weights_flat = cosine_weights.flatten()
+# remove self similarity
+cosine_weights_flat = cosine_weights_flat[cosine_weights_flat != 1.0]
+cosine_weights_test = cosine_weights[:3, :3]
+cosine_weights_test_flat = cosine_weights_test.flatten()
+cosine_weights_test_flat = cosine_weights_test_flat[cosine_weights_test_flat != 1.0]
+```
+
+
+```{python}
+cmap = sns.color_palette()
+
+# Set up a GridSpec layout: 2 rows, 2 columns
+fig = plt.figure(figsize=(10, 10))
+gs = fig.add_gridspec(nrows=2, ncols=2, height_ratios=[1, 1])
+
+# First row: two heatmaps
+ax0 = fig.add_subplot(gs[0, 0])
+sns.heatmap(cosine_weights, ax=ax0, cmap='coolwarm', vmin=-1, vmax=1)
+ax0.set_title("Similarity of All Functions")
+ax0.collections[0].colorbar.remove()  # Remove colorbar from first heatmap
+
+ax1 = fig.add_subplot(gs[0, 1])
+sns.heatmap(cosine_weights_test, ax=ax1, cmap='coolwarm', vmin=-1, vmax=1, annot=True, fmt=".2f")
+ax1.set_title("Similarity of Test Functions")
+
+# Second row: full-width KDE plot
+ax2 = fig.add_subplot(gs[1, :])
+sns.kdeplot(cosine_weights_flat, ax=ax2, label='Full Similarity Distribution', fill=True, alpha=0.5, color=cmap[0])
+for i in range(3):
+    ax2.axvline(cosine_weights[i, :].mean(), color=cmap[-i], linestyle='--', alpha=1,
+                label=f'Feature {i} Average  Similarity')
+    
+
+# also plot the average cosine similarity of the whole matrix
+ax2.axvline(cosine_weights.mean(), color='black', linestyle='--', alpha=1., label='Average Pairwise Similarity')
+    
+# x min and max at -0.5 and .5
+ax2.set_xlim(-0.5, 0.5)
+ax2.set_title("Distribution of Similarities")
+ax2.set_xlabel("Similarity")
+ax2.set_ylabel("Density")
+ax2.legend()
+
+plt.tight_layout()
+plt.show()
+```
+
+The test dimensions do seem to contain three "distinct" functions. They are also not too similar to any of the training functions, though this is hard to quantify.
+
+
+```{python}
+similarities_to_average = []
+average_weight = weights[3:].mean(0).reshape(1, -1)
+for i in range(weights.shape[0]):
+    similarities_to_average.append(1 - pairwise_distances(average_weight, weights[i].reshape(1, -1), metric='cosine'))
+
+```
+
+
+What about the similarity of the test functions to the averaged classifier weight vector, over the entire training functions? Again, it seems like the test functions are not "too" similar to the average of the training functions. Though, dimension 0 seems more similar than the other two. 
+
+This actually shows if you provide uninformative labels in-context, where the model gets higher than chance level accuracy, only on dimension 0. I believe, it's because it's prior after training is pointing towards this function.
+
+```{python}
+fig, ax = plt.subplots(figsize=(10, 5))
+ax.set_title("Similarity of Average Weight with Each Function")
+ax.set_xlabel("Function Index")
+ax.set_ylabel("Similarity")
+ax.scatter(range(len(similarities_to_average)), similarities_to_average)
+# the first three points should have a different color
+ax.scatter(range(3), similarities_to_average[:3], color='black', label='Test Functions')
+ax.axhline(np.mean(similarities_to_average), color='black', linestyle='--', label='Mean Similarity')
+ax.legend()
+plt.show()
+```

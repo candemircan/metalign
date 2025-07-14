@@ -1,0 +1,13 @@
+project:
+  execute-dir: project
+  output-dir: "logs"
+format: 
+  html:
+    code-fold: true
+    code-tools: true
+    embed-resources: true
+    self-contained-math: true
+fig-dpi: 300
+execute:
+  cache: true
+  warning: false
