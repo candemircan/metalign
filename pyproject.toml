@@ -8,7 +8,7 @@ dev = ["pytest", "pre-commit", "ruff","notebook"]
 linux = ["flash-attn; sys_platform == 'linux'", "vllm; sys_platform == 'linux'", "xformers; sys_platform == 'linux'"]
 
 [tool.setuptools]
-py-modules = ["metarep"]
+packages = ["metarep"]
 
 [tool.ruff]
 line-length = 200
