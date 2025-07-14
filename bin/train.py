@@ -44,14 +44,14 @@ def main(
     eval_interval_steps: int = 100,  # evaluate the model every eval_interval_steps steps
     num_eval_episodes: int = 128,  # number of episodes to sample for evaluation
     eval_dims: Param(help="the dimensions to evaluate the model on. These dimensions are not sampled during training. It cannot be empty.", type=int, nargs="*") = [0, 1, 2],
-    checkpoint_dir: str = "checkpoints", # directory to save checkpoints
+    checkpoint_dir: str = "checkpoints", # directory to save checkpoints. this will be placed under data/checkpoints/{name} if name is provided. If name is None, it will be saved under data/checkpoints
     checkpoint_interval_steps: int = 1000, # save checkpoint every N steps
     resume_from_checkpoint: str = None, # path to a checkpoint to resume from
 ):
     """
     train a meta-learning transformer model over a bunch of function learning tasks
     """
-    checkpoint_dir = checkpoint_dir if name is None else os.path.join(checkpoint_dir, name)
+    checkpoint_dir = f"data/{checkpoint_dir}" if name is None else f"data/checkpoints/{name}"
     if not os.path.exists(checkpoint_dir): os.makedirs(checkpoint_dir)
 
     representations = np.load(f"data/backbone_reps/{backbone}.npz")
@@ -127,7 +127,7 @@ def main(
         print(f"Resuming training from step {start_step}")
 
     best_eval_accuracy = -1.0
-    best_checkpoint_path = os.path.join(checkpoint_dir, "best.pt")
+    best_checkpoint_path = f"{checkpoint_dir}/best.pt"
     if os.path.exists(best_checkpoint_path):
         best_checkpoint = torch.load(best_checkpoint_path, map_location=device)
         if 'eval_accuracy' in best_checkpoint:
@@ -238,13 +238,7 @@ def main(
 
                 if eval_accuracy > best_eval_accuracy:
                     best_eval_accuracy = eval_accuracy
-                    torch.save({
-                        'step': training_step,
-                        'model_state_dict': model.state_dict(),
-                        'optimizer_state_dict': optimizer.state_dict(),
-                        'scheduler_state_dict': scheduler.state_dict() if scheduler else None,
-                        'eval_accuracy': best_eval_accuracy,
-                    }, best_checkpoint_path)
+                    torch.save(model.state_dict(), best_checkpoint_path)
         
         if (training_step + 1) % checkpoint_interval_steps == 0:
             checkpoint_path = os.path.join(checkpoint_dir, "latest.pt")

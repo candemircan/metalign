@@ -16,11 +16,11 @@ from .rope import apply_rotary_emb, precompute_freqs_cis
 
 @dataclass
 class TransformerConfig:
-    input_size: int = 1536
+    input_size: int = 2306
     embedding: bool = True
     hidden_size: int = 768
-    num_attention_heads: int = 8
-    intermediate_size: int = 2304
+    num_attention_heads: int = 12
+    intermediate_size: int = 3072
     num_layers: int = 6
     hidden_act: str = "gelu"
     bias: bool = False
