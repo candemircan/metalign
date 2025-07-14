@@ -33,7 +33,7 @@ def main(
     sequence_length: int = 100,  # maximum number of position embeddings in the transformer model
     config_file: str = None,  # path to a config file. If provided, it will override the command line arguments. Note that the input_size will always be overriden by the input size of the backbone. See "data/example_transformer_config.toml" for an example config file.
     batch_size: int = 64,  # batch size for training the model
-    training_steps: int = 500000,  # number of training steps per epoch
+    training_steps: int = 20000,  # number of training steps per epoch
     lr: float = 1e-4,  # learning rate for the optimizer
     weight_decay: float = 1e-4,  # weight decay for the optimizer
     warmup_steps: int = 1000,  # number of warmup steps for the learning rate scheduler
@@ -125,6 +125,14 @@ def main(
             scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
         start_step = checkpoint["step"] + 1
         print(f"Resuming training from step {start_step}")
+
+    best_eval_accuracy = -1.0
+    best_checkpoint_path = os.path.join(checkpoint_dir, "best.pt")
+    if os.path.exists(best_checkpoint_path):
+        best_checkpoint = torch.load(best_checkpoint_path, map_location=device)
+        if 'eval_accuracy' in best_checkpoint:
+            best_eval_accuracy = best_checkpoint['eval_accuracy']
+            print(f"Found existing best checkpoint with accuracy: {best_eval_accuracy:.4f}")
 
     config_dict = vars(config)
     config_dict["num_components"] = num_components
@@ -227,9 +235,19 @@ def main(
                 eval_accuracy = correct_predictions / total_predictions
                 wandb.log({"loss_eval": avg_eval_loss, "accuracy_eval": eval_accuracy}, step=training_step)
                 pbar.set_postfix(eval_loss=f"{avg_eval_loss:.4f}", eval_acc=f"{eval_accuracy:.4f}")
+
+                if eval_accuracy > best_eval_accuracy:
+                    best_eval_accuracy = eval_accuracy
+                    torch.save({
+                        'step': training_step,
+                        'model_state_dict': model.state_dict(),
+                        'optimizer_state_dict': optimizer.state_dict(),
+                        'scheduler_state_dict': scheduler.state_dict() if scheduler else None,
+                        'eval_accuracy': best_eval_accuracy,
+                    }, best_checkpoint_path)
         
         if (training_step + 1) % checkpoint_interval_steps == 0:
-            checkpoint_path = os.path.join(checkpoint_dir, f"step_{training_step}.pt")
+            checkpoint_path = os.path.join(checkpoint_dir, "latest.pt")
             torch.save({
                 'step': training_step,
                 'model_state_dict': model.state_dict(),

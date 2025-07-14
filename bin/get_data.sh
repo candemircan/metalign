@@ -21,7 +21,8 @@ fi
 # things images
 if [ ! -d "data/external/THINGS" ]; then
     wget -O data/external/THINGS.zip https://things-initiative.org/uploads/THINGS/images.zip
-    unzip data/external/THINGS.zip -d data/external/THINGS
+    unzip data/external/THINGS.zip -d data/external/
+    mv data/external/images data/external/THINGS
     rm data/external/THINGS.zip
 fi
 
