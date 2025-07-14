@@ -1,7 +1,7 @@
 [project]
 name = "metarep"
 version = "0.0.1"
-dependencies = ["torch", "seaborn", "fastcore", "einops", "torchvision", "scikit-learn", "vit_prisma @ git+https://github.com/Prisma-Multimodal/ViT-Prisma.git", "h5py", "wandb", "shiny"]
+dependencies = ["torch", "seaborn", "fastcore", "einops", "torchvision", "scikit-learn", "vit_prisma @ git+https://github.com/Prisma-Multimodal/ViT-Prisma.git", "h5py", "wandb", "shiny", "nnsight"]
 
 [project.optional-dependencies]
 dev = ["pytest", "pre-commit", "ruff","notebook"]
