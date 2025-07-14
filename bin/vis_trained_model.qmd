@@ -14,12 +14,14 @@ import numpy as np
 import seaborn as sns
 import torch
 from nnsight import NNsight
-from metarep.data import ThingsFunctionLearning
 import torch.nn.functional as F
 import pandas as pd
 
+from metarep.data import ThingsFunctionLearning
 from metarep.data import prepare_things_spose
 from metarep.model import Transformer, TransformerConfig
+
+_ = torch.set_grad_enabled(False)
 ```
 
 
