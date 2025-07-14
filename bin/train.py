@@ -51,6 +51,7 @@ def main(
     """
     train a meta-learning transformer model over a bunch of function learning tasks
     """
+    checkpoint_dir = checkpoint_dir if name is None else os.path.join(checkpoint_dir, name)
     if not os.path.exists(checkpoint_dir): os.makedirs(checkpoint_dir)
 
     representations = np.load(f"data/backbone_reps/{backbone}.npz")
@@ -228,7 +229,7 @@ def main(
                 pbar.set_postfix(eval_loss=f"{avg_eval_loss:.4f}", eval_acc=f"{eval_accuracy:.4f}")
         
         if (training_step + 1) % checkpoint_interval_steps == 0:
-            checkpoint_path = os.path.join(checkpoint_dir, f"checkpoint_step_{training_step}.pt")
+            checkpoint_path = os.path.join(checkpoint_dir, f"step_{training_step}.pt")
             torch.save({
                 'step': training_step,
                 'model_state_dict': model.state_dict(),
