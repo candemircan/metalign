@@ -190,6 +190,9 @@ class Coco(ImageDataset):
 
 
 class ThingsFunctionLearning(Dataset):
+    """
+    A dataset for classification on the THINGS dataset, using SPoSE embeddings.
+    """
     def __init__(self, representations: dict, data_root: Path = Path("data/external")):
         X, Y = prepare_things_spose(representations, data_root=data_root)
         
@@ -214,6 +217,15 @@ class ThingsFunctionLearning(Dataset):
             self.neg_probs[dim] = F.softmax(-neg_vals, dim=0)
     
     def sample_episode(self, dim: int, seq_len: int):
+        """
+        Sample an episode of `seq_len` examples for a given dimension.
+        The episode consists of half positive and half negative examples, sampled according to the weighted probabilities of the positive and negative examples. 
+        The positive example pool is the upper median split, and the negative example pool is the lower median split.
+        
+        For positive examples, we simply sample from the multinomial distribution of the positive loadings. For negative examples, we sample from the negative pool, which is technically small positive loadings, but we use the negative sign to ensure that we sample from the lower median split.
+
+        The loadings are passed through a softmax before multinomial sampling.
+        """
         pos_indices = self.median_splits[dim]['pos']
         neg_indices = self.median_splits[dim]['neg']
         
