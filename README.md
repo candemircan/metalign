@@ -18,12 +18,10 @@ For setup, you need to do the following things:
     bash setup.sh
     ```
 
-3. The project uses a lot of external data, which is not committed to the repository. You can download the data by running the following script:
+3. The project uses a lot of external data, which is not committed to the repository. You can download the data by running the following script, which requires `wget`.
     ```bash
     bash bin/get_data.sh
     ```
-
-This requires `wget`.
 
 4. If you want to run the visualisation documents (`bin/vis*qmd`), you need to install [`quarto`](https://quarto.org/docs/get-started/). After installing, you can render the documents with the following command, which will render them as html files into the `log` folder:
     ```bash
