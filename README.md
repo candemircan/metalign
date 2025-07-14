@@ -25,9 +25,9 @@ For setup, you need to do the following things:
 
 This requires `wget`.
 
-4. If you want to run the visualisation documents (`bin/vis*qmd`), you need to install [`quarto`](https://quarto.org/docs/get-started/). After installing, you can render the documents by running:
+4. If you want to run the visualisation documents (`bin/vis*qmd`), you need to install [`quarto`](https://quarto.org/docs/get-started/). After installing, you can render the documents with the following command, which will render them as html files into the `log` folder:
     ```bash
-    quarto render bin/vis*.qmd
+    quarto render .
     ```
 
 ## Folder Structure
