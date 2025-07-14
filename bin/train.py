@@ -1,80 +1,67 @@
-#TODO: no need for epochs, just steps
-#TODO: checkpointing
 import math
 
 import numpy as np
 import tomllib
 import torch
-from fastcore.script import bool_arg, call_parse
+from fastcore.script import Param, bool_arg, call_parse
 from sklearn.decomposition import PCA
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import LambdaLR
-from tqdm import tqdm, trange
+from tqdm import trange
 
 import wandb
 from metarep.data import ThingsFunctionLearning
-from metarep.metrics import r2_score
 from metarep.model import Transformer, TransformerConfig
 
 
 @call_parse
 def main(
-    backbone: str = "dinov2_vitb14_reg", # backbone from which the representations are extracted. the name must match data/backbone_reps/{backbone}.npz
-    input_type: str = "all", # can be one of "all", "cls", "register", "patch". If "all", all representations are concatenated. "registers" is possible only if the model is trained with registers.
-    wandb_name: str = "metarep", # name of the wandb project. Used to log the model.
-    embedding: bool = False, # whether to use an embedding layer at the beginning of the model
-    hidden_size: int = 768, # hidden size of the transformer model. if this is different from the input size, an embedding layer must be used
-    num_attention_heads: int = 12, # number of attention heads in the transformer model
-    intermediate_size: int = 3072, # size of the intermediate layer in the MLP of the transformer model
-    num_layers: int = 6, # number of transformer layers
-    hidden_act: str = "gelu", # activation function for the MLP in the transformer model
-    bias: bool = False, # whether to use bias in the linear layers of the transformer model
-    logit_bias: bool_arg = True, # whether to use bias in the final linear layer of the transformer model. If False, the final layer will not have a bias term.
-    attention_dropout: float = 0.1, # dropout rate for the attention layers in the transformer model
-    sequence_length: int = 100, # maximum number of position embeddings in the transformer model
-    config_file: str = None, # path to a config file. If provided, it will override the command line arguments. Note that the input_size will always be overriden by the input size of the backbone. See "data/example_transformer_config.toml" for an example config file.
-    batch_size: int = 64, # batch size for training the model
-    epochs: int = 100, # number of epochs to train the model
-    steps_per_epoch: int = 100, # number of training steps per epoch
-    lr: float = 1e-4, # learning rate for the optimizer
-    weight_decay: float = 1e-4, # weight decay for the optimizer
-    warmup_steps: int = 1000, # number of warmup steps for the learning rate scheduler
-    max_latent: int = 41, # the maximum dimension ID + 1 that will be sampled from SPoSE during training. Dimensions 0, 1, and 2 are never sampled for training.
-    name: str = None, # name of the model. If provided, it will be used to log the model.
-    num_components: int = None, # number of components to use for dimensionality reduction. If None, the original data is used.
-    scale: bool = False, # If True, do min-max scaling. If False, do not.
-    constant_lr: bool = False, # If True, do not schedule the LR, also no warmup then
-    easy_mode: bool = False, # If True, only train and eval on one dimension (0)
-    easy_mode_dim: int = 0, # The dimension to use for easy mode. Only used if easy_mode is True.
+    backbone: str = "dinov2_vitb14_reg",  # backbone from which the representations are extracted. the name must match data/backbone_reps/{backbone}.npz
+    input_type: str = "all",  # can be one of "all", "cls", "register", "patch". If "all", all representations are concatenated. "registers" is possible only if the model is trained with registers.
+    wandb_name: str = "metarep",  # name of the wandb project. Used to log the model.
+    embedding: bool = False,  # whether to use an embedding layer at the beginning of the model
+    hidden_size: int = 768,  # hidden size of the transformer model. if this is different from the input size, an embedding layer must be used
+    num_attention_heads: int = 12,  # number of attention heads in the transformer model
+    intermediate_size: int = 3072,  # size of the intermediate layer in the MLP of the transformer model
+    num_layers: int = 6,  # number of transformer layers
+    hidden_act: str = "gelu",  # activation function for the MLP in the transformer model
+    bias: bool = False,  # whether to use bias in the linear layers of the transformer model
+    logit_bias: bool_arg = True,  # whether to use bias in the final linear layer of the transformer model. If False, the final layer will not have a bias term.
+    attention_dropout: float = 0.1,  # dropout rate for the attention layers in the transformer model
+    sequence_length: int = 100,  # maximum number of position embeddings in the transformer model
+    config_file: str = None,  # path to a config file. If provided, it will override the command line arguments. Note that the input_size will always be overriden by the input size of the backbone. See "data/example_transformer_config.toml" for an example config file.
+    batch_size: int = 64,  # batch size for training the model
+    training_steps: int = 500000,  # number of training steps per epoch
+    lr: float = 1e-4,  # learning rate for the optimizer
+    weight_decay: float = 1e-4,  # weight decay for the optimizer
+    warmup_steps: int = 1000,  # number of warmup steps for the learning rate scheduler
+    name: str = None,  # name of the model. If provided, it will be used to log the model.
+    num_components: int = None,  # number of components to use for dimensionality reduction. If None, the original data is used.
+    constant_lr: bool = False,  # If True, do not schedule the LR, also no warmup then
+    log_interval_steps: int = 10,  # log training loss every N steps
+    eval_interval_steps: int = 100,  # evaluate the model every eval_interval_steps steps
+    num_eval_episodes: int = 128,  # number of episodes to sample for evaluation
+    eval_dims: Param(help="the dimensions to evaluate the model on. These dimensions are not sampled during training. It cannot be empty.", type=int, nargs="*") = [0, 1, 2],
 ):
     """
     train a meta-learning transformer model over a bunch of function learning tasks
     """
 
-    eval_dims = [0, 1, 2] if not easy_mode else [easy_mode_dim]
-
     representations = np.load(f"data/backbone_reps/{backbone}.npz")
     if input_type != "all": representations = {input_type: representations[input_type]}
     data = ThingsFunctionLearning(representations=representations)
-    
-    if easy_mode:
-        total_images = len(data)
-        train_size = int(0.8 * total_images)
-        indices = torch.randperm(total_images)
-        train_indices = indices[:train_size]
-        eval_indices = indices[train_size:]
-    else:
-        train_indices = eval_indices = None
+
     if num_components is not None:
         pca = PCA(n_components=num_components)
         data.X = torch.from_numpy(pca.fit_transform(data.X)).to(torch.float32)
         data.feature_dim = num_components
-    input_size = data.feature_dim + 1 # +1 because we always prepend the target from the previous observation to the input
-
-
+    
+    # +2 because we always prepend the target from the previous observation to the input as a one hot vector
+    # ie [0 1] if the target is 1, [1 0] if the target is 0
+    input_size = data.feature_dim + 2
     if config_file:
         config = tomllib.load(open(config_file, "rb"))
-        config['input_size'] = input_size  # always overriden
+        config["input_size"] = input_size  # always overriden
         config = TransformerConfig(**config)
     else:
         config = TransformerConfig(
@@ -97,6 +84,7 @@ def main(
     device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
     model.to(device)
 
+    # no weight decay on bias and layernorm parameters
     no_decay = ["ln1", "ln2", "bias", "final_ln"]
     optimizer_grouped_parameters = [
         {
@@ -110,145 +98,119 @@ def main(
     ]
 
     optimizer = AdamW(optimizer_grouped_parameters, lr=lr)
-    
+
     scheduler = None
     if not constant_lr:
-        num_training_steps = epochs * steps_per_epoch
-
         def lr_lambda(current_step):
             if current_step < warmup_steps:
                 return float(current_step) / float(max(1, warmup_steps))
-            progress = float(current_step - warmup_steps) / float(max(1, num_training_steps - warmup_steps))
+            progress = float(current_step - warmup_steps) / float(max(1, training_steps - warmup_steps))
             return 0.5 * (1.0 + math.cos(math.pi * progress))
 
         scheduler = LambdaLR(optimizer, lr_lambda)
 
     config_dict = vars(config)
     config_dict["num_components"] = num_components
-    config_dict["easy_mode"] = easy_mode
-    config_dict["easy_mode_dim"] = easy_mode_dim
     config_dict["constant_lr"] = constant_lr
-    config_dict["scale"] = scale
+    config_dict["log_interval_steps"] = log_interval_steps # Log this new param
+    config_dict["eval_interval_steps"] = eval_interval_steps # Log this new param
+    config_dict["num_eval_episodes"] = num_eval_episodes # Log this new param
 
     wandb.init(project=wandb_name, name=config.name, config=config_dict)
 
-    
-    criterion = torch.nn.MSELoss()
+    criterion = torch.nn.BCEWithLogitsLoss()
 
+    pbar = trange(training_steps, desc="Training Steps")
+    num_dims = list(range(data.Y.shape[1]))
+    train_dims = [d for d in num_dims if d not in eval_dims]
     
-    pbar = trange(epochs, desc="Epochs")
-    for epoch in pbar:
+    accumulated_train_loss = 0.0
+    accumulated_train_correct = 0
+    accumulated_train_total = 0
+    
+    for training_step in pbar:
         model.train()
-        for step in tqdm(range(steps_per_epoch), desc="Steps", leave=False):
+        
+        sampled_dims = torch.randint(len(train_dims), (batch_size,))
+        X_batch = []
+        Y_batch = []
+        
+        for i in range(batch_size):
+            dim = train_dims[sampled_dims[i]]
+            X_episode, Y_episode = data.sample_episode(dim, sequence_length)
             
-            if easy_mode:
-                batch_indices = torch.randint(0, len(train_indices), (batch_size, config.sequence_length))
-                indices = train_indices[batch_indices]
-            else:
-                indices = torch.randint(0, len(data), (batch_size, config.sequence_length))
-            dims = torch.randint(3, max_latent, (batch_size,)) if not easy_mode else torch.full((batch_size,), easy_mode_dim)
+            prev_targets = torch.cat([torch.tensor([0]), Y_episode[:-1]]) 
 
-            batch_x = data.X[indices].to(device)
+            target_onehot = torch.nn.functional.one_hot(prev_targets.long(), num_classes=2).float()
+            target_onehot[0] = 0.0 
             
-            # get the unscaled target values for each sequence in the batch
-            dims_broadcast = dims.view(-1, 1).expand(-1, config.sequence_length)
-            y_unscaled_batch = data.Y[indices, dims_broadcast]
+            inputs = torch.cat([target_onehot, X_episode], dim=1)
 
-            if scale:
-                # calculate min and max for each sequence
-                min_vals = torch.min(y_unscaled_batch, dim=1, keepdim=True).values
-                max_vals = torch.max(y_unscaled_batch, dim=1, keepdim=True).values
+            X_batch.append(inputs)
+            Y_batch.append(Y_episode)
+        
+        X_batch = torch.stack(X_batch).to(device)
+        Y_batch = torch.stack(Y_batch).to(device)
+        
+        logits = model(X_batch).squeeze(-1)
+        loss = criterion(logits, Y_batch)
+        
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        if scheduler: scheduler.step()
+        
+        accumulated_train_loss += loss.item()
+        predictions = (torch.sigmoid(logits) > 0.5).float()
+        accumulated_train_correct += (predictions == Y_batch).sum().item()
+        accumulated_train_total += Y_batch.numel()
+
+        if (training_step + 1) % log_interval_steps == 0:
+            avg_train_loss = accumulated_train_loss / log_interval_steps
+            train_accuracy = accumulated_train_correct / accumulated_train_total
+            wandb.log({"train_loss": avg_train_loss, "train_accuracy": train_accuracy, "lr": optimizer.param_groups[0]["lr"]}, step=training_step)
+            pbar.set_postfix(loss=f"{avg_train_loss:.4f}", acc=f"{train_accuracy:.4f}")
+            accumulated_train_loss = 0.0
+            accumulated_train_correct = 0
+            accumulated_train_total = 0
+
+        if (training_step + 1) % eval_interval_steps == 0:
+            with torch.no_grad():
+                model.eval()
+                eval_losses = []
+                correct_predictions = 0
+                total_predictions = 0
                 
-                # scale each sequence
-                range_vals = max_vals - min_vals
-                batch_y = torch.zeros_like(y_unscaled_batch)
-                valid_range_mask = range_vals.squeeze(1) > 1e-6
-                
-                if valid_range_mask.any(): batch_y[valid_range_mask] = (y_unscaled_batch[valid_range_mask] - min_vals[valid_range_mask]) / range_vals[valid_range_mask]
-            else:
-                batch_y = y_unscaled_batch
-            
-            batch_y = batch_y.to(device)
-            
-            prev_y = torch.zeros_like(batch_y)
-            prev_y[:, 1:] = batch_y[:, :-1]
-            
-            transformer_input = torch.cat([batch_x, prev_y.unsqueeze(-1)], dim=-1)
-            transformer_target = batch_y.unsqueeze(-1)
-            
-            optimizer.zero_grad()
-            predictions = model(transformer_input)
-            loss = criterion(predictions, transformer_target)
-            r2 = r2_score(transformer_target, predictions)
-            
-            loss.backward()
-            optimizer.step()
-            if scheduler:
-                scheduler.step()
-            
-            log_data = {"train_loss": loss.item(), "train_r2": r2.item()}
-            if scheduler: log_data["lr"] = scheduler.get_last_lr()[0]
-            else: log_data["lr"] = lr
-            wandb.log(log_data)
+                # collect episodes first, then process in batches
+                X_eval_batch_list,Y_eval_batch_list = [], [] 
 
-        # Evaluation
-        model.eval()
-        total_loss = 0
-        total_r2 = 0
-        num_eval_steps = 100 
-
-        with torch.no_grad():
-            for _ in range(num_eval_steps):
-                seq_len = np.random.randint(3, config.sequence_length)
-                if easy_mode:
-                    batch_indices = torch.randint(0, len(eval_indices), (batch_size, seq_len))
-                    indices = eval_indices[batch_indices]
-                else:
-                    indices = torch.randint(0, len(data), (batch_size, seq_len))
-                
-                dim = np.random.choice(eval_dims)
-
-                batch_x = data.X[indices].to(device)
-                y_unscaled_batch = data.Y[indices, dim]
-
-                if scale:
-                    min_vals = torch.min(y_unscaled_batch, dim=1, keepdim=True).values
-                    max_vals = torch.max(y_unscaled_batch, dim=1, keepdim=True).values
+                for i in range(num_eval_episodes):
+                    dim = eval_dims[i % len(eval_dims)] # cycle through eval_dims
+                    X_episode, Y_episode = data.sample_episode(dim, sequence_length)
                     
-                    range_vals = max_vals - min_vals
+                    prev_targets = torch.cat([torch.tensor([0]), Y_episode[:-1]])
+                    target_onehot = torch.nn.functional.one_hot(prev_targets.long(), num_classes=2).float()
+                    target_onehot[0] = 0.0
                     
-                    batch_y = torch.zeros_like(y_unscaled_batch)
-                    valid_range_mask = range_vals.squeeze() > 1e-6
+                    inputs = torch.cat([target_onehot, X_episode], dim=1)
                     
-                    if valid_range_mask.any():
-                        batch_y[valid_range_mask] = (y_unscaled_batch[valid_range_mask] - min_vals[valid_range_mask]) / range_vals[valid_range_mask]
-                else:
-                    batch_y = y_unscaled_batch
-
-                batch_y = batch_y.to(device)
+                    X_eval_batch_list.append(inputs)
+                    Y_eval_batch_list.append(Y_episode)
                 
-                prev_y = torch.zeros_like(batch_y)
-                prev_y[:, 1:] = batch_y[:, :-1]
-                
-                transformer_input = torch.cat([batch_x, prev_y.unsqueeze(-1)], dim=-1)
-                transformer_target = batch_y.unsqueeze(-1)
-                
-                predictions = model(transformer_input)
-                loss = criterion(predictions, transformer_target)
-                r2 = r2_score(transformer_target, predictions)
-                
-                total_loss += loss.item()
-                total_r2 += r2.item()
+                for i in range(0, num_eval_episodes, batch_size):
+                    batch_X = torch.stack(X_eval_batch_list[i:i+batch_size]).to(device)
+                    batch_Y = torch.stack(Y_eval_batch_list[i:i+batch_size]).to(device)
 
-        avg_loss = total_loss / num_eval_steps
-        avg_r2 = total_r2 / num_eval_steps
-        eval_metrics = {"eval_loss": avg_loss, "eval_r2": avg_r2}
-        wandb.log(eval_metrics)
-        pbar.set_postfix(eval_metrics)
+                    logits_eval = model(batch_X).squeeze(-1)
+                    loss_eval = criterion(logits_eval, batch_Y)
+                    eval_losses.append(loss_eval.item())
+                    
+                    predictions = (torch.sigmoid(logits_eval) > 0.5).float()
+                    correct_predictions += (predictions == batch_Y).sum().item()
+                    total_predictions += batch_Y.numel()
 
-
-    if config.name:
-        torch.save(model.state_dict(), f"{config.name}.pt")
-        print(f"Model saved to {config.name}.pt")
-    
+                avg_eval_loss = np.mean(eval_losses)
+                eval_accuracy = correct_predictions / total_predictions
+                wandb.log({"eval_loss": avg_eval_loss, "eval_accuracy": eval_accuracy}, step=training_step)
+                pbar.set_postfix(eval_loss=f"{avg_eval_loss:.4f}", eval_acc=f"{eval_accuracy:.4f}")
     wandb.finish()
