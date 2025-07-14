@@ -1,10 +1,12 @@
 import math
+import os
 
 import numpy as np
 import tomllib
 import torch
 from fastcore.script import Param, bool_arg, call_parse
 from sklearn.decomposition import PCA
+from torch.nn import functional as F
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import LambdaLR
 from tqdm import trange
@@ -42,10 +44,14 @@ def main(
     eval_interval_steps: int = 100,  # evaluate the model every eval_interval_steps steps
     num_eval_episodes: int = 128,  # number of episodes to sample for evaluation
     eval_dims: Param(help="the dimensions to evaluate the model on. These dimensions are not sampled during training. It cannot be empty.", type=int, nargs="*") = [0, 1, 2],
+    checkpoint_dir: str = "checkpoints", # directory to save checkpoints
+    checkpoint_interval_steps: int = 1000, # save checkpoint every N steps
+    resume_from_checkpoint: str = None, # path to a checkpoint to resume from
 ):
     """
     train a meta-learning transformer model over a bunch of function learning tasks
     """
+    if not os.path.exists(checkpoint_dir): os.makedirs(checkpoint_dir)
 
     representations = np.load(f"data/backbone_reps/{backbone}.npz")
     if input_type != "all": representations = {input_type: representations[input_type]}
@@ -109,6 +115,16 @@ def main(
 
         scheduler = LambdaLR(optimizer, lr_lambda)
 
+    start_step = 0
+    if resume_from_checkpoint:
+        checkpoint = torch.load(resume_from_checkpoint, map_location=device)
+        model.load_state_dict(checkpoint["model_state_dict"])
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        if scheduler and "scheduler_state_dict" in checkpoint and checkpoint["scheduler_state_dict"] is not None:
+            scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
+        start_step = checkpoint["step"] + 1
+        print(f"Resuming training from step {start_step}")
+
     config_dict = vars(config)
     config_dict["num_components"] = num_components
     config_dict["constant_lr"] = constant_lr
@@ -116,11 +132,9 @@ def main(
     config_dict["eval_interval_steps"] = eval_interval_steps # Log this new param
     config_dict["num_eval_episodes"] = num_eval_episodes # Log this new param
 
-    wandb.init(project=wandb_name, name=config.name, config=config_dict)
+    wandb.init(project=wandb_name, name=config.name, config=config_dict)   
 
-    criterion = torch.nn.BCEWithLogitsLoss()
-
-    pbar = trange(training_steps, desc="Training Steps")
+    pbar = trange(start_step, training_steps, desc="Training Steps")
     num_dims = list(range(data.Y.shape[1]))
     train_dims = [d for d in num_dims if d not in eval_dims]
     
@@ -153,7 +167,7 @@ def main(
         Y_batch = torch.stack(Y_batch).to(device)
         
         logits = model(X_batch).squeeze(-1)
-        loss = criterion(logits, Y_batch)
+        loss =  F.binary_cross_entropy_with_logits(logits, Y_batch)
         
         optimizer.zero_grad()
         loss.backward()
@@ -168,8 +182,7 @@ def main(
         if (training_step + 1) % log_interval_steps == 0:
             avg_train_loss = accumulated_train_loss / log_interval_steps
             train_accuracy = accumulated_train_correct / accumulated_train_total
-            wandb.log({"train_loss": avg_train_loss, "train_accuracy": train_accuracy, "lr": optimizer.param_groups[0]["lr"]}, step=training_step)
-            pbar.set_postfix(loss=f"{avg_train_loss:.4f}", acc=f"{train_accuracy:.4f}")
+            wandb.log({"loss_train": avg_train_loss, "accuracy_train": train_accuracy, "lr": optimizer.param_groups[0]["lr"]}, step=training_step)
             accumulated_train_loss = 0.0
             accumulated_train_correct = 0
             accumulated_train_total = 0
@@ -202,7 +215,7 @@ def main(
                     batch_Y = torch.stack(Y_eval_batch_list[i:i+batch_size]).to(device)
 
                     logits_eval = model(batch_X).squeeze(-1)
-                    loss_eval = criterion(logits_eval, batch_Y)
+                    loss_eval =  F.binary_cross_entropy_with_logits(logits_eval, batch_Y)
                     eval_losses.append(loss_eval.item())
                     
                     predictions = (torch.sigmoid(logits_eval) > 0.5).float()
@@ -211,6 +224,16 @@ def main(
 
                 avg_eval_loss = np.mean(eval_losses)
                 eval_accuracy = correct_predictions / total_predictions
-                wandb.log({"eval_loss": avg_eval_loss, "eval_accuracy": eval_accuracy}, step=training_step)
+                wandb.log({"loss_eval": avg_eval_loss, "accuracy_eval": eval_accuracy}, step=training_step)
                 pbar.set_postfix(eval_loss=f"{avg_eval_loss:.4f}", eval_acc=f"{eval_accuracy:.4f}")
+        
+        if (training_step + 1) % checkpoint_interval_steps == 0:
+            checkpoint_path = os.path.join(checkpoint_dir, f"checkpoint_step_{training_step}.pt")
+            torch.save({
+                'step': training_step,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'scheduler_state_dict': scheduler.state_dict() if scheduler else None,
+            }, checkpoint_path)
+
     wandb.finish()
