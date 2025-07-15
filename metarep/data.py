@@ -234,7 +234,7 @@ class ThingsFunctionLearning(Dataset):
         # Gather Y for the batch and create labels
         Y_values = self.Y[indices]  # Shape: (batch_size, seq_len, n_dims)
         expanded_dims = dims.view(-1, 1, 1).expand(-1, seq_len, 1)
-        Y_selected_dim = torch.gather(Y_values, 2, expanded_dims).squeeze(-1)
+        Y_selected_dim = torch.gather(Y_values, 2, expanded_dims.to(Y_values.device)).squeeze(-1)
         
         expanded_medians = self.medians[dims].view(-1, 1).expand(-1, seq_len)
         
