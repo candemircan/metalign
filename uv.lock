@@ -539,16 +539,6 @@ wheels = [
 ]
 
 [[package]]
-name = "flash-attn"
-version = "2.8.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "einops" },
-    { name = "torch" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/e8/6d/7066d160bdffa2f9da29a8c3957f266b17a03ca0b3bdc8fdae86d9881fe7/flash_attn-2.8.1.tar.gz", hash = "sha256:0ff003899fcb244f357905b04f622d5c9736887126dd6675f8f4bc52954e3923", size = 8166563, upload-time = "2025-07-10T05:16:39.729Z" }
-
-[[package]]
 name = "fonttools"
 version = "4.58.5"
 source = { registry = "https://pypi.org/simple" }
@@ -1402,16 +1392,11 @@ dev = [
     { name = "pytest" },
     { name = "ruff" },
 ]
-linux = [
-    { name = "flash-attn", marker = "sys_platform == 'linux'" },
-    { name = "xformers", marker = "sys_platform == 'linux'" },
-]
 
 [package.metadata]
 requires-dist = [
     { name = "einops", specifier = "==0.8.1" },
     { name = "fastcore", specifier = "==1.8.4" },
-    { name = "flash-attn", marker = "sys_platform == 'linux' and extra == 'linux'" },
     { name = "h5py", specifier = "==3.14.0" },
     { name = "jupyter-cache", marker = "extra == 'dev'" },
     { name = "nnsight", specifier = "==0.4.8" },
@@ -1427,9 +1412,8 @@ requires-dist = [
     { name = "torchvision", specifier = "==0.22.1" },
     { name = "vit-prisma", git = "https://github.com/Prisma-Multimodal/ViT-Prisma.git?rev=97dd26fc01dfd856060c4a234b882c6f16836c15" },
     { name = "wandb", specifier = "==0.21.0" },
-    { name = "xformers", marker = "sys_platform == 'linux' and extra == 'linux'" },
 ]
-provides-extras = ["dev", "linux"]
+provides-extras = ["dev"]
 
 [[package]]
 name = "mistune"
@@ -3214,19 +3198,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c9/4a/44d3c295350d776427904d73c189e10aeae66d7f555bb2feee16d1e4ba5a/wsproto-1.2.0.tar.gz", hash = "sha256:ad565f26ecb92588a3e43bc3d96164de84cd9902482b130d0ddbaa9664a85065", size = 53425, upload-time = "2022-08-23T19:58:21.447Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/78/58/e860788190eba3bcce367f74d29c4675466ce8dddfba85f7827588416f01/wsproto-1.2.0-py3-none-any.whl", hash = "sha256:b9acddd652b585d75b20477888c56642fdade28bdfd3579aa24a4d2c037dd736", size = 24226, upload-time = "2022-08-23T19:58:19.96Z" },
-]
-
-[[package]]
-name = "xformers"
-version = "0.0.31.post1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "numpy" },
-    { name = "torch" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/29/e2/77fb19e49e2ee06e070c8383b286c5510c1451404440aa9639544e180e5e/xformers-0.0.31.post1.tar.gz", hash = "sha256:06a12031a00aadd56fbe543a73258b18064bccdf85fbf5de4c3e67c69e301505", size = 12110280, upload-time = "2025-07-08T15:35:49.125Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/84/bb/7faaaeffbb120c6d4240586f323fed6756afe13e92cfe5ad582d155bde87/xformers-0.0.31.post1-cp39-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:81ecbcaf6253f61378189bd1cc3a1e2ff994d3ecb391fe098ef88834c6ff6358", size = 117058051, upload-time = "2025-07-08T15:35:37.914Z" },
 ]
 
 [[package]]

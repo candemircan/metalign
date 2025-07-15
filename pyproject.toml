@@ -19,7 +19,6 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest", "pre-commit", "ruff","notebook", "jupyter-cache"]
-linux = ["flash-attn; sys_platform == 'linux'", "xformers; sys_platform == 'linux'"]
 
 [tool.setuptools]
 packages = ["metarep"]
