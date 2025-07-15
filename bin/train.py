@@ -1,8 +1,8 @@
 import math
 import os
+import tomllib
 
 import numpy as np
-import tomllib
 import torch
 from fastcore.script import Param, bool_arg, call_parse
 from sklearn.decomposition import PCA

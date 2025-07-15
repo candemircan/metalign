@@ -1,5 +1,6 @@
 [project]
 name = "metarep"
+requires-python = "==3.12.5"
 version = "0.0.1"
 dependencies = [
     "torch == 2.7.1", 
@@ -25,3 +26,6 @@ packages = ["metarep"]
 line-length = 200
 lint.ignore = ["E731", "E501", "E701", "E702", "F403"]
 lint.extend-select = ["I"]
+target-version = "py312"
+[tool.ruff.lint.isort]
+extra-standard-library = ["tomllib"]

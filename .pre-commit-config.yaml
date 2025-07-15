@@ -6,6 +6,8 @@ repos:
     # Run the linter.
     - id: ruff
       args: [ --config=pyproject.toml, --fix, --exit-non-zero-on-fix]
+      language_version: python3.12
+
 - repo: local
   hooks:
     - id: pytest
