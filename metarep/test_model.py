@@ -2,7 +2,7 @@ import pytest
 import torch
 
 from metarep.model import MLP, SelfAttention, Transformer, TransformerBlock, TransformerConfig
-from metarep.rope import precompute_freqs_cis
+from metarep.rope import RotaryPositionalEmbeddings
 
 
 @pytest.fixture
@@ -32,12 +32,10 @@ def test_self_attention(config: TransformerConfig):
     attention = SelfAttention(
         hidden_size=config.hidden_size,
         num_attention_heads=config.num_attention_heads,
+        rope=RotaryPositionalEmbeddings(dim=config.hidden_size // config.num_attention_heads, max_seq_len=config.sequence_length),
     )
     x = torch.randn(2, 10, config.hidden_size)
-    head_dim = config.hidden_size // config.num_attention_heads
-    freqs_cis = precompute_freqs_cis(head_dim, config.sequence_length)
-    seq_len = x.shape[1]
-    output = attention(x, freqs_cis=freqs_cis[:seq_len])
+    output = attention(x)
     assert output.shape == x.shape
 
 def test_transformer_block(config: TransformerConfig):
@@ -46,12 +44,11 @@ def test_transformer_block(config: TransformerConfig):
         num_attention_heads=config.num_attention_heads,
         intermediate_size=config.intermediate_size,
         hidden_act=config.hidden_act,
+        rope=RotaryPositionalEmbeddings(dim=config.hidden_size // config.num_attention_heads, max_seq_len=config.sequence_length),
     )
     x = torch.randn(2, 10, config.hidden_size)
-    head_dim = config.hidden_size // config.num_attention_heads
-    freqs_cis = precompute_freqs_cis(head_dim, config.sequence_length)
-    seq_len = x.shape[1]
-    output = block(x, freqs_cis=freqs_cis[:seq_len])
+
+    output = block(x)
     assert output.shape == x.shape
 
 def test_transformer(config: TransformerConfig):

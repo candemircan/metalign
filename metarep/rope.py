@@ -1,90 +1,129 @@
 """
-ROPE from the original Llama implementation. Minor adjustments were made to reoder some axes
-https://github.com/meta-llama/llama/blob/689c7f261b9c5514636ecc3c5fefefcbb3e6eed7/llama/model.py#L80
+Rotary Positional Embeddings (RoPE) implementation.
+This is taken exactly as is from the torchtune library [here](https://github.com/pytorch/torchtune/blob/main/torchtune/modules/position_embeddings.py)
+The reason for this and not installing torchtune is torchtune has a bunch of depdencies that are not needed for this project
 """
-__all__ = ["precompute_freqs_cis", "reshape_for_broadcast", "apply_rotary_emb"]
+__all__ = ["RotaryPositionalEmbeddings"]
 
-from typing import Tuple
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
+from typing import Optional
 
 import torch
+from torch import nn
 
 
-def precompute_freqs_cis(dim: int, end: int, theta: float = 10000.0):
+class RotaryPositionalEmbeddings(nn.Module):
     """
-    Precompute the frequency tensor for complex exponentials (cis) with given dimensions.
+    This class implements Rotary Positional Embeddings (RoPE)
+    proposed in https://arxiv.org/abs/2104.09864.
 
-    This function calculates a frequency tensor with complex exponentials using the given dimension 'dim'
-    and the end index 'end'. The 'theta' parameter scales the frequencies.
-    The returned tensor contains complex values in complex64 data type.
+    Reference implementation (used for correctness verfication)
+    can be found here:
+    https://github.com/meta-llama/llama/blob/main/llama/model.py#L80
+
+    In this implementation we cache the embeddings for each position upto
+    ``max_seq_len`` by computing this during init.
 
     Args:
-        dim (int): Dimension of the frequency tensor.
-        end (int): End index for precomputing frequencies.
-        theta (float, optional): Scaling factor for frequency computation. Defaults to 10000.0.
-
-    Returns:
-        torch.Tensor: Precomputed frequency tensor with complex exponentials.
+        dim (int): Embedding dimension. This is usually set to the dim of each
+            head in the attention module computed as ``embed_dim // num_heads``
+        max_seq_len (int): Maximum expected sequence length for the
+            model, if exceeded the cached freqs will be recomputed
+        base (int): The base for the geometric progression used to compute
+            the rotation angles
     """
-    freqs = 1.0 / (theta ** (torch.arange(0, dim, 2)[: (dim // 2)].float() / dim))
-    t = torch.arange(end, device=freqs.device)  # type: ignore
-    freqs = torch.outer(t, freqs).float()  # type: ignore
-    freqs_cis = torch.polar(torch.ones_like(freqs), freqs)  # complex64
-    return freqs_cis
 
+    def __init__(
+        self,
+        dim: int,
+        max_seq_len: int = 4096,
+        base: int = 10_000,
+    ) -> None:
+        super().__init__()
+        self.dim = dim
+        self.base = base
+        self.max_seq_len = max_seq_len
+        self.rope_init()
 
-def reshape_for_broadcast(freqs_cis: torch.Tensor, x: torch.Tensor):
-    """
-    Reshape frequency tensor for broadcasting it with another tensor.
+    def rope_init(self):
+        theta = 1.0 / (
+            self.base
+            ** (torch.arange(0, self.dim, 2)[: (self.dim // 2)].float() / self.dim)
+        )
+        self.register_buffer("theta", theta, persistent=False)
+        self.build_rope_cache(self.max_seq_len)
 
-    This function reshapes the frequency tensor to have the same shape as the target tensor 'x'
-    for the purpose of broadcasting the frequency tensor during element-wise operations.
+    def build_rope_cache(self, max_seq_len: int = 4096) -> None:
+        # Create position indexes `[0, 1, ..., max_seq_len - 1]`
+        seq_idx = torch.arange(
+            max_seq_len, dtype=self.theta.dtype, device=self.theta.device
+        )
 
-    Args:
-        freqs_cis (torch.Tensor): Frequency tensor to be reshaped.
-        x (torch.Tensor): Target tensor for broadcasting compatibility.
+        # Outer product of theta and position index; output tensor has
+        # a shape of [max_seq_len, dim // 2]
+        idx_theta = torch.einsum("i, j -> ij", seq_idx, self.theta).float()
 
-    Returns:
-        torch.Tensor: Reshaped frequency tensor.
+        # cache includes both the cos and sin components and so the output shape is
+        # [max_seq_len, dim // 2, 2]
+        cache = torch.stack([torch.cos(idx_theta), torch.sin(idx_theta)], dim=-1)
+        self.register_buffer("cache", cache, persistent=False)
 
-    Raises:
-        AssertionError: If the frequency tensor doesn't match the expected shape.
-        AssertionError: If the target tensor 'x' doesn't have the expected number of dimensions.
-    """
-    ndim = x.ndim
-    assert 0 <= 1 < ndim
-    # freqs_cis shape: (seq_len, dim)
-    # x shape: (batch, n_heads, seq_len, dim)
-    # match dimensions for broadcasting
-    # this part changed from the original implementation
-    assert freqs_cis.shape == (x.shape[-2], x.shape[-1])
-    shape = [1] * (ndim - 2) + list(freqs_cis.shape)
-    return freqs_cis.view(*shape)
+    def forward(
+        self, x: torch.Tensor, *, input_pos: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        """
+        Args:
+            x (torch.Tensor): input tensor with shape
+                ``[b, s, n_h, h_d]``
+            input_pos (Optional[torch.Tensor]): Optional tensor which contains the position ids
+                of each token. During training, this is used to indicate the positions
+                of each token relative to its sample when packed, shape [b, s].
+                During inference, this indicates the position of the current token.
+                If none, assume the index of the token is its position id. Default is None.
 
+        Returns:
+            torch.Tensor: output tensor with shape ``[b, s, n_h, h_d]``
 
-def apply_rotary_emb(
-    xq: torch.Tensor,
-    xk: torch.Tensor,
-    freqs_cis: torch.Tensor,
-) -> Tuple[torch.Tensor, torch.Tensor]:
-    """
-    Apply rotary embeddings to input tensors using the given frequency tensor.
+        Notation used for tensor shapes:
+            - b: batch size
+            - s: sequence length
+            - n_h: num heads
+            - h_d: head dim
+        """
+        # input tensor has shape [b, s, n_h, h_d]
+        seq_len = x.size(1)
 
-    This function applies rotary embeddings to the given query 'xq' and key 'xk' tensors using the provided
-    frequency tensor 'freqs_cis'. The input tensors are reshaped as complex numbers, and the frequency tensor
-    is reshaped for broadcasting compatibility. The resulting tensors contain rotary embeddings and are
-    returned as real tensors.
+        # extract the values based on whether input_pos is set or not
+        rope_cache = (
+            self.cache[:seq_len] if input_pos is None else self.cache[input_pos]
+        )
 
-    Args:
-        xq (torch.Tensor): Query tensor to apply rotary embeddings.
-        xk (torch.Tensor): Key tensor to apply rotary embeddings.
-        freqs_cis (torch.Tensor): Precomputed frequency tensor for complex exponentials.
+        # reshape input; the last dimension is used for computing the output.
+        # Cast to float to match the reference implementation
+        # tensor has shape [b, s, n_h, h_d // 2, 2]
+        xshaped = x.float().reshape(*x.shape[:-1], -1, 2)
 
-    Returns:
-        Tuple[torch.Tensor, torch.Tensor]: Tuple of modified query tensor and key tensor with rotary embeddings.
-    """
-    xq_ = torch.view_as_complex(xq.float().reshape(*xq.shape[:-1], -1, 2))
-    xk_ = torch.view_as_complex(xk.float().reshape(*xk.shape[:-1], -1, 2))
-    freqs_cis = reshape_for_broadcast(freqs_cis, xq_)
-    xq_out = torch.view_as_real(xq_ * freqs_cis).flatten(3)
-    xk_out = torch.view_as_real(xk_ * freqs_cis).flatten(3)
-    return xq_out.type_as(xq), xk_out.type_as(xk)
+        # reshape the cache for broadcasting
+        # tensor has shape [b, s, 1, h_d // 2, 2] if packed samples,
+        # otherwise has shape [1, s, 1, h_d // 2, 2]
+        rope_cache = rope_cache.view(-1, xshaped.size(1), 1, xshaped.size(3), 2)
+
+        # tensor has shape [b, s, n_h, h_d // 2, 2]
+        x_out = torch.stack(
+            [
+                xshaped[..., 0] * rope_cache[..., 0]
+                - xshaped[..., 1] * rope_cache[..., 1],
+                xshaped[..., 1] * rope_cache[..., 0]
+                + xshaped[..., 0] * rope_cache[..., 1],
+            ],
+            -1,
+        )
+
+        # tensor has shape [b, s, n_h, h_d]
+        x_out = x_out.flatten(3)
+        return x_out.type_as(x)
