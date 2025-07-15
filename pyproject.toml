@@ -23,6 +23,14 @@ dev = ["pytest", "pre-commit", "ruff","notebook", "jupyter-cache"]
 [tool.setuptools]
 packages = ["metarep"]
 
+[build-system]
+requires = ["uv_build>=0.7.21,<0.8.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "metarep"
+module-root = ""
+
 [tool.ruff]
 line-length = 200
 lint.ignore = ["E731", "E501", "E701", "E702", "F403"]

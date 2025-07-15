@@ -161,6 +161,7 @@ def main(
         for i in range(batch_size):
             dim = train_dims[sampled_dims[i]]
             X_episode, Y_episode = data.sample_episode(dim, sequence_length)
+            print(Y_episode.mean())
             
             prev_targets = torch.cat([torch.tensor([0]), Y_episode[:-1]]) 
 

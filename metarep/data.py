@@ -11,7 +11,6 @@ import h5py
 import numpy as np
 import torch
 from PIL import Image
-from torch.nn import functional as F
 from torch.utils.data import Dataset
 from torchvision import transforms
 
@@ -190,59 +189,28 @@ class Coco(ImageDataset):
 
 
 class ThingsFunctionLearning(Dataset):
-    """
-    A dataset for classification on the THINGS dataset, using SPoSE embeddings.
-    """
+    "A dataset for classification on the THINGS dataset, using SPoSE embeddings."
     def __init__(self, representations: dict, data_root: Path = Path("data/external")):
+        "Initializes the dataset by preparing data and pre-calculating medians."
         X, Y = prepare_things_spose(representations, data_root=data_root)
         
         self.X, self.Y = X, Y
-            
         self.feature_dim = self.X.shape[1]
-
-        self.median_splits = {}
-        self.pos_probs = {}
-        self.neg_probs = {}
-        for dim in range(self.Y.shape[1]):
-            median_val = torch.median(self.Y[:, dim])
-            pos_mask = self.Y[:, dim] >= median_val
-            neg_mask = ~pos_mask
-            
-            self.median_splits[dim] = {'pos': torch.where(pos_mask)[0], 'neg': torch.where(neg_mask)[0]}
-            
-            pos_vals = self.Y[pos_mask, dim]
-            self.pos_probs[dim] = F.softmax(pos_vals, dim=0)
-            
-            neg_vals = self.Y[neg_mask, dim]
-            self.neg_probs[dim] = F.softmax(-neg_vals, dim=0)
+        self.medians = torch.median(self.Y, dim=0).values
     
     def sample_episode(self, dim: int, seq_len: int):
         """
         Sample an episode of `seq_len` examples for a given dimension.
-        The episode consists of half positive and half negative examples, sampled according to the weighted probabilities of the positive and negative examples. 
         The positive example pool is the upper median split, and the negative example pool is the lower median split.
-        
-        For positive examples, we simply sample from the multinomial distribution of the positive loadings. For negative examples, we sample from the negative pool, which is technically small positive loadings, but we use the negative sign to ensure that we sample from the lower median split.
-
-        The loadings are passed through a softmax before multinomial sampling.
+        There is no guarantee that the positive and negative examples will be balanced, as the sampling is done randomly from the entire distribution
         """
-        pos_indices = self.median_splits[dim]['pos']
-        neg_indices = self.median_splits[dim]['neg']
+        n_samples = self.X.shape[0]
+        indices = torch.randperm(n_samples)[:seq_len]
         
-        n_pos = seq_len // 2
-        n_neg = seq_len - n_pos
-        pos_sampled_indices = torch.multinomial(self.pos_probs[dim], n_pos, replacement=False)
-        pos_sampled = pos_indices[pos_sampled_indices]
+        X_episode = self.X[indices]
+        Y_episode = (self.Y[indices, dim] >= self.medians[dim]).float()
 
-        neg_sampled_indices = torch.multinomial(self.neg_probs[dim], n_neg, replacement=False)
-        neg_sampled = neg_indices[neg_sampled_indices]
-        
-        all_indices = torch.cat([pos_sampled, neg_sampled])
-        all_indices = all_indices[torch.randperm(len(all_indices))]
-        
-        X_episode = self.X[all_indices]
-        median_val = torch.median(self.Y[:, dim])
-        Y_episode = (self.Y[all_indices, dim] >= median_val).float()
+        if torch.rand(1).item() < 0.5: Y_episode = 1 - Y_episode
         return X_episode, Y_episode
 
     def __len__(self):
