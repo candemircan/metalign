@@ -4,6 +4,7 @@ import tomllib
 
 import numpy as np
 import torch
+import wandb
 from fastcore.script import Param, bool_arg, call_parse
 from sklearn.decomposition import PCA
 from torch.nn import functional as F
@@ -11,7 +12,6 @@ from torch.optim import AdamW
 from torch.optim.lr_scheduler import LambdaLR
 from tqdm import trange
 
-import wandb
 from metarep.data import ThingsFunctionLearning
 from metarep.model import Transformer, TransformerConfig
 
