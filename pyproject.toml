@@ -1,11 +1,22 @@
 [project]
 name = "metarep"
 version = "0.0.1"
-dependencies = ["torch", "seaborn", "fastcore", "einops", "torchvision", "scikit-learn", "vit_prisma @ git+https://github.com/Prisma-Multimodal/ViT-Prisma.git", "h5py", "wandb", "shiny", "nnsight"]
+dependencies = [
+    "torch == 2.7.1", 
+    "seaborn == 0.13.2", 
+    "fastcore == 1.8.4", 
+    "einops == 0.8.1", 
+    "torchvision == 0.22.1", 
+    "scikit-learn == 1.7.0", 
+    "vit_prisma @ git+https://github.com/Prisma-Multimodal/ViT-Prisma.git@97dd26fc01dfd856060c4a234b882c6f16836c15", 
+    "h5py == 3.14.0", 
+    "wandb == 0.21.0", 
+    "shiny == 1.4.0", 
+    "nnsight == 0.4.8"]
 
 [project.optional-dependencies]
 dev = ["pytest", "pre-commit", "ruff","notebook", "jupyter-cache"]
-linux = ["flash-attn; sys_platform == 'linux'", "vllm; sys_platform == 'linux'", "xformers; sys_platform == 'linux'"]
+linux = ["flash-attn; sys_platform == 'linux'", "xformers; sys_platform == 'linux'"]
 
 [tool.setuptools]
 packages = ["metarep"]
