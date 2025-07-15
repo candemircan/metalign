@@ -48,6 +48,7 @@ def main(
     checkpoint_interval_steps: int = 1000, # save checkpoint every N steps
     resume_from_checkpoint: str = None, # path to a checkpoint to resume from
     fixed_label: bool = False,  # if True, thepositives are always 1 and the negatives are always 0. If False, for a given sequence, they are reversed with 50% probability.
+    compile: bool = False,  # whether to compile the model with torch.compile
 ):
     """
     train a meta-learning transformer model over a bunch of function learning tasks
@@ -91,6 +92,8 @@ def main(
 
     device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
     model.to(device)
+
+    model = torch.compile(model) if compile else model
 
     # no weight decay on bias and layernorm parameters
     no_decay = ["ln1", "ln2", "bias", "final_ln"]
@@ -146,8 +149,9 @@ def main(
 
     pbar = trange(start_step, training_steps, desc="Training Steps")
     num_dims = list(range(data.Y.shape[1]))
-    train_dims = [d for d in num_dims if d not in eval_dims]
-    
+    train_dims = torch.tensor([d for d in num_dims if d not in eval_dims], device=device)
+    eval_dims = torch.tensor(eval_dims, device=device)
+
     accumulated_train_loss = 0.0
     accumulated_train_correct = 0
     accumulated_train_total = 0
@@ -155,28 +159,18 @@ def main(
     for training_step in pbar:
         model.train()
         
-        sampled_dims = torch.randint(len(train_dims), (batch_size,))
-        X_batch = []
-        Y_batch = []
+        sampled_dim_indices = torch.randint(0, len(train_dims), (batch_size,), device=device)
+        sampled_dims = train_dims[sampled_dim_indices]
         
-        for i in range(batch_size):
-            dim = train_dims[sampled_dims[i]]
-            X_episode, Y_episode = data.sample_episode(dim, sequence_length, fixed_label)
-            
-            prev_targets = torch.cat([torch.tensor([0]), Y_episode[:-1]]) 
+        X_batch, Y_batch = data.sample_batch(sampled_dims, sequence_length, fixed_label)
+        X_batch, Y_batch = X_batch.to(device), Y_batch.to(device)
 
-            target_onehot = torch.nn.functional.one_hot(prev_targets.long(), num_classes=2).float()
-            target_onehot[0] = 0.0 
-            
-            inputs = torch.cat([target_onehot, X_episode], dim=1)
-
-            X_batch.append(inputs)
-            Y_batch.append(Y_episode)
+        prev_targets = torch.cat([torch.zeros(batch_size, 1, device=device), Y_batch[:, :-1]], dim=1)
+        target_onehot = torch.nn.functional.one_hot(prev_targets.long(), num_classes=2).float()
         
-        X_batch = torch.stack(X_batch).to(device)
-        Y_batch = torch.stack(Y_batch).to(device)
+        inputs = torch.cat([target_onehot, X_batch], dim=2)
         
-        logits = model(X_batch).squeeze(-1)
+        logits = model(inputs).squeeze(-1)
         loss =  F.binary_cross_entropy_with_logits(logits, Y_batch)
         
         optimizer.zero_grad()
@@ -200,37 +194,34 @@ def main(
         if (training_step + 1) % eval_interval_steps == 0:
             with torch.no_grad():
                 model.eval()
+                
+                num_eval_batches = (num_eval_episodes + batch_size - 1) // batch_size
                 eval_losses = []
                 correct_predictions = 0
                 total_predictions = 0
-                
-                # collect episodes first, then process in batches
-                X_eval_batch_list,Y_eval_batch_list = [], [] 
 
-                for i in range(num_eval_episodes):
-                    dim = eval_dims[i % len(eval_dims)] # cycle through eval_dims
-                    X_episode, Y_episode = data.sample_episode(dim, sequence_length)
+                for i in range(num_eval_batches):
+                    eval_batch_size = min(batch_size, num_eval_episodes - i * batch_size)
                     
-                    prev_targets = torch.cat([torch.tensor([0]), Y_episode[:-1]])
+                    # cycle through eval_dims
+                    dim_indices = torch.arange(i * batch_size, (i * batch_size) + eval_batch_size) % len(eval_dims)
+                    dims = eval_dims[dim_indices]
+
+                    X_eval, Y_eval = data.sample_batch(dims, sequence_length, fixed_label=False)
+                    X_eval, Y_eval = X_eval.to(device), Y_eval.to(device)
+
+                    prev_targets = torch.cat([torch.zeros(eval_batch_size, 1, device=device), Y_eval[:, :-1]], dim=1)
                     target_onehot = torch.nn.functional.one_hot(prev_targets.long(), num_classes=2).float()
-                    target_onehot[0] = 0.0
                     
-                    inputs = torch.cat([target_onehot, X_episode], dim=1)
-                    
-                    X_eval_batch_list.append(inputs)
-                    Y_eval_batch_list.append(Y_episode)
-                
-                for i in range(0, num_eval_episodes, batch_size):
-                    batch_X = torch.stack(X_eval_batch_list[i:i+batch_size]).to(device)
-                    batch_Y = torch.stack(Y_eval_batch_list[i:i+batch_size]).to(device)
+                    inputs_eval = torch.cat([target_onehot, X_eval], dim=2)
 
-                    logits_eval = model(batch_X).squeeze(-1)
-                    loss_eval =  F.binary_cross_entropy_with_logits(logits_eval, batch_Y)
+                    logits_eval = model(inputs_eval).squeeze(-1)
+                    loss_eval = F.binary_cross_entropy_with_logits(logits_eval, Y_eval)
                     eval_losses.append(loss_eval.item())
                     
                     predictions = (torch.sigmoid(logits_eval) > 0.5).float()
-                    correct_predictions += (predictions == batch_Y).sum().item()
-                    total_predictions += batch_Y.numel()
+                    correct_predictions += (predictions == Y_eval).sum().item()
+                    total_predictions += Y_eval.numel()
 
                 avg_eval_loss = np.mean(eval_losses)
                 eval_accuracy = correct_predictions / total_predictions
@@ -239,7 +230,13 @@ def main(
 
                 if eval_accuracy > best_eval_accuracy:
                     best_eval_accuracy = eval_accuracy
-                    torch.save(model.state_dict(), best_checkpoint_path)
+                    torch.save({
+                        'step': training_step,
+                        'model_state_dict': model.state_dict(),
+                        'optimizer_state_dict': optimizer.state_dict(),
+                        'scheduler_state_dict': scheduler.state_dict() if scheduler else None,
+                        'eval_accuracy': eval_accuracy,
+                    }, best_checkpoint_path)
         
         if (training_step + 1) % checkpoint_interval_steps == 0:
             checkpoint_path = os.path.join(checkpoint_dir, "latest.pt")

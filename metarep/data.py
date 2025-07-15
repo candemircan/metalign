@@ -214,6 +214,38 @@ class ThingsFunctionLearning(Dataset):
             if torch.rand(1).item() < 0.5: Y_episode = 1 - Y_episode
         return X_episode, Y_episode
 
+    def sample_batch(self, dims: torch.Tensor, seq_len: int, fixed_label: bool = False):
+        """
+        Sample a batch of episodes of `seq_len` examples for given dimensions.
+        The positive example pool is the upper median split, and the negative example pool is the lower median split.
+        There is no guarantee that the positive and negative examples will be balanced, as the sampling is done randomly from the entire distribution
+        """
+        batch_size = len(dims)
+        n_samples = self.X.shape[0]
+
+        # Sample indices for each episode in the batch, without replacement
+        # Shape: (batch_size, seq_len)
+        indices = torch.rand(batch_size, n_samples, device=self.X.device).topk(seq_len, dim=1).indices
+
+        # Gather X for the batch
+        # Shape: (batch_size, seq_len, feature_dim)
+        X_batch = self.X[indices]
+
+        # Gather Y for the batch and create labels
+        Y_values = self.Y[indices]  # Shape: (batch_size, seq_len, n_dims)
+        expanded_dims = dims.view(-1, 1, 1).expand(-1, seq_len, 1)
+        Y_selected_dim = torch.gather(Y_values, 2, expanded_dims).squeeze(-1)
+        
+        expanded_medians = self.medians[dims].view(-1, 1).expand(-1, seq_len)
+        
+        Y_batch = (Y_selected_dim >= expanded_medians).float()
+
+        if not fixed_label:
+            flip_mask = torch.rand(batch_size, 1, device=Y_batch.device) < 0.5
+            Y_batch[flip_mask] = 1 - Y_batch[flip_mask]
+            
+        return X_batch, Y_batch
+
     def __len__(self):
         return len(self.X)
 
