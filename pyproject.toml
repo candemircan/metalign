@@ -13,7 +13,9 @@ dependencies = [
     "h5py == 3.14.0", 
     "wandb == 0.21.0", 
     "shiny == 1.4.0", 
-    "nnsight == 0.4.8"]
+    "nnsight == 0.4.8",
+    "quarto-cli == 1.7.32"
+    ]
 
 [project.optional-dependencies]
 dev = ["pytest", "pre-commit", "ruff","notebook", "jupyter-cache"]

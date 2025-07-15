@@ -164,3 +164,6 @@ checkpoints
 *ipynb
 /.quarto/
 .jupyter_cache
+example*
+
+example*

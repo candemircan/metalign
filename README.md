@@ -23,10 +23,12 @@ For setup, you need to do the following things:
     bash bin/get_data.sh
     ```
 
-4. If you want to run the visualisation documents (`bin/vis*qmd`), you need to install [`quarto`](https://quarto.org/docs/get-started/). After installing, you can render the documents with the following command, which will render them as html files into the `log` folder:
+4. Activate the virtual environment and run any script in the project.
     ```bash
-    quarto render .
+    source .venv/bin/activate
     ```
+    
+    *Note*: The `bin/*qmd` files contain the visualisations, and they need to be rendered with `quarto render file.qmd`. This generates the HTML files with the visualisations and places them under `logs/`. If you want to run them all, just run `quarto render .`.
 
 ## Folder Structure
 
