@@ -42,3 +42,6 @@ lint.extend-select = ["I"]
 target-version = "py312"
 [tool.ruff.lint.isort]
 extra-standard-library = ["tomllib"]
+
+[tool.ruff.lint.isort]
+known-third-party = ["wandb"]
