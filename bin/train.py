@@ -159,18 +159,28 @@ def main(
     for training_step in pbar:
         model.train()
         
-        sampled_dim_indices = torch.randint(0, len(train_dims), (batch_size,), device=device)
-        sampled_dims = train_dims[sampled_dim_indices]
+        sampled_dims = torch.randint(len(train_dims), (batch_size,))
+        X_batch = []
+        Y_batch = []
         
-        X_batch, Y_batch = data.sample_batch(sampled_dims, sequence_length, fixed_label)
-        X_batch, Y_batch = X_batch.to(device), Y_batch.to(device)
+        for i in range(batch_size):
+            dim = train_dims[sampled_dims[i]]
+            X_episode, Y_episode = data.sample_episode(dim, sequence_length, fixed_label)
+            
+            prev_targets = torch.cat([torch.tensor([0]), Y_episode[:-1]]) 
 
-        prev_targets = torch.cat([torch.zeros(batch_size, 1, device=device), Y_batch[:, :-1]], dim=1)
-        target_onehot = torch.nn.functional.one_hot(prev_targets.long(), num_classes=2).float()
+            target_onehot = torch.nn.functional.one_hot(prev_targets.long(), num_classes=2).float()
+            target_onehot[0] = 0.0 
+            
+            inputs = torch.cat([target_onehot, X_episode], dim=1)
+
+            X_batch.append(inputs)
+            Y_batch.append(Y_episode)
         
-        inputs = torch.cat([target_onehot, X_batch], dim=2)
+        X_batch = torch.stack(X_batch).to(device)
+        Y_batch = torch.stack(Y_batch).to(device)
         
-        logits = model(inputs).squeeze(-1)
+        logits = model(X_batch).squeeze(-1)
         loss =  F.binary_cross_entropy_with_logits(logits, Y_batch)
         
         optimizer.zero_grad()
