@@ -4,7 +4,6 @@ import tomllib
 
 import numpy as np
 import torch
-import wandb
 from fastcore.script import Param, bool_arg, call_parse
 from sklearn.decomposition import PCA
 from torch.nn import functional as F
@@ -12,6 +11,7 @@ from torch.optim import AdamW
 from torch.optim.lr_scheduler import LambdaLR
 from tqdm import trange
 
+import wandb
 from metarep.data import ThingsFunctionLearning
 from metarep.model import Transformer, TransformerConfig
 
@@ -94,7 +94,7 @@ def main(
     device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
     model.to(device)
 
-    model = torch.compile(model) if compile else model
+    if compile: model.compile(fullgraph=True, mode="max-autotune")
 
     # no weight decay on bias and layernorm parameters
     no_decay = ["ln1", "ln2", "bias", "final_ln"]
