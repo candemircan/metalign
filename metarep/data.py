@@ -198,7 +198,7 @@ class ThingsFunctionLearning(Dataset):
         self.feature_dim = self.X.shape[1]
         self.medians = torch.median(self.Y, dim=0).values
     
-    def sample_episode(self, dim: int, seq_len: int):
+    def sample_episode(self, dim: int, seq_len: int, fixed_label: bool = False):
         """
         Sample an episode of `seq_len` examples for a given dimension.
         The positive example pool is the upper median split, and the negative example pool is the lower median split.
@@ -210,7 +210,8 @@ class ThingsFunctionLearning(Dataset):
         X_episode = self.X[indices]
         Y_episode = (self.Y[indices, dim] >= self.medians[dim]).float()
 
-        if torch.rand(1).item() < 0.5: Y_episode = 1 - Y_episode
+        if not fixed_label:
+            if torch.rand(1).item() < 0.5: Y_episode = 1 - Y_episode
         return X_episode, Y_episode
 
     def __len__(self):

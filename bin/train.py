@@ -43,10 +43,11 @@ def main(
     log_interval_steps: int = 10,  # log training loss every N steps
     eval_interval_steps: int = 100,  # evaluate the model every eval_interval_steps steps
     num_eval_episodes: int = 128,  # number of episodes to sample for evaluation
-    eval_dims: Param(help="the dimensions to evaluate the model on. These dimensions are not sampled during training. It cannot be empty.", type=int, nargs="*") = [0, 1, 2],
+    eval_dims: Param(help="the dimensions to evaluate the model on. These dimensions are not sampled during training. It cannot be empty.", type=int, nargs="*") = [0, 1, 2], # type: ignore
     checkpoint_dir: str = "checkpoints", # directory to save checkpoints. this will be placed under data/checkpoints/{name} if name is provided. If name is None, it will be saved under data/checkpoints
     checkpoint_interval_steps: int = 1000, # save checkpoint every N steps
     resume_from_checkpoint: str = None, # path to a checkpoint to resume from
+    fixed_label: bool = False,  # if True, thepositives are always 1 and the negatives are always 0. If False, for a given sequence, they are reversed with 50% probability.
 ):
     """
     train a meta-learning transformer model over a bunch of function learning tasks
@@ -160,7 +161,7 @@ def main(
         
         for i in range(batch_size):
             dim = train_dims[sampled_dims[i]]
-            X_episode, Y_episode = data.sample_episode(dim, sequence_length)
+            X_episode, Y_episode = data.sample_episode(dim, sequence_length, fixed_label)
             
             prev_targets = torch.cat([torch.tensor([0]), Y_episode[:-1]]) 
 
