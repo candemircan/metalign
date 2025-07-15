@@ -1,5 +1,5 @@
 """
-ROPE from the original Llama implementation.
+ROPE from the original Llama implementation. Minor adjustments were made to reoder some axes
 https://github.com/meta-llama/llama/blob/689c7f261b9c5514636ecc3c5fefefcbb3e6eed7/llama/model.py#L80
 """
 __all__ = ["precompute_freqs_cis", "reshape_for_broadcast", "apply_rotary_emb"]
