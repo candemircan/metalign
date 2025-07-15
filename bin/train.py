@@ -15,6 +15,7 @@ from tqdm import trange
 from metarep.data import ThingsFunctionLearning
 from metarep.model import Transformer, TransformerConfig
 
+torch.set_float32_matmul_precision('high')
 
 @call_parse
 def main(
@@ -204,34 +205,37 @@ def main(
         if (training_step + 1) % eval_interval_steps == 0:
             with torch.no_grad():
                 model.eval()
-                
-                num_eval_batches = (num_eval_episodes + batch_size - 1) // batch_size
                 eval_losses = []
                 correct_predictions = 0
                 total_predictions = 0
+                
+                # collect episodes first, then process in batches
+                X_eval_batch_list,Y_eval_batch_list = [], [] 
 
-                for i in range(num_eval_batches):
-                    eval_batch_size = min(batch_size, num_eval_episodes - i * batch_size)
+                for i in range(num_eval_episodes):
+                    dim = eval_dims[i % len(eval_dims)] # cycle through eval_dims
+                    X_episode, Y_episode = data.sample_episode(dim, sequence_length)
                     
-                    # cycle through eval_dims
-                    dim_indices = torch.arange(i * batch_size, (i * batch_size) + eval_batch_size) % len(eval_dims)
-                    dims = eval_dims[dim_indices]
-
-                    X_eval, Y_eval = data.sample_batch(dims, sequence_length, fixed_label=False)
-                    X_eval, Y_eval = X_eval.to(device), Y_eval.to(device)
-
-                    prev_targets = torch.cat([torch.zeros(eval_batch_size, 1, device=device), Y_eval[:, :-1]], dim=1)
+                    prev_targets = torch.cat([torch.tensor([0]), Y_episode[:-1]])
                     target_onehot = torch.nn.functional.one_hot(prev_targets.long(), num_classes=2).float()
+                    target_onehot[0] = 0.0
                     
-                    inputs_eval = torch.cat([target_onehot, X_eval], dim=2)
+                    inputs = torch.cat([target_onehot, X_episode], dim=1)
+                    
+                    X_eval_batch_list.append(inputs)
+                    Y_eval_batch_list.append(Y_episode)
+                
+                for i in range(0, num_eval_episodes, batch_size):
+                    batch_X = torch.stack(X_eval_batch_list[i:i+batch_size]).to(device)
+                    batch_Y = torch.stack(Y_eval_batch_list[i:i+batch_size]).to(device)
 
-                    logits_eval = model(inputs_eval).squeeze(-1)
-                    loss_eval = F.binary_cross_entropy_with_logits(logits_eval, Y_eval)
+                    logits_eval = model(batch_X).squeeze(-1)
+                    loss_eval =  F.binary_cross_entropy_with_logits(logits_eval, batch_Y)
                     eval_losses.append(loss_eval.item())
                     
                     predictions = (torch.sigmoid(logits_eval) > 0.5).float()
-                    correct_predictions += (predictions == Y_eval).sum().item()
-                    total_predictions += Y_eval.numel()
+                    correct_predictions += (predictions == batch_Y).sum().item()
+                    total_predictions += batch_Y.numel()
 
                 avg_eval_loss = np.mean(eval_losses)
                 eval_accuracy = correct_predictions / total_predictions
@@ -240,13 +244,7 @@ def main(
 
                 if eval_accuracy > best_eval_accuracy:
                     best_eval_accuracy = eval_accuracy
-                    torch.save({
-                        'step': training_step,
-                        'model_state_dict': model.state_dict(),
-                        'optimizer_state_dict': optimizer.state_dict(),
-                        'scheduler_state_dict': scheduler.state_dict() if scheduler else None,
-                        'eval_accuracy': eval_accuracy,
-                    }, best_checkpoint_path)
+                    torch.save(model.state_dict(), best_checkpoint_path)
         
         if (training_step + 1) % checkpoint_interval_steps == 0:
             checkpoint_path = os.path.join(checkpoint_dir, "latest.pt")
