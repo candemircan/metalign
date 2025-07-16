@@ -20,4 +20,4 @@ repos:
   rev: 0.7.21
   hooks:
     - id: uv-sync
-      args: ["--all-extras"]
+      args: ["--all-packages"]
