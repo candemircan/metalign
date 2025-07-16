@@ -1397,8 +1397,8 @@ dependencies = [
 
 [package.optional-dependencies]
 dev = [
+    { name = "ipykernel" },
     { name = "jupyter-cache" },
-    { name = "notebook" },
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "ruff" },
@@ -1410,9 +1410,9 @@ requires-dist = [
     { name = "fastcore", specifier = "==1.8.4" },
     { name = "flash-attn", marker = "sys_platform == 'linux'", specifier = "==2.8.1" },
     { name = "h5py", specifier = "==3.14.0" },
+    { name = "ipykernel", marker = "extra == 'dev'" },
     { name = "jupyter-cache", marker = "extra == 'dev'" },
     { name = "nnsight", specifier = "==0.4.8" },
-    { name = "notebook", marker = "extra == 'dev'" },
     { name = "pre-commit", marker = "extra == 'dev'" },
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "quarto-cli", specifier = "==1.7.32" },
