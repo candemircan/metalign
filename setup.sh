@@ -19,7 +19,7 @@ fi
 export UV_TORCH_BACKEND=auto
 uv sync --all-extras
 source .venv/bin/activate
-pre-commit install
+pre-commit install --install-hooks -t post-checkout -t post-merge -t post-rewrite
 pre-commit run --all-files
 
 
