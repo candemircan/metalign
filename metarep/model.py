@@ -3,6 +3,7 @@ transformer and transformer parts for meta-learning
 """
 __all__ = ["TransformerConfig", "Transformer", "TransformerBlock", "SelfAttention", "MLP"]
 
+import math
 from dataclasses import dataclass
 from typing import Optional
 
@@ -28,7 +29,7 @@ class TransformerConfig:
     attention_dropout: float = 0.1
     sequence_length: int = 100
     name: Optional[str] = None
-    positional_embedding_type: str = "learned" # Can be "learned" or "rope"
+    positional_embedding_type: str = "learned" # Can be "learned", "rope", or "sinusoidal"
 
     def __post_init__(self):
         if self.hidden_size % self.num_attention_heads != 0:
@@ -38,8 +39,8 @@ class TransformerConfig:
             head_dim = self.hidden_size // self.num_attention_heads
             if head_dim % 2 != 0:
                 raise ValueError(f"head_dim ({head_dim}), calculated as hidden_size / num_attention_heads, must be even for RoPE")
-        elif self.positional_embedding_type not in ["learned", "rope"]:
-            raise ValueError(f"positional_embedding_type must be 'learned' or 'rope', but got '{self.positional_embedding_type}'")
+        elif self.positional_embedding_type not in ["learned", "rope", "sinusoidal"]:
+            raise ValueError(f"positional_embedding_type must be 'learned', 'rope', or 'sinusoidal', but got '{self.positional_embedding_type}'")
 
 
 class MLP(nn.Module):
@@ -114,6 +115,18 @@ class LearnedPositionalEmbedding(nn.Module):
         pos_embeds = self.embedding(position_ids)
         return x + pos_embeds
 
+class SinusoidalPositionalEmbedding(nn.Module):
+    def __init__(self, seq_len: int, hidden_size: int):
+        super().__init__()
+        position = torch.arange(seq_len).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, hidden_size, 2) * (-math.log(10000.0) / hidden_size))
+        pe = torch.zeros(1, seq_len, hidden_size)
+        pe[0, :, 0::2] = torch.sin(position * div_term)
+        pe[0, :, 1::2] = torch.cos(position * div_term)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return x + self.pe[:, :x.size(1)]
 
 class Transformer(torch.nn.Module):
     def __init__(self, config: TransformerConfig=TransformerConfig()):
@@ -125,13 +138,15 @@ class Transformer(torch.nn.Module):
         if config.embedding: self.embedding = nn.Linear(config.input_size, config.hidden_size, bias=config.bias)
         else: self.embedding = nn.Identity()
 
-
         if config.positional_embedding_type == "learned":
             self.pos_encoder = LearnedPositionalEmbedding(seq_len=config.sequence_length,hidden_size=config.hidden_size)
             self.rope = None
         elif config.positional_embedding_type == "rope":
             self.pos_encoder = None
             self.rope = RotaryPositionalEmbeddings(dim=config.hidden_size // config.num_attention_heads,max_seq_len=config.sequence_length)
+        elif config.positional_embedding_type == "sinusoidal":
+            self.pos_encoder = SinusoidalPositionalEmbedding(seq_len=config.sequence_length, hidden_size=config.hidden_size)
+            self.rope = None
         
         self.layers = nn.ModuleList([
             TransformerBlock(
