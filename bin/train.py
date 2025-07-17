@@ -73,6 +73,7 @@ def main(
     if args["spose_input"]: 
         data.X = data.Y
         data.feature_dim = data.X.shape[1]
+        args["backbone"] = "spose"
 
     if args["num_components"] is not None:
         pca = PCA(n_components=args["num_components"])
