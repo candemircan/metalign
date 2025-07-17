@@ -36,11 +36,11 @@ def main(
     sequence_length: int = 100,  # maximum number of position embeddings in the transformer model
     config_file: str = None,  # path to a config file. If provided, any parameters in the file will override the corresponding command line arguments. See "data/example_transformer_config.toml" for an example config file.
     batch_size: int = 64,  # batch size for training the model
-    training_steps: int = 20000,  # number of training steps per epoch
+    training_steps: int = 500000,  # number of training steps per epoch
     seed: int = 1234, # random seed for reproducibility
-    lr: float = 1e-4,  # learning rate for the optimizer
+    lr: float = 5e-5,  # learning rate for the optimizer
     weight_decay: float = 1e-4,  # weight decay for the optimizer
-    warmup_steps: int = 1000,  # number of warmup steps for the learning rate scheduler
+    warmup_steps: int = 10000,  # number of warmup steps for the learning rate scheduler
     name: str = None,  # name of the model. If provided, it will be used to log the model.
     num_components: int = None,  # number of components to use for dimensionality reduction. If None, the original data is used.
     constant_lr: bool = False,  # If True, do not schedule the LR, also no warmup then
