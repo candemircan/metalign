@@ -48,7 +48,7 @@ def main(
     checkpoint_dir: str = "checkpoints", # directory to save checkpoints. this will be placed under data/checkpoints/{name} if name is provided. If name is None, it will be saved under data/checkpoints
     checkpoint_interval_steps: int = 1000, # save checkpoint every N steps
     resume_from_checkpoint: str = None, # path to a checkpoint to resume from
-    fixed_label: bool = False,  # if True, thepositives are always 1 and the negatives are always 0. If False, for a given sequence, they are reversed with 50% probability.
+    fixed_label: bool = False,  # if True, the positives are always 1 and the negatives are always 0. If False, for a given sequence, they are reversed with 50% probability.
     compile: bool = False,  # whether to compile the model with torch.compile
 ):
     """
@@ -142,9 +142,9 @@ def main(
     config_dict = vars(config)
     config_dict["num_components"] = num_components
     config_dict["constant_lr"] = constant_lr
-    config_dict["log_interval_steps"] = log_interval_steps # Log this new param
-    config_dict["eval_interval_steps"] = eval_interval_steps # Log this new param
-    config_dict["num_eval_episodes"] = num_eval_episodes # Log this new param
+    config_dict["log_interval_steps"] = log_interval_steps 
+    config_dict["eval_interval_steps"] = eval_interval_steps 
+    config_dict["num_eval_episodes"] = num_eval_episodes 
 
     wandb.init(project=wandb_name, name=config.name, config=config_dict)   
 
