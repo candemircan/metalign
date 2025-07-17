@@ -1,6 +1,7 @@
 import math
 import os
 import tomllib
+from pprint import pprint
 
 import numpy as np
 import torch
@@ -32,7 +33,7 @@ def main(
     logit_bias: bool_arg = True,  # whether to use bias in the final linear layer of the transformer model. If False, the final layer will not have a bias term.
     attention_dropout: float = 0.1,  # dropout rate for the attention layers in the transformer model
     sequence_length: int = 100,  # maximum number of position embeddings in the transformer model
-    config_file: str = None,  # path to a config file. If provided, it will override the command line arguments. Note that the input_size will always be overriden by the input size of the backbone. See "data/example_transformer_config.toml" for an example config file.
+    config_file: str = None,  # path to a config file. If provided, any parameters in the file will override the corresponding command line arguments. See "data/example_transformer_config.toml" for an example config file.
     batch_size: int = 64,  # batch size for training the model
     training_steps: int = 20000,  # number of training steps per epoch
     lr: float = 1e-4,  # learning rate for the optimizer
@@ -54,54 +55,56 @@ def main(
     """
     train a meta-learning transformer model over a bunch of function learning tasks
     """
-    checkpoint_dir = f"data/{checkpoint_dir}" if name is None else f"data/checkpoints/{name}"
-    if not os.path.exists(checkpoint_dir): os.makedirs(checkpoint_dir)
+    args = locals()
+    if config_file:
+        config_data = tomllib.load(open(config_file, "rb"))
+        args.update(config_data)
+    pprint(args)
+    
+    full_checkpoint_dir = f"data/checkpoints/{args["checkpoint_dir"]}" if args["name"] is None else f"data/checkpoints/{args["name"]}"
+    if not os.path.exists(full_checkpoint_dir): os.makedirs(full_checkpoint_dir)
 
-    representations = np.load(f"data/backbone_reps/{backbone}.npz")
-    if input_type != "all": representations = {input_type: representations[input_type]}
+    representations = np.load(f"data/backbone_reps/{args["backbone"]}.npz")
+    if args["input_type"] != "all": representations = {args["input_type"]: representations[args["input_type"]]}
     data = ThingsFunctionLearning(representations=representations)
 
-    if num_components is not None:
-        pca = PCA(n_components=num_components)
+    if args["num_components"] is not None:
+        pca = PCA(n_components=args["num_components"])
         data.X = torch.from_numpy(pca.fit_transform(data.X)).to(torch.float32)
-        data.feature_dim = num_components
+        data.feature_dim = args["num_components"]
     
     # +2 because we always prepend the target from the previous observation to the input as a one hot vector
     # ie [0 1] if the target is 1, [1 0] if the target is 0
     input_size = data.feature_dim + 2
-    if config_file:
-        config = tomllib.load(open(config_file, "rb"))
-        config["input_size"] = input_size  # always overriden
-        config = TransformerConfig(**config)
-    else:
-        config = TransformerConfig(
-            input_size=input_size,
-            embedding=embedding,
-            hidden_size=hidden_size,
-            num_attention_heads=num_attention_heads,
-            intermediate_size=intermediate_size,
-            num_layers=num_layers,
-            hidden_act=hidden_act,
-            bias=bias,
-            logit_bias=logit_bias,
-            attention_dropout=attention_dropout,
-            sequence_length=sequence_length,
-            name=name,
-        )
+    
+    config = TransformerConfig(
+        input_size=input_size,
+        embedding=args["embedding"],
+        hidden_size=args["hidden_size"],
+        num_attention_heads=args["num_attention_heads"],
+        intermediate_size=args["intermediate_size"],
+        num_layers=args["num_layers"],
+        hidden_act=args["hidden_act"],
+        bias=args["bias"],
+        logit_bias=args["logit_bias"],
+        attention_dropout=args["attention_dropout"],
+        sequence_length=args["sequence_length"],
+        name=args["name"],
+    )
 
     model = Transformer(config)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
     model.to(device)
 
-    if compile: model.compile(fullgraph=True, mode="max-autotune")
+    if args["compile"]: model.compile(fullgraph=True, mode="max-autotune")
 
     # no weight decay on bias and layernorm parameters
     no_decay = ["ln1", "ln2", "bias", "final_ln"]
     optimizer_grouped_parameters = [
         {
             "params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)],
-            "weight_decay": weight_decay,
+            "weight_decay": args["weight_decay"],
         },
         {
             "params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)],
@@ -109,21 +112,21 @@ def main(
         },
     ]
 
-    optimizer = AdamW(optimizer_grouped_parameters, lr=lr)
+    optimizer = AdamW(optimizer_grouped_parameters, lr=args["lr"])
 
     scheduler = None
-    if not constant_lr:
+    if not args["constant_lr"]:
         def lr_lambda(current_step):
-            if current_step < warmup_steps:
-                return float(current_step) / float(max(1, warmup_steps))
-            progress = float(current_step - warmup_steps) / float(max(1, training_steps - warmup_steps))
+            if current_step < args["warmup_steps"]:
+                return float(current_step) / float(max(1, args["warmup_steps"]))
+            progress = float(current_step - args["warmup_steps"]) / float(max(1, args["training_steps"] - args["warmup_steps"]))
             return 0.5 * (1.0 + math.cos(math.pi * progress))
 
         scheduler = LambdaLR(optimizer, lr_lambda)
 
     start_step = 0
-    if resume_from_checkpoint:
-        checkpoint = torch.load(resume_from_checkpoint, map_location=device)
+    if args["resume_from_checkpoint"]:
+        checkpoint = torch.load(args["resume_from_checkpoint"], map_location=device)
         model.load_state_dict(checkpoint["model_state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
         if scheduler and "scheduler_state_dict" in checkpoint and checkpoint["scheduler_state_dict"] is not None:
@@ -132,7 +135,7 @@ def main(
         print(f"Resuming training from step {start_step}")
 
     best_eval_accuracy = -1.0
-    best_checkpoint_path = f"{checkpoint_dir}/best.pt"
+    best_checkpoint_path = f"{full_checkpoint_dir}/best.pt"
     if os.path.exists(best_checkpoint_path):
         best_checkpoint = torch.load(best_checkpoint_path, map_location=device)
         if 'eval_accuracy' in best_checkpoint:
@@ -140,18 +143,18 @@ def main(
             print(f"Found existing best checkpoint with accuracy: {best_eval_accuracy:.4f}")
 
     config_dict = vars(config)
-    config_dict["num_components"] = num_components
-    config_dict["constant_lr"] = constant_lr
-    config_dict["log_interval_steps"] = log_interval_steps 
-    config_dict["eval_interval_steps"] = eval_interval_steps 
-    config_dict["num_eval_episodes"] = num_eval_episodes 
+    config_dict["num_components"] = args["num_components"]
+    config_dict["constant_lr"] = args["constant_lr"]
+    config_dict["log_interval_steps"] = args["log_interval_steps"]
+    config_dict["eval_interval_steps"] = args["eval_interval_steps"]
+    config_dict["num_eval_episodes"] = args["num_eval_episodes"]
 
-    wandb.init(project=wandb_name, name=config.name, config=config_dict)   
+    wandb.init(project=args["wandb_name"], name=config.name, config=config_dict)   
 
-    pbar = trange(start_step, training_steps, desc="Training Steps")
+    pbar = trange(start_step, args["training_steps"], desc="Training Steps")
     num_dims = list(range(data.Y.shape[1]))
-    train_dims = torch.tensor([d for d in num_dims if d not in eval_dims], device=device)
-    eval_dims = torch.tensor(eval_dims, device=device)
+    train_dims = torch.tensor([d for d in num_dims if d not in args["eval_dims"]], device=device)
+    eval_dims_tensor = torch.tensor(args["eval_dims"], device=device)
 
     accumulated_train_loss = 0.0
     accumulated_train_correct = 0
@@ -160,13 +163,13 @@ def main(
     for training_step in pbar:
         model.train()
         
-        sampled_dims = torch.randint(len(train_dims), (batch_size,))
+        sampled_dims = torch.randint(len(train_dims), (args["batch_size"],))
         X_batch = []
         Y_batch = []
         
-        for i in range(batch_size):
+        for i in range(args["batch_size"]):
             dim = train_dims[sampled_dims[i]]
-            X_episode, Y_episode = data.sample_episode(dim, sequence_length, fixed_label)
+            X_episode, Y_episode = data.sample_episode(dim, args["sequence_length"], args["fixed_label"])
             
             prev_targets = torch.cat([torch.tensor([0]), Y_episode[:-1]]) 
 
@@ -194,15 +197,15 @@ def main(
         accumulated_train_correct += (predictions == Y_batch).sum().item()
         accumulated_train_total += Y_batch.numel()
 
-        if (training_step + 1) % log_interval_steps == 0:
-            avg_train_loss = accumulated_train_loss / log_interval_steps
+        if (training_step + 1) % args["log_interval_steps"] == 0:
+            avg_train_loss = accumulated_train_loss / args["log_interval_steps"]
             train_accuracy = accumulated_train_correct / accumulated_train_total
             wandb.log({"loss_train": avg_train_loss, "accuracy_train": train_accuracy, "lr": optimizer.param_groups[0]["lr"]}, step=training_step)
             accumulated_train_loss = 0.0
             accumulated_train_correct = 0
             accumulated_train_total = 0
 
-        if (training_step + 1) % eval_interval_steps == 0:
+        if (training_step + 1) % args["eval_interval_steps"] == 0:
             with torch.no_grad():
                 model.eval()
                 eval_losses = []
@@ -212,9 +215,9 @@ def main(
                 # collect episodes first, then process in batches
                 X_eval_batch_list,Y_eval_batch_list = [], [] 
 
-                for i in range(num_eval_episodes):
-                    dim = eval_dims[i % len(eval_dims)] # cycle through eval_dims
-                    X_episode, Y_episode = data.sample_episode(dim, sequence_length)
+                for i in range(args["num_eval_episodes"]):
+                    dim = eval_dims_tensor[i % len(eval_dims_tensor)] # cycle through eval_dims
+                    X_episode, Y_episode = data.sample_episode(dim, args["sequence_length"])
                     
                     prev_targets = torch.cat([torch.tensor([0]), Y_episode[:-1]])
                     target_onehot = torch.nn.functional.one_hot(prev_targets.long(), num_classes=2).float()
@@ -225,9 +228,9 @@ def main(
                     X_eval_batch_list.append(inputs)
                     Y_eval_batch_list.append(Y_episode)
                 
-                for i in range(0, num_eval_episodes, batch_size):
-                    batch_X = torch.stack(X_eval_batch_list[i:i+batch_size]).to(device)
-                    batch_Y = torch.stack(Y_eval_batch_list[i:i+batch_size]).to(device)
+                for i in range(0, args["num_eval_episodes"], args["batch_size"]):
+                    batch_X = torch.stack(X_eval_batch_list[i:i+args["batch_size"]]).to(device)
+                    batch_Y = torch.stack(Y_eval_batch_list[i:i+args["batch_size"]]).to(device)
 
                     logits_eval = model(batch_X).squeeze(-1)
                     loss_eval =  F.binary_cross_entropy_with_logits(logits_eval, batch_Y)
@@ -244,10 +247,14 @@ def main(
 
                 if eval_accuracy > best_eval_accuracy:
                     best_eval_accuracy = eval_accuracy
-                    torch.save(model.state_dict(), best_checkpoint_path)
+                    torch.save({
+                        'model_state_dict': model.state_dict(),
+                        'eval_accuracy': eval_accuracy,
+                        'step': training_step
+                    }, best_checkpoint_path)
         
-        if (training_step + 1) % checkpoint_interval_steps == 0:
-            checkpoint_path = os.path.join(checkpoint_dir, "latest.pt")
+        if (training_step + 1) % args["checkpoint_interval_steps"] == 0:
+            checkpoint_path = os.path.join(full_checkpoint_dir, "latest.pt")
             torch.save({
                 'step': training_step,
                 'model_state_dict': model.state_dict(),

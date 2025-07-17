@@ -18,9 +18,7 @@ fi
 
 export UV_TORCH_BACKEND=auto
 uv sync --all-extras
-source .venv/bin/activate
-pre-commit install
-pre-commit run --all-files
-
+uv run pre-commit install
+uv run pre-commit run --all-files
 
 echo -e "\nexample*" >> .gitignore
