@@ -29,6 +29,13 @@ class TransformerConfig:
     sequence_length: int = 100
     name: Optional[str] = None
 
+    def __post_init__(self):
+        if self.hidden_size % self.num_attention_heads != 0:
+            raise ValueError(f"hidden_size ({self.hidden_size}) must be divisible by num_attention_heads ({self.num_attention_heads})")
+        head_dim = self.hidden_size // self.num_attention_heads
+        if head_dim % 2 != 0:
+            raise ValueError(f"head_dim ({head_dim}), calculated as hidden_size / num_attention_heads, must be even for RoPE")
+
 
 class MLP(nn.Module):
     def __init__(self, hidden_size:int, intermediate_size:int, hidden_act: str, bias: bool = False):
@@ -50,8 +57,6 @@ class SelfAttention(nn.Module):
         self.head_dim = hidden_size // num_attention_heads
         self.attention_dropout = attention_dropout
         self.rope = rope
-
-        if hidden_size % num_attention_heads != 0: raise ValueError(f"hidden_size {hidden_size} must be divisible by num_heads {num_attention_heads}")
 
         self.qkv = nn.Linear(hidden_size, hidden_size * 3, bias=bias)
         self.o_proj = nn.Linear(hidden_size, hidden_size, bias=bias)
@@ -124,6 +129,7 @@ class Transformer(torch.nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.embedding(x)
+        print(x.shape)
         for layer in self.layers:
             x = layer(x)
         return self.linear_head(self.final_ln(x))
