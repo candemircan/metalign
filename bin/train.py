@@ -142,14 +142,8 @@ def main(
             best_eval_accuracy = best_checkpoint['eval_accuracy']
             print(f"Found existing best checkpoint with accuracy: {best_eval_accuracy:.4f}")
 
-    config_dict = vars(config)
-    config_dict["num_components"] = args["num_components"]
-    config_dict["constant_lr"] = args["constant_lr"]
-    config_dict["log_interval_steps"] = args["log_interval_steps"]
-    config_dict["eval_interval_steps"] = args["eval_interval_steps"]
-    config_dict["num_eval_episodes"] = args["num_eval_episodes"]
 
-    wandb.init(project=args["wandb_name"], name=config.name, config=config_dict)   
+    wandb.init(project=args["wandb_name"], name=config.name, config=args)   
 
     pbar = trange(start_step, args["training_steps"], desc="Training Steps")
     num_dims = list(range(data.Y.shape[1]))
