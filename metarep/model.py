@@ -129,7 +129,6 @@ class Transformer(torch.nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.embedding(x)
-        print(x.shape)
         for layer in self.layers:
             x = layer(x)
         return self.linear_head(self.final_ln(x))
