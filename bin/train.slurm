@@ -3,12 +3,12 @@
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
-#SBATCH --time=08:00:00
+#SBATCH --time=04:00:00
 #SBATCH --gres=gpu:1
 #SBATCH --partition=gpu_p
 #SBATCH --qos=gpu_normal
 #SBATCH --nice=10000
-#SBATCH --output=logs/predict_brain_%j.out
+#SBATCH --output=logs/train_%j.out
 
 config_file="$1"
 
