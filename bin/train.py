@@ -132,6 +132,7 @@ def main(
         if scheduler and "scheduler_state_dict" in checkpoint and checkpoint["scheduler_state_dict"] is not None:
             scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
         start_step = checkpoint["step"] + 1
+        if args["compile"]: model.compile(fullgraph=True, mode="max-autotune")
         print(f"Resuming training from step {start_step}")
 
     best_eval_accuracy = -1.0
@@ -242,7 +243,7 @@ def main(
                 if eval_accuracy > best_eval_accuracy:
                     best_eval_accuracy = eval_accuracy
                     torch.save({
-                        'model_state_dict': model.state_dict(),
+                        'model_state_dict': {k: v.cpu() for k, v in model.state_dict().items()},
                         'eval_accuracy': eval_accuracy,
                         'step': training_step
                     }, best_checkpoint_path)
@@ -251,7 +252,7 @@ def main(
             checkpoint_path = os.path.join(full_checkpoint_dir, "latest.pt")
             torch.save({
                 'step': training_step,
-                'model_state_dict': model.state_dict(),
+                'model_state_dict': {k: v.cpu() for k, v in model.state_dict().items()},
                 'optimizer_state_dict': optimizer.state_dict(),
                 'scheduler_state_dict': scheduler.state_dict() if scheduler else None,
             }, checkpoint_path)
