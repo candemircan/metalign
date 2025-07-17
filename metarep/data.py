@@ -190,13 +190,20 @@ class Coco(ImageDataset):
 
 class ThingsFunctionLearning(Dataset):
     "A dataset for classification on the THINGS dataset, using SPoSE embeddings."
-    def __init__(self, representations: dict, data_root: Path = Path("data/external")):
+    def __init__(self, representations: dict, data_root: Path = Path("data/external"), scale: bool = True):
         "Initializes the dataset by preparing data and pre-calculating medians."
         X, Y = prepare_things_spose(representations, data_root=data_root)
         
         self.X, self.Y = X, Y
         self.feature_dim = self.X.shape[1]
         self.medians = torch.median(self.Y, dim=0).values
+
+        if scale:
+            self.mean = self.X.mean(dim=0, keepdim=True)
+            self.std = self.X.std(dim=0, keepdim=True)
+            self.X = (self.X - self.mean) / (self.std + 1e-8)
+        else:
+            self.mean, self.std = None, None
     
     def sample_episode(self, dim: int, seq_len: int, fixed_label: bool = False):
         """
@@ -213,9 +220,19 @@ class ThingsFunctionLearning(Dataset):
         if not fixed_label:
             if torch.rand(1).item() < 0.5: Y_episode = 1 - Y_episode
         return X_episode, Y_episode
+    
+    def inverse_transform(self, X):
+        """
+        Inverse transform the data, i.e. scale it back to the original space.
+        """
+        if self.mean is None or self.std is None:
+            print("Warning: No scaling applied, returning original data.")
+            return X
+        return X * self.std + self.mean
 
     def __len__(self):
         return len(self.X)
 
     def __getitem__(self, idxs, dim):
         return self.X[idxs], self.Y[idxs, dim]
+    

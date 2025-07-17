@@ -49,8 +49,10 @@ def main(
     checkpoint_dir: str = "checkpoints", # directory to save checkpoints. this will be placed under data/checkpoints/{name} if name is provided. If name is None, it will be saved under data/checkpoints
     checkpoint_interval_steps: int = 1000, # save checkpoint every N steps
     resume_from_checkpoint: str = None, # path to a checkpoint to resume from
+    scale: bool_arg = True,  # whether to scale the input data to have zero mean and unit variance
+    spose_input: bool = False, # if True, use the SPoSE as input. Used for overfitting and debugging. The functions are also sampled from this. Therefore, this must be trivially easy. It will override `backbone` and `input_type`.
     fixed_label: bool = False,  # if True, the positives are always 1 and the negatives are always 0. If False, for a given sequence, they are reversed with 50% probability.
-    compile: bool = False,  # whether to compile the model with torch.compile
+    compile: bool_arg = True,  # whether to compile the model with torch.compile
 ):
     """
     train a meta-learning transformer model over a bunch of function learning tasks
@@ -66,7 +68,11 @@ def main(
 
     representations = np.load(f"data/backbone_reps/{args["backbone"]}.npz")
     if args["input_type"] != "all": representations = {args["input_type"]: representations[args["input_type"]]}
-    data = ThingsFunctionLearning(representations=representations)
+    data = ThingsFunctionLearning(representations=representations, scale=args["scale"])
+
+    if args["spose_input"]: 
+        data.X = data.Y
+        data.feature_dim = data.X.shape[1]
 
     if args["num_components"] is not None:
         pca = PCA(n_components=args["num_components"])
