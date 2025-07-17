@@ -205,17 +205,51 @@ class ThingsFunctionLearning(Dataset):
         else:
             self.mean, self.std = None, None
     
-    def sample_episode(self, dim: int, seq_len: int, fixed_label: bool = False):
+    def sample_episode(self, dim: int, seq_len: int, fixed_label: bool = False, weighted: bool = False):
         """
         Sample an episode of `seq_len` examples for a given dimension.
         The positive example pool is the upper median split, and the negative example pool is the lower median split.
-        There is no guarantee that the positive and negative examples will be balanced, as the sampling is done randomly from the entire distribution
+        There is no guarantee that the positive and negative examples will be balanced, as the sampling is done randomly from the entire distribution.
+        If `weighted` is True, sample positive and negative instances weighted by their magnitude.
         """
-        n_samples = self.X.shape[0]
-        indices = torch.randperm(n_samples)[:seq_len]
-        
-        X_episode = self.X[indices]
-        Y_episode = (self.Y[indices, dim] >= self.medians[dim]).float()
+        if not weighted:
+            n_samples = self.X.shape[0]
+            indices = torch.randperm(n_samples)[:seq_len]
+            
+            X_episode = self.X[indices]
+            Y_episode = (self.Y[indices, dim] >= self.medians[dim]).float()
+        else:
+            # determine the number of positive and negative samples from a normal distribution
+            std_dev = seq_len / 20.0 # this is just a heuristic, can be tuned
+            n_pos = int(torch.normal(mean=float(seq_len / 2), std=std_dev).round().clamp(0, seq_len).item())
+            n_neg = seq_len - n_pos
+
+            # Identify positive and negative pools based on the median
+            median = self.medians[dim]
+            y_dim = self.Y[:, dim]
+            
+            pos_mask = y_dim >= median
+            neg_mask = ~pos_mask
+
+            pos_indices = torch.where(pos_mask)[0]
+            neg_indices = torch.where(neg_mask)[0]
+
+            # calculate weights for sampling based on magnitude from the median
+            pos_weights = y_dim[pos_mask] - median
+            neg_weights = median - y_dim[neg_mask]
+
+
+            # sample from positive and negative pools
+            pos_sample_indices = pos_indices[torch.multinomial(pos_weights, n_pos, replacement=False)]
+            neg_sample_indices = neg_indices[torch.multinomial(neg_weights, n_neg, replacement=False)]
+
+            # combine and shuffle
+            indices = torch.cat([pos_sample_indices, neg_sample_indices])
+            perm = torch.randperm(len(indices))
+            indices = indices[perm]
+
+            X_episode = self.X[indices]
+            Y_episode = (self.Y[indices, dim] >= self.medians[dim]).float()
 
         if not fixed_label:
             if torch.rand(1).item() < 0.5: Y_episode = 1 - Y_episode

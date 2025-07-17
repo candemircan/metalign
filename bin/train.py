@@ -52,6 +52,7 @@ def main(
     scale: bool_arg = True,  # whether to scale the input data to have zero mean and unit variance
     spose_input: bool = False, # if True, use the SPoSE as input. Used for overfitting and debugging. The functions are also sampled from this. Therefore, this must be trivially easy. It will override `backbone` and `input_type`.
     fixed_label: bool = False,  # if True, the positives are always 1 and the negatives are always 0. If False, for a given sequence, they are reversed with 50% probability.
+    weighted: bool = False, #  If True, sample positive and negative instances weighted by their magnitude. Otherwise, sample uniformly.
     compile: bool_arg = True,  # whether to compile the model with torch.compile
 ):
     """
@@ -171,7 +172,7 @@ def main(
         
         for i in range(args["batch_size"]):
             dim = train_dims[sampled_dims[i]]
-            X_episode, Y_episode = data.sample_episode(dim, args["sequence_length"], args["fixed_label"])
+            X_episode, Y_episode = data.sample_episode(dim, args["sequence_length"], args["fixed_label"], args["weighted"])
             
             prev_targets = torch.cat([torch.tensor([0]), Y_episode[:-1]]) 
 
@@ -219,7 +220,7 @@ def main(
 
                 for i in range(args["num_eval_episodes"]):
                     dim = eval_dims_tensor[i % len(eval_dims_tensor)] # cycle through eval_dims
-                    X_episode, Y_episode = data.sample_episode(dim, args["sequence_length"])
+                    X_episode, Y_episode =data.sample_episode(dim, args["sequence_length"], args["fixed_label"], args["weighted"])
                     
                     prev_targets = torch.cat([torch.tensor([0]), Y_episode[:-1]])
                     target_onehot = torch.nn.functional.one_hot(prev_targets.long(), num_classes=2).float()
