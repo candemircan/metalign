@@ -1,5 +1,6 @@
 import math
 import os
+import random
 import tomllib
 from pprint import pprint
 
@@ -36,6 +37,7 @@ def main(
     config_file: str = None,  # path to a config file. If provided, any parameters in the file will override the corresponding command line arguments. See "data/example_transformer_config.toml" for an example config file.
     batch_size: int = 64,  # batch size for training the model
     training_steps: int = 20000,  # number of training steps per epoch
+    seed: int = 1234, # random seed for reproducibility
     lr: float = 1e-4,  # learning rate for the optimizer
     weight_decay: float = 1e-4,  # weight decay for the optimizer
     warmup_steps: int = 1000,  # number of warmup steps for the learning rate scheduler
@@ -63,6 +65,13 @@ def main(
         config_data = tomllib.load(open(config_file, "rb"))
         args.update(config_data)
     pprint(args)
+
+    random.seed(args["seed"])
+    np.random.seed(args["seed"])
+    torch.manual_seed(args["seed"])
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    if torch.cuda.is_available(): torch.cuda.manual_seed_all(args["seed"])
     
     full_checkpoint_dir = f"data/checkpoints/{args["checkpoint_dir"]}" if args["name"] is None else f"data/checkpoints/{args["name"]}"
     if not os.path.exists(full_checkpoint_dir): os.makedirs(full_checkpoint_dir)
@@ -77,7 +86,7 @@ def main(
         args["backbone"] = "spose"
 
     if args["num_components"] is not None:
-        pca = PCA(n_components=args["num_components"])
+        pca = PCA(n_components=args["num_components"], random_state=args["seed"])
         data.X = torch.from_numpy(pca.fit_transform(data.X)).to(torch.float32)
         data.feature_dim = args["num_components"]
     
