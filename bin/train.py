@@ -55,6 +55,7 @@ def main(
     spose_input: bool = False, # if True, use the SPoSE as input. Used for overfitting and debugging. The functions are also sampled from this. Therefore, this must be trivially easy. It will override `backbone` and `input_type`.
     fixed_label: bool = False,  # if True, the positives are always 1 and the negatives are always 0. If False, for a given sequence, they are reversed with 50% probability.
     weighted: bool = False, #  If True, sample positive and negative instances weighted by their magnitude. Otherwise, sample uniformly.
+    positional_embedding_type: str = "learned",  # Can be "learned" or "rope".
     compile: bool_arg = True,  # whether to compile the model with torch.compile
 ):
     """
@@ -107,6 +108,7 @@ def main(
         attention_dropout=args["attention_dropout"],
         sequence_length=args["sequence_length"],
         name=args["name"],
+        positional_embedding_type=args["positional_embedding_type"],
     )
 
     model = Transformer(config)
