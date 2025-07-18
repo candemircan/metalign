@@ -8,11 +8,11 @@
 #SBATCH --partition=gpu_p
 #SBATCH --qos=gpu_normal
 #SBATCH --nice=10000
+#SBATCH --output=logs/train_%j.out
 
-# get the config file name from the first argument
 config_file="$1"
 
-# check if the arguments are provided
+# Check if the arguments are provided
 if [[ -z "$config_file" ]]; then
     echo "Error: You need to provide a config file as a positional argument. e.g. sbatch bin/train.slurm data/example_transformer_config.toml"
     exit 1
