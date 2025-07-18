@@ -81,6 +81,7 @@ class TrainingConfigTUI(App):
             "eval_interval_steps": 100,
             "num_eval_episodes": 128,
             "eval_dims": [0, 1, 2],
+            "tags": [],
             "checkpoint_dir": "checkpoints",
             "checkpoint_interval_steps": 1000,
             "scale": True,
@@ -128,6 +129,7 @@ class TrainingConfigTUI(App):
                 yield self._create_input_group("eval_interval_steps", "Eval Interval Steps", str(self.defaults["eval_interval_steps"]))
                 yield self._create_input_group("num_eval_episodes", "Num Eval Episodes", str(self.defaults["num_eval_episodes"]))
                 yield self._create_input_group("eval_dims", "Eval Dims (space separated)", " ".join(map(str, self.defaults["eval_dims"])))
+                yield self._create_input_group("tags", "Tags (space separated)", " ".join(self.defaults["tags"]))
 
                 yield self._create_input_group("checkpoint_dir", "Checkpoint Dir", self.defaults["checkpoint_dir"])
                 yield self._create_input_group("checkpoint_interval_steps", "Checkpoint Interval", str(self.defaults["checkpoint_interval_steps"]))
@@ -189,6 +191,8 @@ class TrainingConfigTUI(App):
                         config[key] = int(value) if value else None
                     elif key == "eval_dims":
                         config[key] = [int(x.strip()) for x in value.split()]
+                    elif key == "tags":
+                        config[key] = value.split()
                     else:
                         config[key] = value
 

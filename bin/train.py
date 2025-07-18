@@ -40,7 +40,7 @@ def main(
     seed: int = 1234, # random seed for reproducibility
     lr: float = 3e-5,  # learning rate for the optimizer
     weight_decay: float = 1e-4,  # weight decay for the optimizer
-    warmup_steps: int = 10000,  # number of warmup steps for the learning rate scheduler
+    warmup_steps: int = 50000,  # number of warmup steps for the learning rate scheduler
     name: str = None,  # name of the model. If provided, it will be used to log the model.
     num_components: int = None,  # number of components to use for dimensionality reduction. If None, the original data is used.
     constant_lr: bool = False,  # If True, do not schedule the LR, also no warmup then
@@ -48,6 +48,7 @@ def main(
     eval_interval_steps: int = 100,  # evaluate the model every eval_interval_steps steps
     num_eval_episodes: int = 128,  # number of episodes to sample for evaluation
     eval_dims: Param(help="the dimensions to evaluate the model on. These dimensions are not sampled during training. It cannot be empty.", type=int, nargs="*") = [0, 1, 2], # type: ignore
+    tags: Param(help="tags to use for the wandb run. If empty, no tags are used.", type=str, nargs="*") = [],  # type: ignore
     checkpoint_dir: str = "checkpoints", # directory to save checkpoints. this will be placed under data/checkpoints/{name} if name is provided. If name is None, it will be saved under data/checkpoints
     checkpoint_interval_steps: int = 1000, # save checkpoint every N steps
     resume_from_checkpoint: str = None, # path to a checkpoint to resume from
@@ -151,7 +152,6 @@ def main(
         if scheduler and "scheduler_state_dict" in checkpoint and checkpoint["scheduler_state_dict"] is not None:
             scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
         start_step = checkpoint["step"] + 1
-        if args["compile"]: model.compile(fullgraph=True, mode="max-autotune")
         print(f"Resuming training from step {start_step}")
 
     best_eval_accuracy = -1.0
@@ -163,7 +163,8 @@ def main(
             print(f"Found existing best checkpoint with accuracy: {best_eval_accuracy:.4f}")
 
 
-    wandb.init(project=args["wandb_name"], name=config.name, config=args)   
+    wandb.init(project=args["wandb_name"], name=config.name, config=args, tags=args["tags"])   
+    wandb.watch(model, log='all', log_freq=args["log_interval_steps"] * 10)
 
     pbar = trange(start_step, args["training_steps"], desc="Training Steps")
     num_dims = list(range(data.Y.shape[1]))
@@ -203,6 +204,7 @@ def main(
         
         optimizer.zero_grad()
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
         if scheduler: scheduler.step()
         
