@@ -143,6 +143,7 @@ class TrainingConfigTUI(App):
 
                 with Container(classes="submit-container"):
                     yield Button("Submit Training Job", id="submit", classes="submit-button")
+                    yield Button("Save Config Only", id="save_config", classes="submit-button")
 
         yield Footer()
 
@@ -159,8 +160,26 @@ class TrainingConfigTUI(App):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "submit":
             self.action_submit()
+        elif event.button.id == "save_config":
+            self.action_save_config()
 
     def action_submit(self) -> None:
+        config_file = self._generate_config()
+        if config_file:
+            try:
+                subprocess.run(["sbatch", "bin/train.slurm", str(config_file)], check=True)
+                self.notify(f"Training job submitted with config: {config_file}")
+            except subprocess.CalledProcessError as e:
+                self.notify(f"Failed to submit job: {e}", severity="error")
+            except FileNotFoundError:
+                self.notify("sbatch command not found. Make sure you're on a SLURM system.", severity="error")
+
+    def action_save_config(self) -> None:
+        config_file = self._generate_config()
+        if config_file:
+            self.notify(f"Configuration saved to: {config_file}")
+
+    def _generate_config(self) -> Path | None:
         config = {}
 
         for key in self.defaults.keys():
@@ -216,13 +235,7 @@ class TrainingConfigTUI(App):
         with open(config_file, "wb") as f:
             tomli_w.dump(config, f)
 
-        try:
-            subprocess.run(["sbatch", "bin/train.slurm", str(config_file)], check=True)
-            self.notify(f"Training job submitted with config: {config_file}")
-        except subprocess.CalledProcessError as e:
-            self.notify(f"Failed to submit job: {e}", severity="error")
-        except FileNotFoundError:
-            self.notify("sbatch command not found. Make sure you're on a SLURM system.", severity="error")
+        return config_file
 
 
 @call_parse
