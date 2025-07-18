@@ -36,9 +36,9 @@ def main(
     sequence_length: int = 100,  # maximum number of position embeddings in the transformer model
     config_file: str = None,  # path to a config file. If provided, any parameters in the file will override the corresponding command line arguments. See "data/example_transformer_config.toml" for an example config file.
     batch_size: int = 64,  # batch size for training the model
-    training_steps: int = 500000,  # number of training steps per epoch
+    training_steps: int = 1000000,  # number of training steps per epoch
     seed: int = 1234, # random seed for reproducibility
-    lr: float = 5e-5,  # learning rate for the optimizer
+    lr: float = 3e-5,  # learning rate for the optimizer
     weight_decay: float = 1e-4,  # weight decay for the optimizer
     warmup_steps: int = 10000,  # number of warmup steps for the learning rate scheduler
     name: str = None,  # name of the model. If provided, it will be used to log the model.
@@ -56,7 +56,7 @@ def main(
     fixed_label: bool = False,  # if True, the positives are always 1 and the negatives are always 0. If False, for a given sequence, they are reversed with 50% probability.
     weighted: bool = False, #  If True, sample positive and negative instances weighted by their magnitude. Otherwise, sample uniformly.
     positional_embedding_type: str = "learned",  # Can be "learned", "rope", or "sinusoidal".
-    compile: bool_arg = True,  # whether to compile the model with torch.compile
+    compile: bool = False,  # whether to compile the model with torch.compile
 ):
     """
     train a meta-learning transformer model over a bunch of function learning tasks
