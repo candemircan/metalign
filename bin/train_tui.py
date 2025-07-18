@@ -74,7 +74,7 @@ class TrainingConfigTUI(App):
             "seed": 1234,
             "lr": 3e-5,
             "weight_decay": 1e-4,
-            "warmup_steps": 10000,
+            "warmup_steps": 50000,
             "num_components": None,
             "constant_lr": False,
             "log_interval_steps": 10,
