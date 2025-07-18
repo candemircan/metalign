@@ -1,6 +1,6 @@
 """
-training configuration TUI.
-fully ai generated
+trianing configuration TUI
+fully AI generated
 """
 import subprocess
 import tomllib
@@ -10,7 +10,7 @@ from pathlib import Path
 from fastcore.script import call_parse
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Container, Horizontal, Vertical
+from textual.containers import Container, Horizontal, ScrollableContainer, Vertical
 from textual.widgets import Button, Footer, Header, Input, Label, Select, Switch
 
 
@@ -18,6 +18,11 @@ class TrainingConfigTUI(App):
     CSS = """
     .container {
         padding: 1;
+        height: 100vh;
+    }
+    
+    .scrollable {
+        height: 1fr;
     }
     
     .input-group {
@@ -46,7 +51,7 @@ class TrainingConfigTUI(App):
         height: 3;
     }
     """
-
+    
     BINDINGS = [
         Binding("ctrl+c", "quit", "Quit"),
         Binding("ctrl+s", "submit", "Submit"),
@@ -93,55 +98,56 @@ class TrainingConfigTUI(App):
 
     def compose(self) -> ComposeResult:
         yield Header()
-
+        
         with Container(classes="container"):
-            yield Label("Training Configuration", id="title")
-
-            with Vertical():
-                yield self._create_input_group("name", "Name", "Name for the run")
-                yield self._create_input_group("backbone", "Backbone", self.defaults["backbone"])
-                yield self._create_select_group("input_type", "Input Type", ["all", "cls", "register", "patch"], self.defaults["input_type"])
-                yield self._create_input_group("wandb_name", "Wandb Project", self.defaults["wandb_name"])
-
-                yield self._create_switch_group("embedding", "Use Embedding", self.defaults["embedding"])
-                yield self._create_input_group("hidden_size", "Hidden Size", str(self.defaults["hidden_size"]))
-                yield self._create_input_group("num_attention_heads", "Attention Heads", str(self.defaults["num_attention_heads"]))
-                yield self._create_input_group("intermediate_size", "Intermediate Size", str(self.defaults["intermediate_size"]))
-                yield self._create_input_group("num_layers", "Num Layers", str(self.defaults["num_layers"]))
-                yield self._create_select_group("hidden_act", "Hidden Activation", ["gelu", "relu", "swish"], self.defaults["hidden_act"])
-
-                yield self._create_switch_group("bias", "Use Bias", self.defaults["bias"])
-                yield self._create_switch_group("logit_bias", "Logit Bias", self.defaults["logit_bias"])
-                yield self._create_input_group("attention_dropout", "Attention Dropout", str(self.defaults["attention_dropout"]))
-                yield self._create_input_group("sequence_length", "Sequence Length", str(self.defaults["sequence_length"]))
-
-                yield self._create_input_group("batch_size", "Batch Size", str(self.defaults["batch_size"]))
-                yield self._create_input_group("training_steps", "Training Steps", str(self.defaults["training_steps"]))
-                yield self._create_input_group("seed", "Seed", str(self.defaults["seed"]))
-                yield self._create_input_group("lr", "Learning Rate", str(self.defaults["lr"]))
-                yield self._create_input_group("weight_decay", "Weight Decay", str(self.defaults["weight_decay"]))
-                yield self._create_input_group("warmup_steps", "Warmup Steps", str(self.defaults["warmup_steps"]))
-
-                yield self._create_input_group("num_components", "Num Components (PCA)", "")
-                yield self._create_switch_group("constant_lr", "Constant LR", self.defaults["constant_lr"])
-                yield self._create_input_group("log_interval_steps", "Log Interval Steps", str(self.defaults["log_interval_steps"]))
-                yield self._create_input_group("eval_interval_steps", "Eval Interval Steps", str(self.defaults["eval_interval_steps"]))
-                yield self._create_input_group("num_eval_episodes", "Num Eval Episodes", str(self.defaults["num_eval_episodes"]))
-                yield self._create_input_group("eval_dims", "Eval Dims (space separated)", " ".join(map(str, self.defaults["eval_dims"])))
-
-                yield self._create_input_group("checkpoint_dir", "Checkpoint Dir", self.defaults["checkpoint_dir"])
-                yield self._create_input_group("checkpoint_interval_steps", "Checkpoint Interval", str(self.defaults["checkpoint_interval_steps"]))
-
-                yield self._create_switch_group("scale", "Scale Input", self.defaults["scale"])
-                yield self._create_switch_group("spose_input", "SPoSE Input", self.defaults["spose_input"])
-                yield self._create_switch_group("fixed_label", "Fixed Label", self.defaults["fixed_label"])
-                yield self._create_switch_group("weighted", "Weighted Sampling", self.defaults["weighted"])
-                yield self._create_select_group("positional_embedding_type", "Positional Embedding", ["learned", "rope", "sinusoidal"], self.defaults["positional_embedding_type"])
-                yield self._create_switch_group("compile", "Compile Model", self.defaults["compile"])
-
-                with Container(classes="submit-container"):
-                    yield Button("Submit Training Job", id="submit", classes="submit-button")
-
+            with ScrollableContainer(classes="scrollable"):
+                with Vertical():
+                    yield Label("Training Configuration", id="title")
+                    
+                    yield self._create_input_group("name", "Name", "Name for the run")
+                    yield self._create_input_group("backbone", "Backbone", self.defaults["backbone"])
+                    yield self._create_select_group("input_type", "Input Type", ["all", "cls", "register", "patch"], self.defaults["input_type"])
+                    yield self._create_input_group("wandb_name", "Wandb Project", self.defaults["wandb_name"])
+                    
+                    yield self._create_switch_group("embedding", "Use Embedding", self.defaults["embedding"])
+                    yield self._create_input_group("hidden_size", "Hidden Size", str(self.defaults["hidden_size"]))
+                    yield self._create_input_group("num_attention_heads", "Attention Heads", str(self.defaults["num_attention_heads"]))
+                    yield self._create_input_group("intermediate_size", "Intermediate Size", str(self.defaults["intermediate_size"]))
+                    yield self._create_input_group("num_layers", "Num Layers", str(self.defaults["num_layers"]))
+                    yield self._create_select_group("hidden_act", "Hidden Activation", ["gelu", "relu", "swish"], self.defaults["hidden_act"])
+                    
+                    yield self._create_switch_group("bias", "Use Bias", self.defaults["bias"])
+                    yield self._create_switch_group("logit_bias", "Logit Bias", self.defaults["logit_bias"])
+                    yield self._create_input_group("attention_dropout", "Attention Dropout", str(self.defaults["attention_dropout"]))
+                    yield self._create_input_group("sequence_length", "Sequence Length", str(self.defaults["sequence_length"]))
+                    
+                    yield self._create_input_group("batch_size", "Batch Size", str(self.defaults["batch_size"]))
+                    yield self._create_input_group("training_steps", "Training Steps", str(self.defaults["training_steps"]))
+                    yield self._create_input_group("seed", "Seed", str(self.defaults["seed"]))
+                    yield self._create_input_group("lr", "Learning Rate", str(self.defaults["lr"]))
+                    yield self._create_input_group("weight_decay", "Weight Decay", str(self.defaults["weight_decay"]))
+                    yield self._create_input_group("warmup_steps", "Warmup Steps", str(self.defaults["warmup_steps"]))
+                    
+                    yield self._create_input_group("num_components", "Num Components (PCA)", "")
+                    yield self._create_switch_group("constant_lr", "Constant LR", self.defaults["constant_lr"])
+                    yield self._create_input_group("log_interval_steps", "Log Interval Steps", str(self.defaults["log_interval_steps"]))
+                    yield self._create_input_group("eval_interval_steps", "Eval Interval Steps", str(self.defaults["eval_interval_steps"]))
+                    yield self._create_input_group("num_eval_episodes", "Num Eval Episodes", str(self.defaults["num_eval_episodes"]))
+                    yield self._create_input_group("eval_dims", "Eval Dims (space separated)", " ".join(map(str, self.defaults["eval_dims"])))
+                    
+                    yield self._create_input_group("checkpoint_dir", "Checkpoint Dir", self.defaults["checkpoint_dir"])
+                    yield self._create_input_group("checkpoint_interval_steps", "Checkpoint Interval", str(self.defaults["checkpoint_interval_steps"]))
+                    
+                    yield self._create_switch_group("scale", "Scale Input", self.defaults["scale"])
+                    yield self._create_switch_group("spose_input", "SPoSE Input", self.defaults["spose_input"])
+                    yield self._create_switch_group("fixed_label", "Fixed Label", self.defaults["fixed_label"])
+                    yield self._create_switch_group("weighted", "Weighted Sampling", self.defaults["weighted"])
+                    yield self._create_select_group("positional_embedding_type", "Positional Embedding", ["learned", "rope", "sinusoidal"], self.defaults["positional_embedding_type"])
+                    yield self._create_switch_group("compile", "Compile Model", self.defaults["compile"])
+                    
+                    with Container(classes="submit-container"):
+                        yield Button("Submit Training Job", id="submit", classes="submit-button")
+        
         yield Footer()
 
     def _create_input_group(self, key: str, label: str, placeholder: str = "") -> Container:
@@ -155,33 +161,18 @@ class TrainingConfigTUI(App):
         return Horizontal(Label(f"{label}:", classes="label"), Select(options=select_options, value=default, id=key, classes="input"), classes="input-group")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "submit":
-            self.action_submit()
+        if event.button.id == "submit": self.action_submit()
 
     def action_submit(self) -> None:
         config = {}
-
+        
         for key in self.defaults.keys():
             widget = self.query_one(f"#{key}")
-
+            
             if isinstance(widget, Input):
                 value = widget.value.strip()
                 if value:
-                    if key in [
-                        "hidden_size",
-                        "num_attention_heads",
-                        "intermediate_size",
-                        "num_layers",
-                        "sequence_length",
-                        "batch_size",
-                        "training_steps",
-                        "seed",
-                        "warmup_steps",
-                        "log_interval_steps",
-                        "eval_interval_steps",
-                        "num_eval_episodes",
-                        "checkpoint_interval_steps",
-                    ]:
+                    if key in ["hidden_size", "num_attention_heads", "intermediate_size", "num_layers", "sequence_length", "batch_size", "training_steps", "seed", "warmup_steps", "log_interval_steps", "eval_interval_steps", "num_eval_episodes", "checkpoint_interval_steps"]:
                         config[key] = int(value)
                     elif key in ["lr", "weight_decay", "attention_dropout"]:
                         config[key] = float(value)
@@ -191,27 +182,25 @@ class TrainingConfigTUI(App):
                         config[key] = [int(x.strip()) for x in value.split()]
                     else:
                         config[key] = value
-
+                        
             elif isinstance(widget, Switch):
                 config[key] = widget.value
-
+                
             elif isinstance(widget, Select):
-                if widget.value != Select.BLANK:
-                    config[key] = widget.value
+                if widget.value != Select.BLANK: config[key] = widget.value
 
         name_widget = self.query_one("#name")
         run_name = name_widget.value.strip() if name_widget.value.strip() else f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-
-        if "name" not in config and run_name != f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}":
-            config["name"] = run_name
+        
+        if "name" not in config and run_name != f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}": config["name"] = run_name
 
         config_dir = Path("data/configs")
         config_dir.mkdir(exist_ok=True)
         config_file = config_dir / f"{run_name}.toml"
-
+        
         with open(config_file, "w") as f:
             tomllib.dump(config, f)
-
+        
         try:
             subprocess.run(["sbatch", "bin/train.slurm", str(config_file)], check=True)
             self.notify(f"Training job submitted with config: {config_file}")
@@ -220,9 +209,7 @@ class TrainingConfigTUI(App):
         except FileNotFoundError:
             self.notify("sbatch command not found. Make sure you're on a SLURM system.", severity="error")
 
-
 @call_parse
 def main():
-    """Launch TUI for configuring and submitting training jobs"""
     app = TrainingConfigTUI()
     app.run()
