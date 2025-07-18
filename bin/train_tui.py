@@ -3,10 +3,10 @@ training configuration TUI.
 fully ai generated
 """
 import subprocess
-import tomllib
 from datetime import datetime
 from pathlib import Path
 
+import tomli_w
 from fastcore.script import call_parse
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -209,8 +209,8 @@ class TrainingConfigTUI(App):
         config_dir.mkdir(exist_ok=True)
         config_file = config_dir / f"{run_name}.toml"
 
-        with open(config_file, "w") as f:
-            tomllib.dump(config, f)
+        with open(config_file, "wb") as f:
+            tomli_w.dump(config, f)
 
         try:
             subprocess.run(["sbatch", "bin/train.slurm", str(config_file)], check=True)

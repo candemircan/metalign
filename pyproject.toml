@@ -19,7 +19,7 @@ dependencies = [
     ]
 
 [project.optional-dependencies]
-dev = ["pytest", "pre-commit", "ruff","ipykernel", "jupyter-cache", "textual"]
+dev = ["pytest", "pre-commit", "ruff","ipykernel", "jupyter-cache", "textual", "tomli-w"]
 
 [tool.setuptools]
 packages = ["metarep"]
