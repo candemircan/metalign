@@ -16,12 +16,7 @@ from textual.widgets import Button, Footer, Header, Input, Label, Select, Switch
 
 class TrainingConfigTUI(App):
     CSS = """
-    .container {
-        padding: 1;
-        height: 100vh;
-    }
-    
-    .scrollable {
+    ScrollableContainer {
         height: 1fr;
     }
     
@@ -43,12 +38,17 @@ class TrainingConfigTUI(App):
     .submit-container {
         height: 5;
         align: center middle;
-        margin: 1;
+        margin: 2;
     }
     
     .submit-button {
         width: 20;
         height: 3;
+    }
+    
+    .form-content {
+        padding: 1;
+        min-height: 120;
     }
     """
     
@@ -59,7 +59,6 @@ class TrainingConfigTUI(App):
 
     def __init__(self):
         super().__init__()
-        self.config_values = {}
         self.defaults = {
             "backbone": "dinov2_vitb14_reg",
             "input_type": "all",
@@ -99,54 +98,53 @@ class TrainingConfigTUI(App):
     def compose(self) -> ComposeResult:
         yield Header()
         
-        with Container(classes="container"):
-            with ScrollableContainer(classes="scrollable"):
-                with Vertical():
-                    yield Label("Training Configuration", id="title")
-                    
-                    yield self._create_input_group("name", "Name", "Name for the run")
-                    yield self._create_input_group("backbone", "Backbone", self.defaults["backbone"])
-                    yield self._create_select_group("input_type", "Input Type", ["all", "cls", "register", "patch"], self.defaults["input_type"])
-                    yield self._create_input_group("wandb_name", "Wandb Project", self.defaults["wandb_name"])
-                    
-                    yield self._create_switch_group("embedding", "Use Embedding", self.defaults["embedding"])
-                    yield self._create_input_group("hidden_size", "Hidden Size", str(self.defaults["hidden_size"]))
-                    yield self._create_input_group("num_attention_heads", "Attention Heads", str(self.defaults["num_attention_heads"]))
-                    yield self._create_input_group("intermediate_size", "Intermediate Size", str(self.defaults["intermediate_size"]))
-                    yield self._create_input_group("num_layers", "Num Layers", str(self.defaults["num_layers"]))
-                    yield self._create_select_group("hidden_act", "Hidden Activation", ["gelu", "relu", "swish"], self.defaults["hidden_act"])
-                    
-                    yield self._create_switch_group("bias", "Use Bias", self.defaults["bias"])
-                    yield self._create_switch_group("logit_bias", "Logit Bias", self.defaults["logit_bias"])
-                    yield self._create_input_group("attention_dropout", "Attention Dropout", str(self.defaults["attention_dropout"]))
-                    yield self._create_input_group("sequence_length", "Sequence Length", str(self.defaults["sequence_length"]))
-                    
-                    yield self._create_input_group("batch_size", "Batch Size", str(self.defaults["batch_size"]))
-                    yield self._create_input_group("training_steps", "Training Steps", str(self.defaults["training_steps"]))
-                    yield self._create_input_group("seed", "Seed", str(self.defaults["seed"]))
-                    yield self._create_input_group("lr", "Learning Rate", str(self.defaults["lr"]))
-                    yield self._create_input_group("weight_decay", "Weight Decay", str(self.defaults["weight_decay"]))
-                    yield self._create_input_group("warmup_steps", "Warmup Steps", str(self.defaults["warmup_steps"]))
-                    
-                    yield self._create_input_group("num_components", "Num Components (PCA)", "")
-                    yield self._create_switch_group("constant_lr", "Constant LR", self.defaults["constant_lr"])
-                    yield self._create_input_group("log_interval_steps", "Log Interval Steps", str(self.defaults["log_interval_steps"]))
-                    yield self._create_input_group("eval_interval_steps", "Eval Interval Steps", str(self.defaults["eval_interval_steps"]))
-                    yield self._create_input_group("num_eval_episodes", "Num Eval Episodes", str(self.defaults["num_eval_episodes"]))
-                    yield self._create_input_group("eval_dims", "Eval Dims (space separated)", " ".join(map(str, self.defaults["eval_dims"])))
-                    
-                    yield self._create_input_group("checkpoint_dir", "Checkpoint Dir", self.defaults["checkpoint_dir"])
-                    yield self._create_input_group("checkpoint_interval_steps", "Checkpoint Interval", str(self.defaults["checkpoint_interval_steps"]))
-                    
-                    yield self._create_switch_group("scale", "Scale Input", self.defaults["scale"])
-                    yield self._create_switch_group("spose_input", "SPoSE Input", self.defaults["spose_input"])
-                    yield self._create_switch_group("fixed_label", "Fixed Label", self.defaults["fixed_label"])
-                    yield self._create_switch_group("weighted", "Weighted Sampling", self.defaults["weighted"])
-                    yield self._create_select_group("positional_embedding_type", "Positional Embedding", ["learned", "rope", "sinusoidal"], self.defaults["positional_embedding_type"])
-                    yield self._create_switch_group("compile", "Compile Model", self.defaults["compile"])
-                    
-                    with Container(classes="submit-container"):
-                        yield Button("Submit Training Job", id="submit", classes="submit-button")
+        with ScrollableContainer():
+            with Vertical(classes="form-content"):
+                yield Label("Training Configuration", id="title")
+                
+                yield self._create_input_group("name", "Name", "Name for the run")
+                yield self._create_input_group("backbone", "Backbone", self.defaults["backbone"])
+                yield self._create_select_group("input_type", "Input Type", ["all", "cls", "register", "patch"], self.defaults["input_type"])
+                yield self._create_input_group("wandb_name", "Wandb Project", self.defaults["wandb_name"])
+                
+                yield self._create_switch_group("embedding", "Use Embedding", self.defaults["embedding"])
+                yield self._create_input_group("hidden_size", "Hidden Size", str(self.defaults["hidden_size"]))
+                yield self._create_input_group("num_attention_heads", "Attention Heads", str(self.defaults["num_attention_heads"]))
+                yield self._create_input_group("intermediate_size", "Intermediate Size", str(self.defaults["intermediate_size"]))
+                yield self._create_input_group("num_layers", "Num Layers", str(self.defaults["num_layers"]))
+                yield self._create_select_group("hidden_act", "Hidden Activation", ["gelu", "relu", "swish"], self.defaults["hidden_act"])
+                
+                yield self._create_switch_group("bias", "Use Bias", self.defaults["bias"])
+                yield self._create_switch_group("logit_bias", "Logit Bias", self.defaults["logit_bias"])
+                yield self._create_input_group("attention_dropout", "Attention Dropout", str(self.defaults["attention_dropout"]))
+                yield self._create_input_group("sequence_length", "Sequence Length", str(self.defaults["sequence_length"]))
+                
+                yield self._create_input_group("batch_size", "Batch Size", str(self.defaults["batch_size"]))
+                yield self._create_input_group("training_steps", "Training Steps", str(self.defaults["training_steps"]))
+                yield self._create_input_group("seed", "Seed", str(self.defaults["seed"]))
+                yield self._create_input_group("lr", "Learning Rate", str(self.defaults["lr"]))
+                yield self._create_input_group("weight_decay", "Weight Decay", str(self.defaults["weight_decay"]))
+                yield self._create_input_group("warmup_steps", "Warmup Steps", str(self.defaults["warmup_steps"]))
+                
+                yield self._create_input_group("num_components", "Num Components (PCA)", "")
+                yield self._create_switch_group("constant_lr", "Constant LR", self.defaults["constant_lr"])
+                yield self._create_input_group("log_interval_steps", "Log Interval Steps", str(self.defaults["log_interval_steps"]))
+                yield self._create_input_group("eval_interval_steps", "Eval Interval Steps", str(self.defaults["eval_interval_steps"]))
+                yield self._create_input_group("num_eval_episodes", "Num Eval Episodes", str(self.defaults["num_eval_episodes"]))
+                yield self._create_input_group("eval_dims", "Eval Dims (space separated)", " ".join(map(str, self.defaults["eval_dims"])))
+                
+                yield self._create_input_group("checkpoint_dir", "Checkpoint Dir", self.defaults["checkpoint_dir"])
+                yield self._create_input_group("checkpoint_interval_steps", "Checkpoint Interval", str(self.defaults["checkpoint_interval_steps"]))
+                
+                yield self._create_switch_group("scale", "Scale Input", self.defaults["scale"])
+                yield self._create_switch_group("spose_input", "SPoSE Input", self.defaults["spose_input"])
+                yield self._create_switch_group("fixed_label", "Fixed Label", self.defaults["fixed_label"])
+                yield self._create_switch_group("weighted", "Weighted Sampling", self.defaults["weighted"])
+                yield self._create_select_group("positional_embedding_type", "Positional Embedding", ["learned", "rope", "sinusoidal"], self.defaults["positional_embedding_type"])
+                yield self._create_switch_group("compile", "Compile Model", self.defaults["compile"])
+                
+                with Container(classes="submit-container"):
+                    yield Button("Submit Training Job", id="submit", classes="submit-button")
         
         yield Footer()
 
