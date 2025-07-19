@@ -23,6 +23,7 @@ torch.set_float32_matmul_precision('high')
 def main(
     backbone: str = "dinov2_vitb14_reg",  # backbone from which the representations are extracted. the name must match data/backbone_reps/{backbone}.npz
     input_type: str = "all",  # can be one of "all", "cls", "register", "patch". If "all", all representations are concatenated. "registers" is possible only if the model is trained with registers.
+    wandb_log: bool_arg = True,  # whether to log the model to wandb. If False, no logging is done.
     wandb_name: str = "metarep",  # name of the wandb project. Used to log the model.
     embedding: bool = False,  # whether to use an embedding layer at the beginning of the model
     hidden_size: int = 768,  # hidden size of the transformer model. if this is different from the input size, an embedding layer must be used
@@ -163,8 +164,9 @@ def main(
             print(f"Found existing best checkpoint with accuracy: {best_eval_accuracy:.4f}")
 
 
-    wandb.init(project=args["wandb_name"], name=config.name, config=args, tags=args["tags"])   
-    wandb.watch(model, log='all', log_freq=args["log_interval_steps"] * 10)
+    if args["wandb_log"]:
+        wandb.init(project=args["wandb_name"], name=config.name, config=args, tags=args["tags"])   
+        wandb.watch(model, log='all', log_freq=args["log_interval_steps"] * 10)
 
     pbar = trange(start_step, args["training_steps"], desc="Training Steps")
     num_dims = list(range(data.Y.shape[1]))
@@ -216,7 +218,7 @@ def main(
         if (training_step + 1) % args["log_interval_steps"] == 0:
             avg_train_loss = accumulated_train_loss / args["log_interval_steps"]
             train_accuracy = accumulated_train_correct / accumulated_train_total
-            wandb.log({"loss_train": avg_train_loss, "accuracy_train": train_accuracy, "lr": optimizer.param_groups[0]["lr"]}, step=training_step)
+            if args["wandb_log"]: wandb.log({"loss_train": avg_train_loss, "accuracy_train": train_accuracy, "lr": optimizer.param_groups[0]["lr"]}, step=training_step)
             accumulated_train_loss = 0.0
             accumulated_train_correct = 0
             accumulated_train_total = 0
@@ -258,7 +260,7 @@ def main(
 
                 avg_eval_loss = np.mean(eval_losses)
                 eval_accuracy = correct_predictions / total_predictions
-                wandb.log({"loss_eval": avg_eval_loss, "accuracy_eval": eval_accuracy}, step=training_step)
+                if args["wandb_log"]: wandb.log({"loss_eval": avg_eval_loss, "accuracy_eval": eval_accuracy}, step=training_step)
                 pbar.set_postfix(eval_loss=f"{avg_eval_loss:.4f}", eval_acc=f"{eval_accuracy:.4f}")
 
                 if eval_accuracy > best_eval_accuracy:
@@ -278,4 +280,4 @@ def main(
                 'scheduler_state_dict': scheduler.state_dict() if scheduler else None,
             }, checkpoint_path)
 
-    wandb.finish()
+    if args["wandb_log"]: wandb.finish()

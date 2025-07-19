@@ -58,6 +58,7 @@ class TrainingConfigTUI(App):
         self.defaults = {
             "backbone": "dinov2_vitb14_reg",
             "input_type": "all",
+            "wandb_log": True,
             "wandb_name": "metarep",
             "embedding": False,
             "hidden_size": 768,
@@ -102,6 +103,7 @@ class TrainingConfigTUI(App):
                 yield self._create_input_group("name", "Name", "Name for the run")
                 yield self._create_input_group("backbone", "Backbone", self.defaults["backbone"])
                 yield self._create_select_group("input_type", "Input Type", ["all", "cls", "register", "patch"], self.defaults["input_type"])
+                yield self._create_switch_group("wandb_log", "Wandb Logging", self.defaults["wandb_log"])
                 yield self._create_input_group("wandb_name", "Wandb Project", self.defaults["wandb_name"])
 
                 yield self._create_switch_group("embedding", "Use Embedding", self.defaults["embedding"])
