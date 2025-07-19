@@ -221,7 +221,7 @@ class ThingsFunctionLearning(Dataset):
         else:
             # determine the number of positive and negative samples from a normal distribution
             std_dev = seq_len / 20.0 # this is just a heuristic, can be tuned
-            n_pos = int(torch.normal(mean=float(seq_len / 2), std=std_dev).round().clamp(0, seq_len).item())
+            n_pos = int(torch.normal(mean=torch.tensor(seq_len / 2), std=torch.tensor(std_dev)).round().clamp(0, seq_len).item())
             n_neg = seq_len - n_pos
 
             # Identify positive and negative pools based on the median
