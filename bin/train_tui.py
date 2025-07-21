@@ -2,6 +2,7 @@
 training configuration TUI.
 fully ai generated
 """
+import inspect
 import subprocess
 from datetime import datetime
 from pathlib import Path
@@ -12,6 +13,7 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Horizontal, ScrollableContainer
 from textual.widgets import Button, Footer, Header, Input, Label, Select, Switch
+from train import main as train_main
 
 
 class TrainingConfigTUI(App):
@@ -55,43 +57,16 @@ class TrainingConfigTUI(App):
     def __init__(self):
         super().__init__()
         self.config_values = {}
-        self.defaults = {
-            "backbone": "dinov2_vitb14_reg",
-            "input_type": "all",
-            "wandb_log": True,
-            "wandb_name": "metarep",
-            "embedding": False,
-            "hidden_size": 768,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "num_layers": 6,
-            "hidden_act": "gelu",
-            "bias": False,
-            "logit_bias": True,
-            "attention_dropout": 0.1,
-            "sequence_length": 100,
-            "batch_size": 64,
-            "training_steps": 1000000,
-            "seed": 1234,
-            "lr": 3e-5,
-            "weight_decay": 1e-4,
-            "warmup_steps": 50000,
-            "num_components": None,
-            "constant_lr": False,
-            "log_interval_steps": 10,
-            "eval_interval_steps": 100,
-            "num_eval_episodes": 128,
-            "eval_dims": [0, 1, 2],
-            "tags": [],
-            "checkpoint_dir": "checkpoints",
-            "checkpoint_interval_steps": 1000,
-            "scale": True,
-            "spose_input": False,
-            "fixed_label": False,
-            "weighted": False,
-            "positional_embedding_type": "learned",
-            "compile": False,
-        }
+        sig = inspect.signature(train_main)
+        self.parameters = {}
+        self.defaults = {}
+        
+        for param_name, param in sig.parameters.items():
+            self.parameters[param_name] = param
+            if param.default != inspect.Parameter.empty:
+                self.defaults[param_name] = param.default
+            else:
+                self.defaults[param_name] = None
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -100,54 +75,34 @@ class TrainingConfigTUI(App):
             yield Label("Training Configuration", id="title")
 
             with ScrollableContainer():
-                yield self._create_input_group("name", "Name", "Name for the run")
-                yield self._create_input_group("backbone", "Backbone", self.defaults["backbone"])
-                yield self._create_select_group("input_type", "Input Type", ["all", "cls", "register", "patch"], self.defaults["input_type"])
-                yield self._create_switch_group("wandb_log", "Wandb Logging", self.defaults["wandb_log"])
-                yield self._create_input_group("wandb_name", "Wandb Project", self.defaults["wandb_name"])
-
-                yield self._create_switch_group("embedding", "Use Embedding", self.defaults["embedding"])
-                yield self._create_input_group("hidden_size", "Hidden Size", str(self.defaults["hidden_size"]))
-                yield self._create_input_group("num_attention_heads", "Attention Heads", str(self.defaults["num_attention_heads"]))
-                yield self._create_input_group("intermediate_size", "Intermediate Size", str(self.defaults["intermediate_size"]))
-                yield self._create_input_group("num_layers", "Num Layers", str(self.defaults["num_layers"]))
-                yield self._create_select_group("hidden_act", "Hidden Activation", ["gelu", "relu", "swish"], self.defaults["hidden_act"])
-
-                yield self._create_switch_group("bias", "Use Bias", self.defaults["bias"])
-                yield self._create_switch_group("logit_bias", "Logit Bias", self.defaults["logit_bias"])
-                yield self._create_input_group("attention_dropout", "Attention Dropout", str(self.defaults["attention_dropout"]))
-                yield self._create_input_group("sequence_length", "Sequence Length", str(self.defaults["sequence_length"]))
-
-                yield self._create_input_group("batch_size", "Batch Size", str(self.defaults["batch_size"]))
-                yield self._create_input_group("training_steps", "Training Steps", str(self.defaults["training_steps"]))
-                yield self._create_input_group("seed", "Seed", str(self.defaults["seed"]))
-                yield self._create_input_group("lr", "Learning Rate", str(self.defaults["lr"]))
-                yield self._create_input_group("weight_decay", "Weight Decay", str(self.defaults["weight_decay"]))
-                yield self._create_input_group("warmup_steps", "Warmup Steps", str(self.defaults["warmup_steps"]))
-
-                yield self._create_input_group("num_components", "Num Components (PCA)", "")
-                yield self._create_switch_group("constant_lr", "Constant LR", self.defaults["constant_lr"])
-                yield self._create_input_group("log_interval_steps", "Log Interval Steps", str(self.defaults["log_interval_steps"]))
-                yield self._create_input_group("eval_interval_steps", "Eval Interval Steps", str(self.defaults["eval_interval_steps"]))
-                yield self._create_input_group("num_eval_episodes", "Num Eval Episodes", str(self.defaults["num_eval_episodes"]))
-                yield self._create_input_group("eval_dims", "Eval Dims (space separated)", " ".join(map(str, self.defaults["eval_dims"])))
-                yield self._create_input_group("tags", "Tags (space separated)", " ".join(self.defaults["tags"]))
-
-                yield self._create_input_group("checkpoint_dir", "Checkpoint Dir", self.defaults["checkpoint_dir"])
-                yield self._create_input_group("checkpoint_interval_steps", "Checkpoint Interval", str(self.defaults["checkpoint_interval_steps"]))
-
-                yield self._create_switch_group("scale", "Scale Input", self.defaults["scale"])
-                yield self._create_switch_group("spose_input", "SPoSE Input", self.defaults["spose_input"])
-                yield self._create_switch_group("fixed_label", "Fixed Label", self.defaults["fixed_label"])
-                yield self._create_switch_group("weighted", "Weighted Sampling", self.defaults["weighted"])
-                yield self._create_select_group("positional_embedding_type", "Positional Embedding", ["learned", "rope", "sinusoidal"], self.defaults["positional_embedding_type"])
-                yield self._create_switch_group("compile", "Compile Model", self.defaults["compile"])
+                for param_name, param in self.parameters.items():
+                    default_val = self.defaults.get(param_name)
+                    
+                    if param_name == "name":
+                        yield self._create_input_group(param_name, "Name", "Name for the run")
+                    elif param_name == "input_type":
+                        yield self._create_select_group(param_name, "Input Type", ["all", "cls", "register", "patch"], default_val)
+                    elif param_name == "hidden_act":
+                        yield self._create_select_group(param_name, "Hidden Activation", ["gelu", "relu", "swish"], default_val)
+                    elif param_name == "positional_embedding_type":
+                        yield self._create_select_group(param_name, "Positional Embedding", ["learned", "rope", "sinusoidal"], default_val)
+                    elif param.annotation == "bool_arg" or (default_val is not None and isinstance(default_val, bool)):
+                        yield self._create_switch_group(param_name, self._format_label(param_name), default_val if default_val is not None else False)
+                    else:
+                        placeholder = str(default_val) if default_val is not None else ""
+                        if param_name in ["eval_dims", "tags"] and isinstance(default_val, list):
+                            placeholder = " ".join(map(str, default_val))
+                        yield self._create_input_group(param_name, self._format_label(param_name), placeholder)
 
                 with Container(classes="submit-container"):
                     yield Button("Submit Training Job", id="submit", classes="submit-button")
                     yield Button("Save Config Only", id="save_config", classes="submit-button")
 
         yield Footer()
+    
+    def _format_label(self, param_name: str) -> str:
+        """Convert parameter name to a formatted label"""
+        return " ".join(word.capitalize() for word in param_name.split("_"))
 
     def _create_input_group(self, key: str, label: str, placeholder: str = "") -> Container:
         return Horizontal(Label(f"{label}:", classes="label"), Input(placeholder=placeholder, id=key, classes="input"), classes="input-group")
@@ -184,45 +139,35 @@ class TrainingConfigTUI(App):
     def _generate_config(self) -> Path | None:
         config = {}
 
-        for key in self.defaults.keys():
-            widget = self.query_one(f"#{key}")
+        for param_name, param in self.parameters.items():
+            if param_name == "name":
+                continue
+            
+            widget = self.query_one(f"#{param_name}")
+            default_val = self.defaults.get(param_name)
 
             if isinstance(widget, Input):
                 value = widget.value.strip()
                 if value:
-                    if key in [
-                        "hidden_size",
-                        "num_attention_heads",
-                        "intermediate_size",
-                        "num_layers",
-                        "sequence_length",
-                        "batch_size",
-                        "training_steps",
-                        "seed",
-                        "warmup_steps",
-                        "log_interval_steps",
-                        "eval_interval_steps",
-                        "num_eval_episodes",
-                        "checkpoint_interval_steps",
-                    ]:
-                        config[key] = int(value)
-                    elif key in ["lr", "weight_decay", "attention_dropout"]:
-                        config[key] = float(value)
-                    elif key == "num_components":
-                        config[key] = int(value) if value else None
-                    elif key == "eval_dims":
-                        config[key] = [int(x.strip()) for x in value.split()]
-                    elif key == "tags":
-                        config[key] = value.split()
+                    if param.annotation is int or (default_val is not None and isinstance(default_val, int)):
+                        config[param_name] = int(value) if value != "None" else None
+                    elif param.annotation is float or (default_val is not None and isinstance(default_val, float)):
+                        config[param_name] = float(value)
+                    elif param_name == "eval_dims":
+                        config[param_name] = [int(x.strip()) for x in value.split()]
+                    elif param_name == "tags":
+                        config[param_name] = value.split()
+                    elif param_name == "num_components" and value.lower() in ["none", ""]:
+                        config[param_name] = None
                     else:
-                        config[key] = value
+                        config[param_name] = value
 
             elif isinstance(widget, Switch):
-                config[key] = widget.value
+                config[param_name] = widget.value
 
             elif isinstance(widget, Select):
                 if widget.value != Select.BLANK:
-                    config[key] = widget.value
+                    config[param_name] = widget.value
 
         name_widget = self.query_one("#name")
         run_name = name_widget.value.strip() if name_widget.value.strip() else f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
