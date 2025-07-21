@@ -93,12 +93,9 @@ def main(
         data.X = torch.from_numpy(pca.fit_transform(data.X)).to(torch.float32)
         data.feature_dim = args["num_components"]
     
-    # +2 because we always prepend the target from the previous observation to the input as a one hot vector
-    # ie [0 1] if the target is 1, [1 0] if the target is 0
-    input_size = data.feature_dim + 2
     
     config = TransformerConfig(
-        input_size=input_size,
+        input_size=data.feature_dim,
         embedding=args["embedding"],
         hidden_size=args["hidden_size"],
         num_attention_heads=args["num_attention_heads"],
@@ -187,21 +184,13 @@ def main(
         for i in range(args["batch_size"]):
             dim = train_dims[sampled_dims[i]]
             X_episode, Y_episode = data.sample_episode(dim, args["sequence_length"], args["fixed_label"], args["weighted"])
-            
-            prev_targets = torch.cat([torch.tensor([0]), Y_episode[:-1]]) 
-
-            target_onehot = torch.nn.functional.one_hot(prev_targets.long(), num_classes=2).float()
-            target_onehot[0] = 0.0 
-            
-            inputs = torch.cat([target_onehot, X_episode], dim=1)
-
-            X_batch.append(inputs)
+            X_batch.append(X_episode)
             Y_batch.append(Y_episode)
         
         X_batch = torch.stack(X_batch).to(device)
         Y_batch = torch.stack(Y_batch).to(device)
         
-        logits = model(X_batch).squeeze(-1)
+        logits = model(X_batch, Y_batch).squeeze(-1)
         loss =  F.binary_cross_entropy_with_logits(logits, Y_batch)
         
         optimizer.zero_grad()
@@ -236,21 +225,14 @@ def main(
                 for i in range(args["num_eval_episodes"]):
                     dim = eval_dims_tensor[i % len(eval_dims_tensor)] # cycle through eval_dims
                     X_episode, Y_episode =data.sample_episode(dim, args["sequence_length"], args["fixed_label"], args["weighted"])
-                    
-                    prev_targets = torch.cat([torch.tensor([0]), Y_episode[:-1]])
-                    target_onehot = torch.nn.functional.one_hot(prev_targets.long(), num_classes=2).float()
-                    target_onehot[0] = 0.0
-                    
-                    inputs = torch.cat([target_onehot, X_episode], dim=1)
-                    
-                    X_eval_batch_list.append(inputs)
+                    X_eval_batch_list.append(X_episode)
                     Y_eval_batch_list.append(Y_episode)
                 
                 for i in range(0, args["num_eval_episodes"], args["batch_size"]):
                     batch_X = torch.stack(X_eval_batch_list[i:i+args["batch_size"]]).to(device)
                     batch_Y = torch.stack(Y_eval_batch_list[i:i+args["batch_size"]]).to(device)
 
-                    logits_eval = model(batch_X).squeeze(-1)
+                    logits_eval = model(batch_X, batch_Y).squeeze(-1)
                     loss_eval =  F.binary_cross_entropy_with_logits(logits_eval, batch_Y)
                     eval_losses.append(loss_eval.item())
                     

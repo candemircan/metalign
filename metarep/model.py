@@ -17,7 +17,7 @@ from .rope import RotaryPositionalEmbeddings
 
 @dataclass
 class TransformerConfig:
-    input_size: int = 2306
+    input_size: int = 2304 
     embedding: bool = True
     hidden_size: int = 768
     num_attention_heads: int = 12
@@ -133,9 +133,15 @@ class Transformer(torch.nn.Module):
         super().__init__()
         self.config = config
         
-        if not config.embedding and config.input_size != config.hidden_size: raise ValueError(f"Input size {config.input_size} must match hidden size {config.hidden_size} when embedding is False.")
+        # bos token for the first sequence item (2D learnable parameter)
+        self.bos_token = nn.Parameter(torch.randn(2))
+        
+        # actual input size includes features + 2 for target encoding
+        actual_input_size = config.input_size + 2
+        
+        if not config.embedding and actual_input_size != config.hidden_size: raise ValueError(f"Input size {actual_input_size} must match hidden size {config.hidden_size} when embedding is False.")
 
-        if config.embedding: self.embedding = nn.Linear(config.input_size, config.hidden_size, bias=config.bias)
+        if config.embedding: self.embedding = nn.Linear(actual_input_size, config.hidden_size, bias=config.bias)
         else: self.embedding = nn.Identity()
 
         if config.positional_embedding_type == "learned":
@@ -162,7 +168,25 @@ class Transformer(torch.nn.Module):
         self.final_ln = nn.LayerNorm(config.hidden_size)
         self.linear_head = nn.Linear(config.hidden_size,1, bias=config.logit_bias)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self,
+                x: torch.Tensor, # (batch_size, seq_len, feature_dim) - input features
+                y: torch.Tensor # (batch_size, seq_len) - binary targets for each position
+                ) -> torch.Tensor:
+        
+        batch_size = x.shape[0]
+        
+        # create previous targets: shift targets right and prepend BOS token
+        prev_targets = torch.cat([torch.zeros(batch_size, 1, device=x.device), y[:, :-1]], dim=1)
+        
+        # one-hot encode previous targets
+        target_onehot = F.one_hot(prev_targets.long(), num_classes=2).float()
+        
+        # replace the first position with learnable BOS token
+        target_onehot[:, 0] = self.bos_token.unsqueeze(0).expand(batch_size, -1)
+        
+        # concatenate target encoding with input features
+        x = torch.cat([target_onehot, x], dim=-1)
+        
         x = self.embedding(x)
 
         if self.pos_encoder: x = self.pos_encoder(x)
