@@ -8,7 +8,7 @@ dependencies = [
     "fastcore == 1.8.4", 
     "einops == 0.8.1", 
     "torchvision == 0.22.1", 
-    "scikit-learn == 1.7.0", 
+    "scikit-learn", 
     "vit_prisma @ git+https://github.com/Prisma-Multimodal/ViT-Prisma.git@97dd26fc01dfd856060c4a234b882c6f16836c15", 
     "h5py == 3.14.0", 
     "wandb == 0.21.0", 
