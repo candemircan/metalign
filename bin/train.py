@@ -48,7 +48,7 @@ def main(
     log_interval_steps: int = 10,  # log training loss every N steps
     eval_interval_steps: int = 100,  # evaluate the model every eval_interval_steps steps
     num_eval_episodes: int = 128,  # number of episodes to sample for evaluation
-    eval_dims: Param(help="the dimensions to evaluate the model on. These dimensions are not sampled during training. It cannot be empty.", type=int, nargs="*") = list(range(3,66)), # type: ignore
+    eval_dims: Param(help="the dimensions to evaluate the model on. These dimensions are not sampled during training. It cannot be empty.", type=int, nargs="*") = [0, 1, 2], # type: ignore
     tags: Param(help="tags to use for the wandb run. If empty, no tags are used.", type=str, nargs="*") = [],  # type: ignore
     checkpoint_dir: str = "checkpoints", # directory to save checkpoints. this will be placed under data/checkpoints/{name} if name is provided. If name is None, it will be saved under data/checkpoints
     checkpoint_interval_steps: int = 1000, # save checkpoint every N steps

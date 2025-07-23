@@ -51,6 +51,10 @@ class MLP(nn.Module):
 
         self.fc1 = nn.Linear(hidden_size, intermediate_size, bias=bias)
         self.fc2 = nn.Linear(intermediate_size, hidden_size, bias=bias)
+
+        nn.init.normal_(self.fc2.weight, mean=0.0, std=0.01)
+        if bias:
+            nn.init.zeros_(self.fc2.bias)
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.fc2(self.act_fn(self.fc1(x)))
     
@@ -67,9 +71,15 @@ class SelfAttention(nn.Module):
         self.qkv = nn.Linear(hidden_size, hidden_size * 3, bias=bias)
         self.o_proj = nn.Linear(hidden_size, hidden_size, bias=bias)
         self.qkv_split = Rearrange('batch sequence (three head head_dim) -> three batch head sequence head_dim', three=3, head=num_attention_heads)
-        self.rope_transpose = Rearrange('batch head sequence head_dim -> batch sequence head head_dim')
-        self.sdpa_transpose = Rearrange('batch head sequence head_dim -> batch sequence head head_dim')
         self.o_proj_transpose = Rearrange('batch head sequence head_dim -> batch sequence (head head_dim)')
+        if self.rope:
+            self.rope_transpose = Rearrange('batch head sequence head_dim -> batch sequence head head_dim')
+            self.sdpa_transpose = Rearrange('batch sequence head head_dim -> batch head sequence head_dim')
+
+
+        nn.init.normal_(self.o_proj.weight, mean=0.0, std=0.01)
+        if bias:
+            nn.init.zeros_(self.o_proj.bias)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         qkv = self.qkv(x)
@@ -83,6 +93,8 @@ class SelfAttention(nn.Module):
             q = self.sdpa_transpose(q)
             k = self.sdpa_transpose(k)
         
+        q = F.normalize(q, p=2, dim=-1, eps=1e-8)
+        k = F.normalize(k, p=2, dim=-1, eps=1e-8)
         attn_output = F.scaled_dot_product_attention(q, k, v, is_causal=True, dropout_p=self.attention_dropout)
 
         attn_output = self.o_proj_transpose(attn_output)

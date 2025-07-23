@@ -12,14 +12,13 @@ dependencies = [
     "vit_prisma @ git+https://github.com/Prisma-Multimodal/ViT-Prisma.git@97dd26fc01dfd856060c4a234b882c6f16836c15", 
     "h5py == 3.14.0", 
     "wandb == 0.21.0", 
-    "shiny == 1.4.0", 
     "nnsight == 0.4.8",
     "quarto-cli == 1.7.32",
     "flash-attn == 2.8.1 ; sys_platform == 'linux'"
     ]
 
 [project.optional-dependencies]
-dev = ["pytest", "pre-commit", "ruff","ipykernel", "jupyter-cache", "textual", "tomli-w"]
+dev = ["pytest", "pre-commit", "ruff","ipykernel", "jupyter-cache", "textual", "tomli-w","shiny == 1.4.0"]
 
 [tool.setuptools]
 packages = ["metarep"]
