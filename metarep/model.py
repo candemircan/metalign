@@ -23,7 +23,7 @@ class TransformerConfig:
     hidden_act: str = "gelu"
     bias: bool = True
     logit_bias: bool = True
-    attention_dropout: float = 0.1
+    attention_dropout: float = 0.0
     sequence_length: int = 100
     name: Optional[str] = None
     positional_embedding_type: str = "learned" # Only "learned" is supported
