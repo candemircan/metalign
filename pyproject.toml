@@ -14,7 +14,8 @@ dependencies = [
     "wandb == 0.21.0", 
     "nnsight == 0.4.8",
     "quarto-cli == 1.7.32",
-    "flash-attn == 2.8.1 ; sys_platform == 'linux'"
+    "flash-attn == 2.8.1 ; sys_platform == 'linux'",
+    "xformers; sys_platform == 'linux'",
     ]
 
 [project.optional-dependencies]

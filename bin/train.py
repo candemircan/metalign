@@ -21,7 +21,7 @@ torch.set_float32_matmul_precision('high')
 
 @call_parse
 def main(
-    backbone: str = "dinov2_vitb14_reg",  # backbone from which the representations are extracted. the name must match data/backbone_reps/{backbone}.npz
+    backbone: str = "things_dinov2_vitb14_reg",  # backbone from which the representations are extracted. the name must match data/backbone_reps/{backbone}.npz
     input_type: str = "all",  # can be one of "all", "cls", "register", "patch". If "all", all representations are concatenated. "registers" is possible only if the model is trained with registers.
     wandb_log: bool_arg = True,  # whether to log the model to wandb. If False, no logging is done.
     wandb_name: str = "metarep",  # name of the wandb project. Used to log the model.
@@ -33,15 +33,15 @@ def main(
     hidden_act: str = "gelu",  # activation function for the MLP in the transformer model
     bias: bool = False,  # whether to use bias in the linear layers of the transformer model
     logit_bias: bool_arg = True,  # whether to use bias in the final linear layer of the transformer model. If False, the final layer will not have a bias term.
-    attention_dropout: float = 0.1,  # dropout rate for the attention layers in the transformer model
+    attention_dropout: float = 0.0,  # dropout rate for the attention layers in the transformer model
     sequence_length: int = 100,  # maximum number of position embeddings in the transformer model
     config_file: str = None,  # path to a config file. If provided, any parameters in the file will override the corresponding command line arguments. See "data/example_transformer_config.toml" for an example config file.
-    batch_size: int = 64,  # batch size for training the model
+    batch_size: int = 256,  # batch size for training the model
     training_steps: int = 1000000,  # number of training steps per epoch
     seed: int = 1234, # random seed for reproducibility
-    lr: float = 3e-5,  # learning rate for the optimizer
+    lr: float = 1e-4,  # learning rate for the optimizer
     weight_decay: float = 1e-4,  # weight decay for the optimizer
-    warmup_steps: int = 50000,  # number of warmup steps for the learning rate scheduler
+    warmup_steps: int = 10000,  # number of warmup steps for the learning rate scheduler
     name: str = None,  # name of the model. If provided, it will be used to log the model.
     num_components: int = None,  # number of components to use for dimensionality reduction. If None, the original data is used.
     constant_lr: bool = False,  # If True, do not schedule the LR, also no warmup then
@@ -60,9 +60,10 @@ def main(
     positional_embedding_type: str = "learned",  # only 'learned' is supported now
     compile: bool = False,  # whether to compile the model with torch.compile
     sae_mode: bool = False,  # whether to use SAE training mode with separate train/test datasets
-    test_backbone: str = None,  # for SAE mode: backbone for test data. if None, uses same as backbone
-    train_sae_features: str = None,  # for SAE mode: SAE features for training data
-    test_sae_features: str = None,  # for SAE mode: SAE features for test data
+    sae_train_backbone: str = "coco_dinov2_vitb14_reg",  # for SAE mode: backbone for train data.
+    sae_test_backbone: str = "things_dinov2_vitb14_reg",  # for SAE mode: backbone for test data.
+    train_sae_features: str = "coco_sae-top_k-64-cls_only-layer_11-hook_resid_post",  # for SAE mode: SAE features for training data
+    test_sae_features: str = "things_sae-top_k-64-cls_only-layer_11-hook_resid_post",  # for SAE mode: SAE features for test data
     min_nonzero: int = 100,  # for SAE mode: minimum number of non-zero activations per column to keep it in the final array
 ):
     """
@@ -86,8 +87,8 @@ def main(
     if not os.path.exists(full_checkpoint_dir): os.makedirs(full_checkpoint_dir)
 
     if args["sae_mode"]:
-        train_backbone = args["backbone"]
-        test_backbone = args["test_backbone"] if args["test_backbone"] else args["backbone"]
+        train_backbone = args["sae_train_backbone"]
+        test_backbone = args["sae_test_backbone"] 
         
         train_representations = np.load(f"data/backbone_reps/{train_backbone}.npz")
         train_inputs = np.concatenate([train_representations[key] for key in train_representations.keys()], axis=1) if args["input_type"] == "all" else train_representations[args["input_type"]]
