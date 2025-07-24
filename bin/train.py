@@ -14,7 +14,7 @@ from torch.optim import AdamW
 from torch.optim.lr_scheduler import LambdaLR
 from tqdm import trange
 
-from metarep.data import ThingsFunctionLearning
+from metarep.data import SAEFunctionLearning, ThingsFunctionLearning
 from metarep.model import Transformer, TransformerConfig
 
 torch.set_float32_matmul_precision('high')
@@ -48,7 +48,7 @@ def main(
     log_interval_steps: int = 10,  # log training loss every N steps
     eval_interval_steps: int = 100,  # evaluate the model every eval_interval_steps steps
     num_eval_episodes: int = 128,  # number of episodes to sample for evaluation
-    eval_dims: Param(help="the dimensions to evaluate the model on. These dimensions are not sampled during training. It cannot be empty.", type=int, nargs="*") = [0, 1, 2], # type: ignore
+    eval_dims: Param(help="the dimensions to evaluate the model on. These dimensions are not sampled during training. For SAE mode, this is ignored.", type=int, nargs="*") = [0, 1, 2], # type: ignore
     tags: Param(help="tags to use for the wandb run. If empty, no tags are used.", type=str, nargs="*") = [],  # type: ignore
     checkpoint_dir: str = "checkpoints", # directory to save checkpoints. this will be placed under data/checkpoints/{name} if name is provided. If name is None, it will be saved under data/checkpoints
     checkpoint_interval_steps: int = 1000, # save checkpoint every N steps
@@ -59,9 +59,15 @@ def main(
     weighted: bool = False, #  If True, sample positive and negative instances weighted by their magnitude. Otherwise, sample uniformly.
     positional_embedding_type: str = "learned",  # only 'learned' is supported now
     compile: bool = False,  # whether to compile the model with torch.compile
+    sae_mode: bool = False,  # whether to use SAE training mode with separate train/test datasets
+    test_backbone: str = None,  # for SAE mode: backbone for test data. if None, uses same as backbone
+    train_sae_features: str = None,  # for SAE mode: SAE features for training data
+    test_sae_features: str = None,  # for SAE mode: SAE features for test data
+    min_nonzero: int = 100,  # for SAE mode: minimum number of non-zero activations per column to keep it in the final array
 ):
     """
-    train a meta-learning transformer model over a bunch of function learning tasks
+    train a meta-learning transformer model over function learning tasks.
+    supports both regular training and SAE training modes.
     """
     args = locals()
     if config_file:
@@ -79,9 +85,37 @@ def main(
     full_checkpoint_dir = f"data/checkpoints/{args["checkpoint_dir"]}" if args["name"] is None else f"data/checkpoints/{args["name"]}"
     if not os.path.exists(full_checkpoint_dir): os.makedirs(full_checkpoint_dir)
 
-    representations = np.load(f"data/backbone_reps/{args["backbone"]}.npz")
-    if args["input_type"] != "all": representations = {args["input_type"]: representations[args["input_type"]]}
-    data = ThingsFunctionLearning(representations=representations, scale=args["scale"])
+    if args["sae_mode"]:
+        train_backbone = args["backbone"]
+        test_backbone = args["test_backbone"] if args["test_backbone"] else args["backbone"]
+        
+        train_representations = np.load(f"data/backbone_reps/{train_backbone}.npz")
+        train_inputs = np.concatenate([train_representations[key] for key in train_representations.keys()], axis=1) if args["input_type"] == "all" else train_representations[args["input_type"]]
+        
+        train_data = SAEFunctionLearning(
+            inputs=train_inputs,
+            sae_features=args["train_sae_features"],
+            scale=args["scale"],
+            min_nonzero=args["min_nonzero"]
+        )
+        
+        test_representations = np.load(f"data/backbone_reps/{test_backbone}.npz")
+        test_inputs = np.concatenate([test_representations[key] for key in test_representations.keys()], axis=1) if args["input_type"] == "all" else test_representations[args["input_type"]]
+        
+        test_data = SAEFunctionLearning(
+            inputs=test_inputs,
+            sae_features=args["test_sae_features"],
+            scale=args["scale"],
+            min_nonzero=args["min_nonzero"]
+        )
+        
+        data = train_data
+        eval_data = test_data
+    else:
+        representations = np.load(f"data/backbone_reps/{args["backbone"]}.npz")
+        if args["input_type"] != "all": representations = {args["input_type"]: representations[args["input_type"]]}
+        data = ThingsFunctionLearning(representations=representations, scale=args["scale"])
+        eval_data = data
 
     if args["spose_input"]:
         data.X = data.Y
@@ -92,6 +126,10 @@ def main(
         pca = PCA(n_components=args["num_components"], random_state=args["seed"])
         data.X = torch.from_numpy(pca.fit_transform(data.X)).to(torch.float32)
         data.feature_dim = args["num_components"]
+        
+        if args["sae_mode"]:
+            eval_data.X = torch.from_numpy(pca.transform(eval_data.X)).to(torch.float32)
+            eval_data.feature_dim = args["num_components"]
 
 
     config = TransformerConfig(
@@ -166,9 +204,14 @@ def main(
         wandb.watch(model, log='all', log_freq=args["log_interval_steps"] * 10)
 
     pbar = trange(start_step, args["training_steps"], desc="Training Steps")
-    num_dims = list(range(data.Y.shape[1]))
-    train_dims = torch.tensor([d for d in num_dims if d not in args["eval_dims"]], device=device)
-    eval_dims_tensor = torch.tensor(args["eval_dims"], device=device)
+    
+    if args["sae_mode"]:
+        train_dims = torch.tensor(list(range(data.Y.shape[1])), device=device)
+        eval_dims_tensor = torch.tensor(list(range(eval_data.Y.shape[1])), device=device)
+    else:
+        num_dims = list(range(data.Y.shape[1]))
+        train_dims = torch.tensor([d for d in num_dims if d not in args["eval_dims"]], device=device)
+        eval_dims_tensor = torch.tensor(args["eval_dims"], device=device)
 
     accumulated_train_loss = 0.0
     accumulated_train_correct = 0
@@ -224,7 +267,7 @@ def main(
 
                 for i in range(args["num_eval_episodes"]):
                     dim = eval_dims_tensor[i % len(eval_dims_tensor)] # cycle through eval_dims
-                    X_episode, Y_episode =data.sample_episode(dim, args["sequence_length"], args["fixed_label"], args["weighted"])
+                    X_episode, Y_episode = eval_data.sample_episode(dim, args["sequence_length"], args["fixed_label"], args["weighted"])
                     X_eval_batch_list.append(X_episode)
                     Y_eval_batch_list.append(Y_episode)
 
