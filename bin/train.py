@@ -57,7 +57,7 @@ def main(
     spose_input: bool = False, # if True, use the SPoSE as input. Used for overfitting and debugging. The functions are also sampled from this. Therefore, this must be trivially easy. It will override `backbone` and `input_type`.
     fixed_label: bool = False,  # if True, the positives are always 1 and the negatives are always 0. If False, for a given sequence, they are reversed with 50% probability.
     weighted: bool = False, #  If True, sample positive and negative instances weighted by their magnitude. Otherwise, sample uniformly.
-    positional_embedding_type: str = "learned",  # Can be "learned", "rope", or "sinusoidal".
+    positional_embedding_type: str = "learned",  # only 'learned' is supported now
     compile: bool = False,  # whether to compile the model with torch.compile
 ):
     """
@@ -75,7 +75,7 @@ def main(
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
     if torch.cuda.is_available(): torch.cuda.manual_seed_all(args["seed"])
-    
+
     full_checkpoint_dir = f"data/checkpoints/{args["checkpoint_dir"]}" if args["name"] is None else f"data/checkpoints/{args["name"]}"
     if not os.path.exists(full_checkpoint_dir): os.makedirs(full_checkpoint_dir)
 
@@ -83,7 +83,7 @@ def main(
     if args["input_type"] != "all": representations = {args["input_type"]: representations[args["input_type"]]}
     data = ThingsFunctionLearning(representations=representations, scale=args["scale"])
 
-    if args["spose_input"]: 
+    if args["spose_input"]:
         data.X = data.Y
         data.feature_dim = data.X.shape[1]
         args["backbone"] = "spose"
@@ -92,8 +92,8 @@ def main(
         pca = PCA(n_components=args["num_components"], random_state=args["seed"])
         data.X = torch.from_numpy(pca.fit_transform(data.X)).to(torch.float32)
         data.feature_dim = args["num_components"]
-    
-    
+
+
     config = TransformerConfig(
         input_size=data.feature_dim,
         embedding=args["embedding"],
@@ -162,7 +162,7 @@ def main(
 
 
     if args["wandb_log"]:
-        wandb.init(project=args["wandb_name"], name=config.name, config=args, tags=args["tags"])   
+        wandb.init(project=args["wandb_name"], name=config.name, config=args, tags=args["tags"])
         wandb.watch(model, log='all', log_freq=args["log_interval_steps"] * 10)
 
     pbar = trange(start_step, args["training_steps"], desc="Training Steps")
@@ -173,32 +173,32 @@ def main(
     accumulated_train_loss = 0.0
     accumulated_train_correct = 0
     accumulated_train_total = 0
-    
+
     for training_step in pbar:
         model.train()
-        
+
         sampled_dims = torch.randint(len(train_dims), (args["batch_size"],))
         X_batch = []
         Y_batch = []
-        
+
         for i in range(args["batch_size"]):
             dim = train_dims[sampled_dims[i]]
             X_episode, Y_episode = data.sample_episode(dim, args["sequence_length"], args["fixed_label"], args["weighted"])
             X_batch.append(X_episode)
             Y_batch.append(Y_episode)
-        
+
         X_batch = torch.stack(X_batch).to(device)
         Y_batch = torch.stack(Y_batch).to(device)
-        
+
         logits = model(X_batch, Y_batch).squeeze(-1)
         loss =  F.binary_cross_entropy_with_logits(logits, Y_batch)
-        
+
         optimizer.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
         if scheduler: scheduler.step()
-        
+
         accumulated_train_loss += loss.item()
         predictions = (torch.sigmoid(logits) > 0.5).float()
         accumulated_train_correct += (predictions == Y_batch).sum().item()
@@ -218,16 +218,16 @@ def main(
                 eval_losses = []
                 correct_predictions = 0
                 total_predictions = 0
-                
+
                 # collect episodes first, then process in batches
-                X_eval_batch_list,Y_eval_batch_list = [], [] 
+                X_eval_batch_list,Y_eval_batch_list = [], []
 
                 for i in range(args["num_eval_episodes"]):
                     dim = eval_dims_tensor[i % len(eval_dims_tensor)] # cycle through eval_dims
                     X_episode, Y_episode =data.sample_episode(dim, args["sequence_length"], args["fixed_label"], args["weighted"])
                     X_eval_batch_list.append(X_episode)
                     Y_eval_batch_list.append(Y_episode)
-                
+
                 for i in range(0, args["num_eval_episodes"], args["batch_size"]):
                     batch_X = torch.stack(X_eval_batch_list[i:i+args["batch_size"]]).to(device)
                     batch_Y = torch.stack(Y_eval_batch_list[i:i+args["batch_size"]]).to(device)
@@ -235,7 +235,7 @@ def main(
                     logits_eval = model(batch_X, batch_Y).squeeze(-1)
                     loss_eval =  F.binary_cross_entropy_with_logits(logits_eval, batch_Y)
                     eval_losses.append(loss_eval.item())
-                    
+
                     predictions = (torch.sigmoid(logits_eval) > 0.5).float()
                     correct_predictions += (predictions == batch_Y).sum().item()
                     total_predictions += batch_Y.numel()
@@ -250,9 +250,10 @@ def main(
                     torch.save({
                         'model_state_dict': {k: v.cpu() for k, v in model.state_dict().items()},
                         'eval_accuracy': eval_accuracy,
-                        'step': training_step
+                        'step': training_step,
+                        'config': config.to_dict(),
                     }, best_checkpoint_path)
-        
+
         if (training_step + 1) % args["checkpoint_interval_steps"] == 0:
             checkpoint_path = os.path.join(full_checkpoint_dir, "latest.pt")
             torch.save({
@@ -260,6 +261,7 @@ def main(
                 'model_state_dict': {k: v.cpu() for k, v in model.state_dict().items()},
                 'optimizer_state_dict': optimizer.state_dict(),
                 'scheduler_state_dict': scheduler.state_dict() if scheduler else None,
+                'config': config.to_dict(),
             }, checkpoint_path)
 
     if args["wandb_log"]: wandb.finish()
