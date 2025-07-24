@@ -10,7 +10,7 @@ from fastcore.script import call_parse
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from metarep.data import Things
+from metarep.data import Coco, Things
 
 _ = torch.set_grad_enabled(False)
 
@@ -20,6 +20,7 @@ def main(
     repo: str = "facebookresearch/dinov2", # repo given to `torch.hub.load`
     model_name: str = "dinov2_vitb14_reg", # model name in the repo, also given to `torch.hub.load`
     batch_size: int = 64, # batch size for the backbone model, for feature extraction
+    dataset: str = "things", # one of things or coco
     hf_repo: str = None, # HuggingFace repo to the backbone model. If provded, `repo` and `model` are ignored.
     force: bool = False # if True, will extract features even if the file already exists. Otherwise, will skip if the file  exists.
 ):
@@ -33,7 +34,8 @@ def main(
 
     Currently, the extraction keys are formatted after the Dinov2 model only.
     """
-    save_path = Path("data/backbone_reps") / f"{model_name}.npz"
+    ds_prefix = "things" if dataset == "things" else "coco"
+    save_path = Path("data/backbone_reps") / f"{ds_prefix}_{model_name}.npz"
     save_path.parent.mkdir(parents=True, exist_ok=True)
 
     if save_path.exists() and not force:
@@ -48,7 +50,8 @@ def main(
     
     model.eval()
 
-    things_dataloader = DataLoader(Things(), batch_size=batch_size, shuffle=False, num_workers=4)
+    ds = Things() if dataset == "things" else Coco()
+    things_dataloader = DataLoader(ds, batch_size=batch_size, shuffle=False, num_workers=4)
     representations=dict(cls=[], register=[], patch=[])
 
     for images in tqdm(things_dataloader, desc="extracting representations"):

@@ -21,7 +21,7 @@ class TransformerConfig:
     intermediate_size: int = 3072
     num_layers: int = 6
     hidden_act: str = "gelu"
-    bias: bool = False
+    bias: bool = True
     logit_bias: bool = True
     attention_dropout: float = 0.1
     sequence_length: int = 100
@@ -67,7 +67,7 @@ class SelfAttention(nn.Module):
         qkv = self.qkv(x)
         q, k, v = self.qkv_split(qkv)
 
-        attn_output = F.scaled_dot_product_attention(q, k, v, is_causal=True, dropout_p=self.attention_dropout)
+        attn_output = F.scaled_dot_product_attention(q, k, v, is_causal=True, dropout_p=self.attention_dropout if self.training else 0.0)
 
         attn_output = self.o_proj_transpose(attn_output)
 
@@ -104,7 +104,6 @@ class Transformer(torch.nn.Module):
     def __init__(self, config: TransformerConfig=TransformerConfig()):
         super().__init__()
         self.config = config
-
 
         # actual input size includes features + 2 for target encoding
         actual_input_size = config.input_size + 2

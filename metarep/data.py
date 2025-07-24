@@ -188,85 +188,109 @@ class Coco(ImageDataset):
         super().__init__(root=root, glob_pattern="*.jpg", total_images=total_images)
 
 
-class ThingsFunctionLearning(Dataset):
-    "A dataset for classification on the THINGS dataset, using SPoSE embeddings."
-    def __init__(self, representations: dict, data_root: Path = Path("data/external"), scale: bool = True):
-        "Initializes the dataset by preparing data and pre-calculating medians."
-        X, Y = prepare_things_spose(representations, data_root=data_root)
-        
+class FunctionLearning(Dataset):
+    "Base class for function learning datasets."
+    def __init__(self, X: torch.Tensor, Y: torch.Tensor, scale: bool = True):
         self.X, self.Y = X, Y
         self.feature_dim = self.X.shape[1]
-        self.medians = torch.median(self.Y, dim=0).values
+        self.num_functions = self.Y.shape[1]
 
         if scale:
             self.mean = self.X.mean(dim=0, keepdim=True)
             self.std = self.X.std(dim=0, keepdim=True)
             self.X = (self.X - self.mean) / (self.std + 1e-8)
-        else:
-            self.mean, self.std = None, None
-    
+        else: self.mean, self.std = None, None
+
     def sample_episode(self, dim: int, seq_len: int, fixed_label: bool = False, weighted: bool = False):
-        """
-        Sample an episode of `seq_len` examples for a given dimension.
-        The positive example pool is the upper median split, and the negative example pool is the lower median split.
-        There is no guarantee that the positive and negative examples will be balanced, as the sampling is done randomly from the entire distribution.
-        If `weighted` is True, sample positive and negative instances weighted by their magnitude.
-        """
-        if not weighted:
-            n_samples = self.X.shape[0]
-            indices = torch.randperm(n_samples)[:seq_len]
-            
-            X_episode = self.X[indices]
-            Y_episode = (self.Y[indices, dim] >= self.medians[dim]).float()
-        else:
-            # determine the number of positive and negative samples from a normal distribution
-            std_dev = seq_len / 20.0 # this is just a heuristic, can be tuned
-            n_pos = int(torch.normal(mean=torch.tensor(seq_len / 2), std=torch.tensor(std_dev)).round().clamp(0, seq_len).item())
-            n_neg = seq_len - n_pos
+        raise NotImplementedError
 
-            # Identify positive and negative pools based on the median
-            median = self.medians[dim]
-            y_dim = self.Y[:, dim]
-            
-            pos_mask = y_dim >= median
-            neg_mask = ~pos_mask
-
-            pos_indices = torch.where(pos_mask)[0]
-            neg_indices = torch.where(neg_mask)[0]
-
-            # calculate weights for sampling based on magnitude from the median
-            pos_weights = y_dim[pos_mask] - median
-            neg_weights = median - y_dim[neg_mask]
-
-
-            # sample from positive and negative pools
-            pos_sample_indices = pos_indices[torch.multinomial(pos_weights, n_pos, replacement=False)]
-            neg_sample_indices = neg_indices[torch.multinomial(neg_weights, n_neg, replacement=False)]
-
-            # combine and shuffle
-            indices = torch.cat([pos_sample_indices, neg_sample_indices])
-            perm = torch.randperm(len(indices))
-            indices = indices[perm]
-
-            X_episode = self.X[indices]
-            Y_episode = (self.Y[indices, dim] >= self.medians[dim]).float()
-
-        if not fixed_label:
-            if torch.rand(1).item() < 0.5: Y_episode = 1 - Y_episode
-        return X_episode, Y_episode
-    
     def inverse_transform(self, X):
-        """
-        Inverse transform the data, i.e. scale it back to the original space.
-        """
+        "Inverse transform the data, i.e. scale it back to the original space."
         if self.mean is None or self.std is None:
             print("Warning: No scaling applied, returning original data.")
             return X
         return X * self.std + self.mean
 
-    def __len__(self):
-        return len(self.X)
+    def __len__(self): return len(self.X)
 
-    def __getitem__(self, idxs, dim):
-        return self.X[idxs], self.Y[idxs, dim]
+
+class SAEFunctionLearning(FunctionLearning):
+    "A dataset for learning functions from SAE embeddings."
+    def __init__(self, inputs: np.ndarray, sae_features: str, data_root: Path = Path("data/sae"), scale: bool = True, min_nonzero: int = 100):
+        "Initializes the dataset by preparing data and pre-calculating medians."
+        X = torch.tensor(inputs, dtype=torch.float32)
+        Y = torch.from_numpy(h5_to_numpy(sae_features, data_root=data_root, min_nonzero=min_nonzero))
+        super().__init__(X, Y, scale)
+
+    def sample_episode(self, dim: int, seq_len: int, fixed_label: bool = False, weighted: bool = False):
+        "Sample an episode. Class 0: zero value. Class 1: non-zero value. If weighted, sample non-zero values based on magnitude."
+        y_dim = self.Y[:, dim]
+        
+        std_dev = seq_len / 20.0
+        n_pos = int(torch.normal(mean=torch.tensor(seq_len / 2), std=torch.tensor(std_dev)).round().clamp(0, seq_len).item())
+        n_neg = seq_len - n_pos
+
+        pos_mask = y_dim != 0
+        neg_mask = ~pos_mask
+
+        pos_indices = torch.where(pos_mask)[0]
+        neg_indices = torch.where(neg_mask)[0]
+
+        if weighted:
+            pos_weights = y_dim[pos_mask]
+            pos_sample_indices = pos_indices[torch.multinomial(pos_weights, n_pos, replacement=False)]
+        else:
+            pos_sample_indices = pos_indices[torch.randperm(len(pos_indices))[:n_pos]]
+        
+        neg_sample_indices = neg_indices[torch.randperm(len(neg_indices))[:n_neg]]
+
+        indices = torch.cat([pos_sample_indices, neg_sample_indices])
+        indices = indices[torch.randperm(len(indices))]
+
+        X_episode = self.X[indices]
+        Y_episode = (self.Y[indices, dim] != 0).float()
+
+        if not fixed_label and torch.rand(1).item() < 0.5: Y_episode = 1 - Y_episode
+        return X_episode, Y_episode
+
+
+class ThingsFunctionLearning(FunctionLearning):
+    "A dataset for classification on the THINGS dataset, using SPoSE embeddings."
+    def __init__(self, representations: dict, data_root: Path = Path("data/external"), scale: bool = True):
+        "Initializes the dataset by preparing data and pre-calculating medians."
+        X, Y = prepare_things_spose(representations, data_root=data_root)
+        super().__init__(X, Y, scale)
+        self.medians = torch.median(self.Y, dim=0).values
     
+    def sample_episode(self, dim: int, seq_len: int, fixed_label: bool = False, weighted: bool = False):
+        "Sample an episode. Class 0: lower median split. Class 1: upper median split. If weighted, sample based on magnitude from median."
+        std_dev = seq_len / 20.0
+        n_pos = int(torch.normal(mean=torch.tensor(seq_len / 2), std=torch.tensor(std_dev)).round().clamp(0, seq_len).item())
+        n_neg = seq_len - n_pos
+
+        median = self.medians[dim]
+        y_dim = self.Y[:, dim]
+        
+        pos_mask = y_dim >= median
+        neg_mask = ~pos_mask
+
+        pos_indices = torch.where(pos_mask)[0]
+        neg_indices = torch.where(neg_mask)[0]
+
+        if weighted:
+            pos_weights = y_dim[pos_mask] - median
+            neg_weights = median - y_dim[neg_mask]
+            pos_sample_indices = pos_indices[torch.multinomial(pos_weights, n_pos, replacement=False)]
+            neg_sample_indices = neg_indices[torch.multinomial(neg_weights, n_neg, replacement=False)]
+        else:
+            pos_sample_indices = pos_indices[torch.randperm(len(pos_indices))[:n_pos]]
+            neg_sample_indices = neg_indices[torch.randperm(len(neg_indices))[:n_neg]]
+
+        indices = torch.cat([pos_sample_indices, neg_sample_indices])
+        indices = indices[torch.randperm(len(indices))]
+
+        X_episode = self.X[indices]
+        Y_episode = (self.Y[indices, dim] >= self.medians[dim]).float()
+
+        if not fixed_label and torch.rand(1).item() < 0.5: Y_episode = 1 - Y_episode
+        return X_episode, Y_episode

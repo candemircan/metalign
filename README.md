@@ -23,9 +23,9 @@ For setup, you need to do the following things:
     bash bin/get_data.sh
     ```
 
-4. Activate the virtual environment and run any script in the project.
+4. Run any python script with
     ```bash
-    source .venv/bin/activate
+    uv run bin/script.py
     ```
     
     *Note*: The `bin/*qmd` files contain the visualisations, and they need to be rendered with `quarto render file.qmd`. This generates the HTML files with the visualisations and places them under `logs/`. If you want to run them all, just run `quarto render .`.
