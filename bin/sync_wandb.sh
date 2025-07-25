@@ -10,10 +10,9 @@ CURRENT_TIME=$(date +%s)
 
 while [ $((CURRENT_TIME - START_TIME)) -lt "$RUN_DURATION_SECONDS" ]; do
 
-    echo "Attempting to sync all W&B runs from: $SHARED_WANDB_BASE_DIR"
-    wandb sync "$SHARED_WANDB_BASE_DIR"
+    uv run wandb sync "$SHARED_WANDB_BASE_DIR"
     sleep "$SYNC_INTERVAL_SECONDS"
     CURRENT_TIME=$(date +%s)
 done
 
-wandb sync "$SHARED_WANDB_BASE_DIR"
+uv run wandb sync "$SHARED_WANDB_BASE_DIR"
