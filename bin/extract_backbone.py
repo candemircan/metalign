@@ -17,10 +17,10 @@ _ = torch.set_grad_enabled(False)
 
 @call_parse
 def main(
+    dataset: str, # one of things or coco
     repo: str = "facebookresearch/dinov2", # repo given to `torch.hub.load`
     model_name: str = "dinov2_vitb14_reg", # model name in the repo, also given to `torch.hub.load`
     batch_size: int = 64, # batch size for the backbone model, for feature extraction
-    dataset: str = "things", # one of things or coco
     hf_repo: str = None, # HuggingFace repo to the backbone model. If provded, `repo` and `model` are ignored.
     force: bool = False # if True, will extract features even if the file already exists. Otherwise, will skip if the file  exists.
 ):

@@ -201,7 +201,8 @@ def main(
 
 
     if args["wandb_log"]:
-        wandb.init(project=args["wandb_name"], name=config.name, config=args, tags=args["tags"])
+        device_name = os.uname()[1]
+        wandb.init(project=args["wandb_name"], name=config.name, config=args, tags=args["tags"], mode="offine" if "juwels" in device_name else "online")
         wandb.watch(model, log='all', log_freq=args["log_interval_steps"] * 10)
 
     pbar = trange(start_step, args["training_steps"], desc="Training Steps")
