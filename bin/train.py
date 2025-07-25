@@ -201,7 +201,9 @@ def main(
 
 
     if args["wandb_log"]:
-        device_name = os.uname()[1]
+        # hacky way to see if i'm training on juwels, which does not have internet in compute nodes
+        # in this case, gotta also run bin/sync_wandb.sh from the login node
+        device_name = os.uname()[1] 
         wandb.init(project=args["wandb_name"], name=config.name, config=args, tags=args["tags"], mode="offine" if "juwels" in device_name else "online")
         wandb.watch(model, log='all', log_freq=args["log_interval_steps"] * 10)
 
