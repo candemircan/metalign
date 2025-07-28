@@ -163,3 +163,7 @@ wandb
 *ipynb
 /.quarto/
 .jupyter_cache
+
+example*
+
+example*

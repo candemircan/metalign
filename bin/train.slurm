@@ -1,21 +1,16 @@
 #!/bin/bash
-
+#SBATCH --account=hai_1065
 #SBATCH --nodes=1
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=32G
-#SBATCH --time=10:00:00
-#SBATCH --gres=gpu:1
-#SBATCH --partition=gpu_p
-#SBATCH --qos=gpu_normal
-#SBATCH --nice=10000
 #SBATCH --output=logs/train_%j.out
+#SBATCH --time=10:00:00
+#SBATCH --partition=booster
+#SBATCH --gres=gpu:4
 
-config_file="$1"
+module load CUDA/12
 
-# Check if the arguments are provided
-if [[ -z "$config_file" ]]; then
-    echo "Error: You need to provide a config file as a positional argument. e.g. sbatch bin/train.slurm data/example_transformer_config.toml"
-    exit 1
-fi
+srun --exclusive -n 1 --gres=gpu:1  --cpus-per-task=4 uv run bin/train.py --config_file data/configs/0.toml &
+srun --exclusive -n 1 --gres=gpu:1  --cpus-per-task=4 uv run bin/train.py --config_file data/configs/1.toml &
+srun --exclusive -n 1 --gres=gpu:1  --cpus-per-task=4 uv run bin/train.py --config_file data/configs/2.toml &
+srun --exclusive -n 1 --gres=gpu:1  --cpus-per-task=4 uv run bin/train.py --config_file data/configs/3.toml &
 
-uv run bin/train.py --config_file "$config_file"
+wait

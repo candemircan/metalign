@@ -31,7 +31,7 @@ def main(
     intermediate_size: int = 3072,  # size of the intermediate layer in the MLP of the transformer model
     num_layers: int = 6,  # number of transformer layers
     hidden_act: str = "gelu",  # activation function for the MLP in the transformer model
-    bias: bool = False,  # whether to use bias in the linear layers of the transformer model
+    bias: bool_arg = True,  # whether to use bias in the linear layers of the transformer model
     logit_bias: bool_arg = True,  # whether to use bias in the final linear layer of the transformer model. If False, the final layer will not have a bias term.
     attention_dropout: float = 0.0,  # dropout rate for the attention layers in the transformer model
     sequence_length: int = 100,  # maximum number of position embeddings in the transformer model
@@ -202,7 +202,7 @@ def main(
 
     if args["wandb_log"]:
         device_name = os.uname()[1]
-        wandb.init(project=args["wandb_name"], name=config.name, config=args, tags=args["tags"], mode="offine" if "juwels" in device_name else "online")
+        wandb.init(project=args["wandb_name"], name=config.name, config=args, tags=args["tags"], mode="offline" if "juwels" in device_name else "online")
         wandb.watch(model, log='all', log_freq=args["log_interval_steps"] * 10)
 
     pbar = trange(start_step, args["training_steps"], desc="Training Steps")
@@ -296,7 +296,7 @@ def main(
                         'model_state_dict': {k: v.cpu() for k, v in model.state_dict().items()},
                         'eval_accuracy': eval_accuracy,
                         'step': training_step,
-                        'config': config.to_dict(),
+                        'config': config,
                     }, best_checkpoint_path)
 
         if (training_step + 1) % args["checkpoint_interval_steps"] == 0:
@@ -306,7 +306,7 @@ def main(
                 'model_state_dict': {k: v.cpu() for k, v in model.state_dict().items()},
                 'optimizer_state_dict': optimizer.state_dict(),
                 'scheduler_state_dict': scheduler.state_dict() if scheduler else None,
-                'config': config.to_dict(),
+                'config': config,
             }, checkpoint_path)
 
     if args["wandb_log"]: wandb.finish()
