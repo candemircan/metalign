@@ -14,7 +14,7 @@ from torch.optim import AdamW
 from torch.optim.lr_scheduler import LambdaLR
 from tqdm import trange
 
-from metarep.data import SAEFunctionLearning, ThingsFunctionLearning
+from metarep.data import SAEFunctionLearning, SimpleFunctionLearning, ThingsFunctionLearning
 from metarep.model import Transformer, TransformerConfig
 
 torch.set_float32_matmul_precision('high')
@@ -65,6 +65,7 @@ def main(
     train_sae_features: str = "coco_sae-top_k-64-cls_only-layer_11-hook_resid_post",  # for SAE mode: SAE features for training data
     test_sae_features: str = "things_sae-top_k-64-cls_only-layer_11-hook_resid_post",  # for SAE mode: SAE features for test data
     min_nonzero: int = 100,  # for SAE mode: minimum number of non-zero activations per column to keep it in the final array
+    simple_mode: bool = False,  # whether to use simple sklearn-generated classification functions instead of backbone representations
 ):
     """
     train a meta-learning transformer model over function learning tasks.
@@ -86,7 +87,10 @@ def main(
     full_checkpoint_dir = f"data/checkpoints/{args["checkpoint_dir"]}" if args["name"] is None else f"data/checkpoints/{args["name"]}"
     if not os.path.exists(full_checkpoint_dir): os.makedirs(full_checkpoint_dir)
 
-    if args["sae_mode"]:
+    if args["simple_mode"]:
+        data = SimpleFunctionLearning(scale=args["scale"], random_state=args["seed"])
+        eval_data = data
+    elif args["sae_mode"]:
         train_backbone = args["sae_train_backbone"]
         test_backbone = args["sae_test_backbone"] 
         
@@ -212,6 +216,12 @@ def main(
     if args["sae_mode"]:
         train_dims = torch.tensor(list(range(data.Y.shape[1])), device=device)
         eval_dims_tensor = torch.tensor(list(range(eval_data.Y.shape[1])), device=device)
+    elif args["simple_mode"]:
+        # For simple mode, we can sample from a very large range since functions are generated on the fly
+        max_functions = 1000000  # Large number for effectively infinite functions
+        train_dims = torch.arange(max_functions, device=device)
+        eval_dims_tensor = torch.arange(args["eval_dims"][0] if args["eval_dims"] else 0, 
+                                      args["eval_dims"][-1] + 1 if args["eval_dims"] else 3, device=device)
     else:
         num_dims = list(range(data.Y.shape[1]))
         train_dims = torch.tensor([d for d in num_dims if d not in args["eval_dims"]], device=device)

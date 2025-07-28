@@ -2,7 +2,7 @@
 common datasets and processing utils  used throughout the project
 """
 
-__all__ = ["prepare_things_spose", "ImageDataset", "Things", "Coco", "ThingsFunctionLearning", "h5_to_numpy", "image_transform"]
+__all__ = ["prepare_things_spose", "ImageDataset", "Things", "Coco", "ThingsFunctionLearning", "SimpleFunctionLearning", "h5_to_numpy", "image_transform"]
 
 from pathlib import Path
 from typing import Sequence
@@ -11,6 +11,7 @@ import h5py
 import numpy as np
 import torch
 from PIL import Image
+from sklearn.datasets import make_classification
 from torch.utils.data import Dataset
 from torchvision import transforms
 
@@ -291,6 +292,76 @@ class ThingsFunctionLearning(FunctionLearning):
 
         X_episode = self.X[indices]
         Y_episode = (self.Y[indices, dim] >= self.medians[dim]).float()
+
+        if not fixed_label and torch.rand(1).item() < 0.5: Y_episode = 1 - Y_episode
+        return X_episode, Y_episode
+
+
+class SimpleFunctionLearning(FunctionLearning):
+    "A dataset for learning simple binary classification functions using sklearn, generating them on the fly."
+    def __init__(self, n_samples: int = 10000, n_features: int = 5, scale: bool = True, random_state: int = 42):
+        "Generate a base dataset for sampling episodes from dynamically created functions."
+        self.n_samples = n_samples
+        self.n_features = n_features
+        self.base_random_state = random_state
+        
+        # Create a dummy dataset just to initialize the base class
+        X_dummy, y_dummy = make_classification(
+            n_samples=n_samples,
+            n_features=n_features,
+            n_informative=n_features,
+            n_redundant=0,
+            n_clusters_per_class=1,
+            random_state=random_state
+        )
+        
+        X = torch.tensor(X_dummy, dtype=torch.float32)
+        Y = torch.tensor(y_dummy.reshape(-1, 1), dtype=torch.float32)  # Single dummy function
+        
+        super().__init__(X, Y, scale)
+        
+        # Override num_functions to be effectively infinite
+        self.num_functions = float('inf')
+        
+    def _generate_function(self, dim: int):
+        "Generate a classification function on the fly using the dim as seed."
+        X_func, y_func = make_classification(
+            n_samples=self.n_samples,
+            n_features=self.n_features,
+            n_informative=self.n_features,
+            n_redundant=0,
+            n_clusters_per_class=1,
+            random_state=self.base_random_state + dim
+        )
+        return torch.from_numpy(X_func).to(torch.float32), torch.from_numpy(y_func).to(torch.float32)
+        
+    def sample_episode(self, dim: int, seq_len: int, fixed_label: bool = False, weighted: bool = False):
+        "Sample an episode by generating a function on the fly."
+        # Generate the function for this specific dim
+        X_func, y_func = self._generate_function(dim.item())
+        
+        # Apply scaling if it was used during initialization
+        if self.mean is not None and self.std is not None:
+            X_func = (X_func - self.mean) / (self.std + 1e-8)
+        
+        std_dev = seq_len / 20.0
+        n_pos = int(torch.normal(mean=torch.tensor(seq_len / 2), std=torch.tensor(std_dev)).round().clamp(0, seq_len).item())
+        n_neg = seq_len - n_pos
+
+        pos_mask = y_func == 1
+        neg_mask = y_func == 0
+
+        pos_indices = torch.where(pos_mask)[0]
+        neg_indices = torch.where(neg_mask)[0]
+
+        pos_sample_indices = pos_indices[torch.randperm(len(pos_indices))[:n_pos]]
+        neg_sample_indices = neg_indices[torch.randperm(len(neg_indices))[:n_neg]]
+
+        indices = torch.cat([pos_sample_indices, neg_sample_indices])
+        indices = indices[torch.randperm(len(indices))]
+
+        X_episode = X_func[indices]
+        Y_episode = y_func[indices]
 
         if not fixed_label and torch.rand(1).item() < 0.5: Y_episode = 1 - Y_episode
         return X_episode, Y_episode
