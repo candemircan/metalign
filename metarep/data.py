@@ -2,7 +2,7 @@
 common datasets and processing utils  used throughout the project
 """
 
-__all__ = ["prepare_things_spose", "ImageDataset", "Things", "Coco", "ThingsFunctionLearning", "SimpleFunctionLearning", "h5_to_numpy", "image_transform"]
+__all__ = ["prepare_things_spose", "ImageDataset", "Things", "Coco", "h5_to_numpy", "image_transform", "ThingsEpisodeDataset", "SAEEpisodeDataset", "SimpleEpisodeDataset", "SAEActivationsCache"]
 
 from pathlib import Path
 from typing import Sequence
@@ -102,6 +102,41 @@ def h5_to_numpy(model_name: str = "things_sae-top_k-64-cls_only-layer_11-hook_re
     return activations
 
 
+class SAEActivationsCache:
+    "Efficient caching for SAE h5 file access with lazy loading."
+    def __init__(self, model_name: str, data_root: Path = Path("data/sae"), min_nonzero: int = 1):
+        self.file_path = data_root / f"{model_name}.h5"
+        self.min_nonzero = min_nonzero
+        self._activations = None
+        self._valid_columns = None
+        
+    def _load_data(self):
+        if self._activations is not None: return
+        
+        with h5py.File(self.file_path, 'r') as sae_h5:
+            all_indices = []
+            for k in sae_h5.keys():
+                all_indices.extend(sae_h5[k]["indices"][:].tolist())
+            
+            num_cols = max(all_indices) + 1
+            self._activations = np.zeros((len(sae_h5), num_cols), dtype=np.float32)
+            
+            for img in range(len(sae_h5)):
+                img_id = str(img)
+                h5_activations = sae_h5[img_id]["activations"][:]
+                indices = sae_h5[img_id]["indices"][:]
+                self._activations[img, indices] = h5_activations
+        
+        non_zero_counts = np.count_nonzero(self._activations, axis=0)
+        self._valid_columns = non_zero_counts >= self.min_nonzero
+        self._activations = self._activations[:, self._valid_columns]
+    
+    @property
+    def activations(self):
+        self._load_data()
+        return self._activations
+
+
 
 def prepare_things_spose(
     representations: np.lib.npyio.NpzFile, # directly from np.load("data/backbone_reps/{backbone}.npz"), keys are different token types (e.g. cls), values are numpy arrays of shape (N, D) where N is the number of images and D is the dimension of the representation 
@@ -189,85 +224,40 @@ class Coco(ImageDataset):
         super().__init__(root=root, glob_pattern="*.jpg", total_images=total_images)
 
 
-class FunctionLearning(Dataset):
-    "Base class for function learning datasets."
-    def __init__(self, X: torch.Tensor, Y: torch.Tensor, scale: bool = True):
+class ThingsEpisodeDataset(Dataset):
+    "Episode-based dataset for THINGS, optimized for DataLoader usage."
+    def __init__(self, representations: dict, data_root: Path = Path("data/external"), 
+                 seq_len: int = 120, scale: bool = True, fixed_label: bool = False, 
+                 weighted: bool = False, train_dims: list = None, epoch_size: int = 100000):
+        X, Y = prepare_things_spose(representations, data_root=data_root)
+        
         self.X, self.Y = X, Y
         self.feature_dim = self.X.shape[1]
         self.num_functions = self.Y.shape[1]
-
+        self.seq_len = seq_len
+        self.fixed_label = fixed_label
+        self.weighted = weighted
+        self.epoch_size = epoch_size
+        
         if scale:
             self.mean = self.X.mean(dim=0, keepdim=True)
             self.std = self.X.std(dim=0, keepdim=True)
             self.X = (self.X - self.mean) / (self.std + 1e-8)
         else: self.mean, self.std = None, None
-
-    def sample_episode(self, dim: int, seq_len: int, fixed_label: bool = False, weighted: bool = False):
-        raise NotImplementedError
-
-    def inverse_transform(self, X):
-        "Inverse transform the data, i.e. scale it back to the original space."
-        if self.mean is None or self.std is None:
-            print("Warning: No scaling applied, returning original data.")
-            return X
-        return X * self.std + self.mean
-
-    def __len__(self): return len(self.X)
-
-
-class SAEFunctionLearning(FunctionLearning):
-    "A dataset for learning functions from SAE embeddings."
-    def __init__(self, inputs: np.ndarray, sae_features: str, data_root: Path = Path("data/sae"), scale: bool = True, min_nonzero: int = 100):
-        "Initializes the dataset by preparing data and pre-calculating medians."
-        X = torch.tensor(inputs, dtype=torch.float32)
-        Y = torch.from_numpy(h5_to_numpy(sae_features, data_root=data_root, min_nonzero=min_nonzero))
-        super().__init__(X, Y, scale)
-
-    def sample_episode(self, dim: int, seq_len: int, fixed_label: bool = False, weighted: bool = False):
-        "Sample an episode. Class 0: zero value. Class 1: non-zero value. If weighted, sample non-zero values based on magnitude."
-        y_dim = self.Y[:, dim]
-        
-        std_dev = seq_len / 20.0
-        n_pos = int(torch.normal(mean=torch.tensor(seq_len / 2), std=torch.tensor(std_dev)).round().clamp(0, seq_len).item())
-        n_neg = seq_len - n_pos
-
-        pos_mask = y_dim != 0
-        neg_mask = ~pos_mask
-
-        pos_indices = torch.where(pos_mask)[0]
-        neg_indices = torch.where(neg_mask)[0]
-
-        if weighted:
-            pos_weights = y_dim[pos_mask]
-            pos_sample_indices = pos_indices[torch.multinomial(pos_weights, n_pos, replacement=False)]
-        else:
-            pos_sample_indices = pos_indices[torch.randperm(len(pos_indices))[:n_pos]]
-        
-        neg_sample_indices = neg_indices[torch.randperm(len(neg_indices))[:n_neg]]
-
-        indices = torch.cat([pos_sample_indices, neg_sample_indices])
-        indices = indices[torch.randperm(len(indices))]
-
-        X_episode = self.X[indices]
-        Y_episode = (self.Y[indices, dim] != 0).float()
-
-        if not fixed_label and torch.rand(1).item() < 0.5: Y_episode = 1 - Y_episode
-        return X_episode, Y_episode
-
-
-class ThingsFunctionLearning(FunctionLearning):
-    "A dataset for classification on the THINGS dataset, using SPoSE embeddings."
-    def __init__(self, representations: dict, data_root: Path = Path("data/external"), scale: bool = True):
-        "Initializes the dataset by preparing data and pre-calculating medians."
-        X, Y = prepare_things_spose(representations, data_root=data_root)
-        super().__init__(X, Y, scale)
+            
         self.medians = torch.median(self.Y, dim=0).values
+        self.train_dims = train_dims if train_dims is not None else list(range(self.num_functions))
+        
+    def __len__(self): return self.epoch_size
     
-    def sample_episode(self, dim: int, seq_len: int, fixed_label: bool = False, weighted: bool = False):
-        "Sample an episode. Class 0: lower median split. Class 1: upper median split. If weighted, sample based on magnitude from median."
-        std_dev = seq_len / 20.0
-        n_pos = int(torch.normal(mean=torch.tensor(seq_len / 2), std=torch.tensor(std_dev)).round().clamp(0, seq_len).item())
-        n_neg = seq_len - n_pos
+    def __getitem__(self, idx):
+        dim = self.train_dims[idx % len(self.train_dims)]
+        return self._sample_episode(dim)
+        
+    def _sample_episode(self, dim: int):
+        std_dev = self.seq_len / 20.0
+        n_pos = int(torch.normal(mean=torch.tensor(self.seq_len / 2), std=torch.tensor(std_dev)).round().clamp(0, self.seq_len).item())
+        n_neg = self.seq_len - n_pos
 
         median = self.medians[dim]
         y_dim = self.Y[:, dim]
@@ -278,7 +268,7 @@ class ThingsFunctionLearning(FunctionLearning):
         pos_indices = torch.where(pos_mask)[0]
         neg_indices = torch.where(neg_mask)[0]
 
-        if weighted:
+        if self.weighted:
             pos_weights = y_dim[pos_mask] - median
             neg_weights = median - y_dim[neg_mask]
             pos_sample_indices = pos_indices[torch.multinomial(pos_weights, n_pos, replacement=False)]
@@ -293,20 +283,89 @@ class ThingsFunctionLearning(FunctionLearning):
         X_episode = self.X[indices]
         Y_episode = (self.Y[indices, dim] >= self.medians[dim]).float()
 
-        if not fixed_label and torch.rand(1).item() < 0.5: Y_episode = 1 - Y_episode
+        if not self.fixed_label and torch.rand(1).item() < 0.5: Y_episode = 1 - Y_episode
         return X_episode, Y_episode
 
 
-class SimpleFunctionLearning(FunctionLearning):
-    "A dataset for learning simple binary classification functions using sklearn, generating them on the fly."
-    def __init__(self, n_samples: int = 10000, n_features: int = 5, scale: bool = True, random_state: int = 42):
-        "Generate a base dataset for sampling episodes from dynamically created functions."
+class SAEEpisodeDataset(Dataset):
+    "Episode-based dataset for SAE features, optimized for DataLoader usage."
+    def __init__(self, inputs: np.ndarray, sae_features: str, data_root: Path = Path("data/sae"),
+                 seq_len: int = 120, scale: bool = True, min_nonzero: int = 100,
+                 fixed_label: bool = False, weighted: bool = False, train_dims: list = None, 
+                 epoch_size: int = 100000):
+        X = torch.tensor(inputs, dtype=torch.float32)
+        
+        # Use cached loading for SAE features
+        self.sae_cache = SAEActivationsCache(sae_features, data_root=data_root, min_nonzero=min_nonzero)
+        Y = torch.from_numpy(self.sae_cache.activations)
+        
+        self.X, self.Y = X, Y
+        self.feature_dim = self.X.shape[1]
+        self.num_functions = self.Y.shape[1]
+        self.seq_len = seq_len
+        self.fixed_label = fixed_label
+        self.weighted = weighted
+        self.epoch_size = epoch_size
+        
+        if scale:
+            self.mean = self.X.mean(dim=0, keepdim=True)
+            self.std = self.X.std(dim=0, keepdim=True)
+            self.X = (self.X - self.mean) / (self.std + 1e-8)
+        else: self.mean, self.std = None, None
+            
+        self.train_dims = train_dims if train_dims is not None else list(range(self.num_functions))
+        
+    def __len__(self): return self.epoch_size
+    
+    def __getitem__(self, idx):
+        dim = self.train_dims[idx % len(self.train_dims)]
+        return self._sample_episode(dim)
+        
+    def _sample_episode(self, dim: int):
+        y_dim = self.Y[:, dim]
+        
+        std_dev = self.seq_len / 20.0
+        n_pos = int(torch.normal(mean=torch.tensor(self.seq_len / 2), std=torch.tensor(std_dev)).round().clamp(0, self.seq_len).item())
+        n_neg = self.seq_len - n_pos
+
+        pos_mask = y_dim != 0
+        neg_mask = ~pos_mask
+
+        pos_indices = torch.where(pos_mask)[0]
+        neg_indices = torch.where(neg_mask)[0]
+
+        if self.weighted:
+            pos_weights = y_dim[pos_mask]
+            pos_sample_indices = pos_indices[torch.multinomial(pos_weights, n_pos, replacement=False)]
+        else:
+            pos_sample_indices = pos_indices[torch.randperm(len(pos_indices))[:n_pos]]
+        
+        neg_sample_indices = neg_indices[torch.randperm(len(neg_indices))[:n_neg]]
+
+        indices = torch.cat([pos_sample_indices, neg_sample_indices])
+        indices = indices[torch.randperm(len(indices))]
+
+        X_episode = self.X[indices]
+        Y_episode = (self.Y[indices, dim] != 0).float()
+
+        if not self.fixed_label and torch.rand(1).item() < 0.5: Y_episode = 1 - Y_episode
+        return X_episode, Y_episode
+
+
+class SimpleEpisodeDataset(Dataset):
+    "Episode-based dataset for simple functions, optimized for DataLoader usage."
+    def __init__(self, n_samples: int = 10000, n_features: int = 5, scale: bool = True, 
+                 random_state: int = 42, seq_len: int = 120, fixed_label: bool = False,
+                 epoch_size: int = 100000):
         self.n_samples = n_samples
         self.n_features = n_features
         self.base_random_state = random_state
+        self.seq_len = seq_len
+        self.fixed_label = fixed_label
+        self.epoch_size = epoch_size
         
-        # Create a dummy dataset just to initialize the base class
-        X_dummy, y_dummy = make_classification(
+        # Generate base data for scaling parameters
+        X_dummy, _ = make_classification(
             n_samples=n_samples,
             n_features=n_features,
             n_informative=n_features,
@@ -315,16 +374,23 @@ class SimpleFunctionLearning(FunctionLearning):
             random_state=random_state
         )
         
-        X = torch.tensor(X_dummy, dtype=torch.float32)
-        Y = torch.tensor(y_dummy.reshape(-1, 1), dtype=torch.float32)  # Single dummy function
+        X_dummy = torch.tensor(X_dummy, dtype=torch.float32)
         
-        super().__init__(X, Y, scale)
+        if scale:
+            self.mean = X_dummy.mean(dim=0, keepdim=True)
+            self.std = X_dummy.std(dim=0, keepdim=True)
+        else: self.mean, self.std = None, None
+            
+        self.feature_dim = n_features
         
-        # Override num_functions to be effectively infinite
-        self.num_functions = float('inf')
+    def __len__(self): return self.epoch_size
+    
+    def __getitem__(self, idx):
+        # Use idx as the function dimension/seed
+        return self._sample_episode(idx)
         
-    def _generate_function(self, dim: int):
-        "Generate a classification function on the fly using the dim as seed."
+    def _sample_episode(self, dim: int):
+        # Generate function on the fly
         X_func, y_func = make_classification(
             n_samples=self.n_samples,
             n_features=self.n_features,
@@ -333,20 +399,17 @@ class SimpleFunctionLearning(FunctionLearning):
             n_clusters_per_class=1,
             random_state=self.base_random_state + dim
         )
-        return torch.from_numpy(X_func).to(torch.float32), torch.from_numpy(y_func).to(torch.float32)
         
-    def sample_episode(self, dim: int, seq_len: int, fixed_label: bool = False, weighted: bool = False):
-        "Sample an episode by generating a function on the fly."
-        # Generate the function for this specific dim
-        X_func, y_func = self._generate_function(dim.item())
+        X_func = torch.tensor(X_func, dtype=torch.float32)
+        y_func = torch.tensor(y_func, dtype=torch.float32)
         
-        # Apply scaling if it was used during initialization
+        # Apply scaling
         if self.mean is not None and self.std is not None:
             X_func = (X_func - self.mean) / (self.std + 1e-8)
         
-        std_dev = seq_len / 20.0
-        n_pos = int(torch.normal(mean=torch.tensor(seq_len / 2), std=torch.tensor(std_dev)).round().clamp(0, seq_len).item())
-        n_neg = seq_len - n_pos
+        std_dev = self.seq_len / 20.0
+        n_pos = int(torch.normal(mean=torch.tensor(self.seq_len / 2), std=torch.tensor(std_dev)).round().clamp(0, self.seq_len).item())
+        n_neg = self.seq_len - n_pos
 
         pos_mask = y_func == 1
         neg_mask = y_func == 0
@@ -363,5 +426,5 @@ class SimpleFunctionLearning(FunctionLearning):
         X_episode = X_func[indices]
         Y_episode = y_func[indices]
 
-        if not fixed_label and torch.rand(1).item() < 0.5: Y_episode = 1 - Y_episode
+        if not self.fixed_label and torch.rand(1).item() < 0.5: Y_episode = 1 - Y_episode
         return X_episode, Y_episode

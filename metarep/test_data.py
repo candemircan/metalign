@@ -6,7 +6,7 @@ import pytest
 import torch
 from PIL import Image
 
-from metarep.data import Coco, ImageDataset, Things, ThingsFunctionLearning, h5_to_numpy, image_transform, prepare_things_spose
+from metarep.data import Coco, ImageDataset, SAEActivationsCache, SAEEpisodeDataset, SimpleEpisodeDataset, Things, ThingsEpisodeDataset, h5_to_numpy, image_transform, prepare_things_spose
 
 
 @pytest.fixture
@@ -148,7 +148,7 @@ def test_prepare_things_spose(tmp_path: Path, monkeypatch):
     assert X_all.shape == (2, 30)
 
 
-def test_things_function_learning(tmp_path: Path, monkeypatch):
+def test_things_episode_dataset(tmp_path: Path, monkeypatch):
     from metarep import data
     monkeypatch.setattr(data, "NUM_THINGS_CATEGORIES", 2)
     
@@ -173,12 +173,103 @@ def test_things_function_learning(tmp_path: Path, monkeypatch):
     
     representations = {"cls": np.random.rand(2, 10).astype(np.float32)}
     
-    dataset = ThingsFunctionLearning(representations, data_root=data_root)
-    assert len(dataset) == 2
+    dataset = ThingsEpisodeDataset(representations, data_root=data_root, seq_len=10, epoch_size=100)
+    assert len(dataset) == 100
     assert dataset.feature_dim == 10
     assert dataset.num_functions == 66
     
-    X_ep, Y_ep = dataset.sample_episode(dim=0, seq_len=2)
-    assert X_ep.shape[1] == 10
-    assert Y_ep.shape[0] == X_ep.shape[0]
-    assert 0 <= Y_ep.shape[0] <= 2
+    # Test __getitem__ returns correct shapes
+    X_ep, Y_ep = dataset[0]
+    assert X_ep.shape[1] == 10  # feature_dim
+    assert Y_ep.shape[0] == X_ep.shape[0]  # same sequence length
+    assert X_ep.shape[0] <= 10  # seq_len constraint
+    assert isinstance(X_ep, torch.Tensor)
+    assert isinstance(Y_ep, torch.Tensor)
+    
+    # Test multiple episodes have different samples
+    X_ep2, Y_ep2 = dataset[1]
+    assert not torch.equal(X_ep, X_ep2)  # Should be different episodes
+
+
+def test_simple_episode_dataset():
+    dataset = SimpleEpisodeDataset(n_samples=1000, n_features=5, seq_len=20, epoch_size=50)
+    assert len(dataset) == 50
+    assert dataset.feature_dim == 5
+    
+    # Test __getitem__ returns correct shapes
+    X_ep, Y_ep = dataset[0]
+    assert X_ep.shape == (20, 5)  # (seq_len, n_features)
+    assert Y_ep.shape == (20,)    # (seq_len,)
+    assert isinstance(X_ep, torch.Tensor)
+    assert isinstance(Y_ep, torch.Tensor)
+    
+    # Test different episodes generate different functions
+    X_ep2, Y_ep2 = dataset[1]
+    assert not torch.equal(X_ep, X_ep2)  # Different functions should give different data
+
+
+def test_sae_activations_cache(tmp_path: Path):
+    data_root = tmp_path / "sae"
+    data_root.mkdir()
+    
+    test_file = data_root / "test_model.h5"
+    
+    with h5py.File(test_file, 'w') as f:
+        f.create_group("0")
+        f["0"].create_dataset("activations", data=[1.0, 2.0, 3.0])
+        f["0"].create_dataset("indices", data=[0, 2, 4])
+        
+        f.create_group("1")
+        f["1"].create_dataset("activations", data=[4.0, 5.0])
+        f["1"].create_dataset("indices", data=[1, 3])
+    
+    cache = SAEActivationsCache("test_model", data_root=data_root, min_nonzero=1)
+    activations = cache.activations
+    
+    assert activations.shape[0] == 2
+    assert activations[0, 0] == 1.0
+    assert activations[0, 2] == 2.0
+    assert activations[0, 4] == 3.0
+    assert activations[1, 1] == 4.0
+    assert activations[1, 3] == 5.0
+
+
+def test_sae_episode_dataset(tmp_path: Path):
+    # Create test SAE data
+    data_root = tmp_path / "sae"
+    data_root.mkdir()
+    
+    test_file = data_root / "test_sae.h5"
+    
+    with h5py.File(test_file, 'w') as f:
+        f.create_group("0")
+        f["0"].create_dataset("activations", data=[1.0, 2.0])
+        f["0"].create_dataset("indices", data=[0, 2])
+        
+        f.create_group("1") 
+        f["1"].create_dataset("activations", data=[3.0])
+        f["1"].create_dataset("indices", data=[1])
+    
+    # Test inputs
+    inputs = np.random.rand(2, 10).astype(np.float32)
+    
+    dataset = SAEEpisodeDataset(
+        inputs=inputs,
+        sae_features="test_sae",
+        data_root=data_root,
+        seq_len=2,
+        min_nonzero=1,
+        epoch_size=20
+    )
+    
+    assert len(dataset) == 20
+    assert dataset.feature_dim == 10
+    assert dataset.num_functions == 3  # 3 SAE features after filtering
+    
+    # Test __getitem__ returns correct shapes
+    X_ep, Y_ep = dataset[0]
+    assert X_ep.shape[1] == 10  # input feature dim
+    assert Y_ep.shape[0] == X_ep.shape[0]  # same sequence length
+    assert X_ep.shape[0] <= 2  # seq_len constraint
+    assert isinstance(X_ep, torch.Tensor)
+    assert isinstance(Y_ep, torch.Tensor)

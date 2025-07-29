@@ -26,7 +26,7 @@ class TransformerConfig:
     attention_dropout: float = 0.0
     sequence_length: int = 100
     name: Optional[str] = None
-    positional_embedding_type: str = "learned" # Only "learned" is supported
+    positional_embedding_type: str = "learned"
 
     def __post_init__(self):
         if self.hidden_size % self.num_attention_heads != 0:

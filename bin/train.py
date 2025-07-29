@@ -1,20 +1,20 @@
-import math
 import os
 import random
 import tomllib
+from pathlib import Path
 from pprint import pprint
 
 import numpy as np
 import torch
 import wandb
 from fastcore.script import Param, bool_arg, call_parse
+from schedulefree import AdamWScheduleFree
 from sklearn.decomposition import PCA
 from torch.nn import functional as F
-from torch.optim import AdamW
-from torch.optim.lr_scheduler import LambdaLR
+from torch.utils.data import DataLoader
 from tqdm import trange
 
-from metarep.data import SAEFunctionLearning, SimpleFunctionLearning, ThingsFunctionLearning
+from metarep.data import SAEActivationsCache, SAEEpisodeDataset, SimpleEpisodeDataset, ThingsEpisodeDataset, prepare_things_spose
 from metarep.model import Transformer, TransformerConfig
 
 torch.set_float32_matmul_precision('high')
@@ -34,17 +34,16 @@ def main(
     bias: bool_arg = True,  # whether to use bias in the linear layers of the transformer model
     logit_bias: bool_arg = True,  # whether to use bias in the final linear layer of the transformer model. If False, the final layer will not have a bias term.
     attention_dropout: float = 0.0,  # dropout rate for the attention layers in the transformer model
-    sequence_length: int = 100,  # maximum number of position embeddings in the transformer model
+    sequence_length: int = 120,  # maximum number of position embeddings in the transformer model
     config_file: str = None,  # path to a config file. If provided, any parameters in the file will override the corresponding command line arguments. See "data/example_transformer_config.toml" for an example config file.
     batch_size: int = 256,  # batch size for training the model
     training_steps: int = 1000000,  # number of training steps per epoch
     seed: int = 1234, # random seed for reproducibility
-    lr: float = 1e-4,  # learning rate for the optimizer
-    weight_decay: float = 1e-4,  # weight decay for the optimizer
+    lr: float = 0.0025,  # learning rate for the optimizer
+    weight_decay: float = 0,  # weight decay for the optimizer
     warmup_steps: int = 10000,  # number of warmup steps for the learning rate scheduler
     name: str = None,  # name of the model. If provided, it will be used to log the model.
     num_components: int = None,  # number of components to use for dimensionality reduction. If None, the original data is used.
-    constant_lr: bool = False,  # If True, do not schedule the LR, also no warmup then
     log_interval_steps: int = 10,  # log training loss every N steps
     eval_interval_steps: int = 100,  # evaluate the model every eval_interval_steps steps
     num_eval_episodes: int = 128,  # number of episodes to sample for evaluation
@@ -64,7 +63,7 @@ def main(
     sae_test_backbone: str = "things_dinov2_vitb14_reg",  # for SAE mode: backbone for test data.
     train_sae_features: str = "coco_sae-top_k-64-cls_only-layer_11-hook_resid_post",  # for SAE mode: SAE features for training data
     test_sae_features: str = "things_sae-top_k-64-cls_only-layer_11-hook_resid_post",  # for SAE mode: SAE features for test data
-    min_nonzero: int = 100,  # for SAE mode: minimum number of non-zero activations per column to keep it in the final array
+    min_nonzero: int = 120,  # for SAE mode: minimum number of non-zero activations per column to keep it in the final array
     simple_mode: bool = False,  # whether to use simple sklearn-generated classification functions instead of backbone representations
 ):
     """
@@ -88,8 +87,28 @@ def main(
     if not os.path.exists(full_checkpoint_dir): os.makedirs(full_checkpoint_dir)
 
     if args["simple_mode"]:
-        data = SimpleFunctionLearning(scale=args["scale"], random_state=args["seed"])
-        eval_data = data
+        n_features = 5
+        
+        train_episode_dataset = SimpleEpisodeDataset(
+            n_samples=10000,
+            n_features=n_features,
+            scale=args["scale"],
+            random_state=args["seed"],
+            seq_len=args["sequence_length"],
+            fixed_label=args["fixed_label"],
+            epoch_size=args["training_steps"]
+        )
+        
+        eval_episode_dataset = SimpleEpisodeDataset(
+            n_samples=10000,
+            n_features=n_features,
+            scale=args["scale"],
+            random_state=args["seed"] + 9999,  # different seed for eval
+            seq_len=args["sequence_length"],
+            fixed_label=args["fixed_label"],
+            epoch_size=args["num_eval_episodes"]
+        )
+        
     elif args["sae_mode"]:
         train_backbone = args["sae_train_backbone"]
         test_backbone = args["sae_test_backbone"] 
@@ -97,48 +116,214 @@ def main(
         train_representations = np.load(f"data/backbone_reps/{train_backbone}.npz")
         train_inputs = np.concatenate([train_representations[key] for key in train_representations.keys()], axis=1) if args["input_type"] == "all" else train_representations[args["input_type"]]
         
-        train_data = SAEFunctionLearning(
-            inputs=train_inputs,
-            sae_features=args["train_sae_features"],
-            scale=args["scale"],
-            min_nonzero=args["min_nonzero"]
-        )
-        
         test_representations = np.load(f"data/backbone_reps/{test_backbone}.npz")
         test_inputs = np.concatenate([test_representations[key] for key in test_representations.keys()], axis=1) if args["input_type"] == "all" else test_representations[args["input_type"]]
         
-        test_data = SAEFunctionLearning(
-            inputs=test_inputs,
-            sae_features=args["test_sae_features"],
+        # Get feature dimension from input data
+        feature_dim = train_inputs.shape[1]
+        
+        train_dims = list(range(SAEActivationsCache(args["train_sae_features"], data_root=Path("data/sae"), min_nonzero=args["min_nonzero"]).activations.shape[1]))
+        eval_dims = list(range(SAEActivationsCache(args["test_sae_features"], data_root=Path("data/sae"), min_nonzero=args["min_nonzero"]).activations.shape[1]))
+        
+        train_episode_dataset = SAEEpisodeDataset(
+            inputs=train_inputs,
+            sae_features=args["train_sae_features"],
+            data_root=Path("data/sae"),
+            seq_len=args["sequence_length"],
             scale=args["scale"],
-            min_nonzero=args["min_nonzero"]
+            min_nonzero=args["min_nonzero"],
+            fixed_label=args["fixed_label"],
+            weighted=args["weighted"],
+            train_dims=train_dims,
+            epoch_size=args["training_steps"]
         )
         
-        data = train_data
-        eval_data = test_data
+        eval_episode_dataset = SAEEpisodeDataset(
+            inputs=test_inputs,
+            sae_features=args["test_sae_features"],
+            data_root=Path("data/sae"),
+            seq_len=args["sequence_length"],
+            scale=args["scale"],
+            min_nonzero=args["min_nonzero"],
+            fixed_label=args["fixed_label"],
+            weighted=args["weighted"],
+            train_dims=eval_dims,
+            epoch_size=args["num_eval_episodes"]
+        )
+        
     else:
         representations = np.load(f"data/backbone_reps/{args["backbone"]}.npz")
         if args["input_type"] != "all": representations = {args["input_type"]: representations[args["input_type"]]}
-        data = ThingsFunctionLearning(representations=representations, scale=args["scale"])
-        eval_data = data
+        
+        # Get feature dimension from representations
+        if args["input_type"] == "all":
+            feature_dim = sum(representations[key].shape[1] for key in representations.keys())
+        else:
+            feature_dim = representations[args["input_type"]].shape[1]
+        
+        # Prepare SPoSE data for dimension info
+        X, Y = prepare_things_spose(representations, data_root=Path("data/external"))
+        num_dims = list(range(Y.shape[1]))
+        train_dims = [d for d in num_dims if d not in args["eval_dims"]]
+        eval_dims = args["eval_dims"]
+        
+        train_episode_dataset = ThingsEpisodeDataset(
+            representations=representations,
+            data_root=Path("data/external"),
+            seq_len=args["sequence_length"],
+            scale=args["scale"],
+            fixed_label=args["fixed_label"],
+            weighted=args["weighted"],
+            train_dims=train_dims,
+            epoch_size=args["training_steps"]
+        )
+        
+        eval_episode_dataset = ThingsEpisodeDataset(
+            representations=representations,
+            data_root=Path("data/external"),
+            seq_len=args["sequence_length"],
+            scale=args["scale"],
+            fixed_label=args["fixed_label"],
+            weighted=args["weighted"],
+            train_dims=eval_dims,
+            epoch_size=args["num_eval_episodes"]
+        )
 
-    if args["spose_input"]:
-        data.X = data.Y
-        data.feature_dim = data.X.shape[1]
-        args["backbone"] = "spose"
-
+    # Apply PCA if specified
     if args["num_components"] is not None:
         pca = PCA(n_components=args["num_components"], random_state=args["seed"])
-        data.X = torch.from_numpy(pca.fit_transform(data.X)).to(torch.float32)
-        data.feature_dim = args["num_components"]
         
-        if args["sae_mode"]:
-            eval_data.X = torch.from_numpy(pca.transform(eval_data.X)).to(torch.float32)
-            eval_data.feature_dim = args["num_components"]
+        if args["simple_mode"]:
+            # For simple mode, we need to update the dataset's scaling parameters
+            feature_dim = args["num_components"]
+            train_episode_dataset.feature_dim = feature_dim
+            eval_episode_dataset.feature_dim = feature_dim
+        elif args["sae_mode"]:
+            # Transform SAE inputs and update datasets
+            train_inputs_pca = pca.fit_transform(train_inputs)
+            test_inputs_pca = pca.transform(test_inputs)
+            feature_dim = args["num_components"]
+            
+            # Update datasets with PCA-transformed inputs
+            train_episode_dataset = SAEEpisodeDataset(
+                inputs=train_inputs_pca,
+                sae_features=args["train_sae_features"],
+                data_root=Path("data/sae"),
+                seq_len=args["sequence_length"],
+                scale=args["scale"],
+                min_nonzero=args["min_nonzero"],
+                fixed_label=args["fixed_label"],
+                weighted=args["weighted"],
+                train_dims=train_dims,
+                epoch_size=args["training_steps"]
+            )
+            
+            eval_episode_dataset = SAEEpisodeDataset(
+                inputs=test_inputs_pca,
+                sae_features=args["test_sae_features"],
+                data_root=Path("data/sae"),
+                seq_len=args["sequence_length"],
+                scale=args["scale"],
+                min_nonzero=args["min_nonzero"],
+                fixed_label=args["fixed_label"],
+                weighted=args["weighted"],
+                train_dims=eval_dims,
+                epoch_size=args["num_eval_episodes"]
+            )
+        else:
+            # For THINGS, apply PCA to representation data
+            if args["input_type"] == "all":
+                all_data = np.concatenate([representations[key] for key in representations.keys()], axis=1)
+            else:
+                all_data = representations[args["input_type"]]
+            
+            all_data_pca = pca.fit_transform(all_data)
+            feature_dim = args["num_components"]
+            
+            # Create new representations dict with PCA data
+            pca_representations = {"pca": all_data_pca}
+            
+            # Update datasets with PCA data
+            train_episode_dataset = ThingsEpisodeDataset(
+                representations=pca_representations,
+                data_root=Path("data/external"),
+                seq_len=args["sequence_length"],
+                scale=args["scale"],
+                fixed_label=args["fixed_label"],
+                weighted=args["weighted"],
+                train_dims=train_dims,
+                epoch_size=args["training_steps"]
+            )
+            
+            eval_episode_dataset = ThingsEpisodeDataset(
+                representations=pca_representations,
+                data_root=Path("data/external"),
+                seq_len=args["sequence_length"],
+                scale=args["scale"],
+                fixed_label=args["fixed_label"],
+                weighted=args["weighted"],
+                train_dims=eval_dims,
+                epoch_size=args["num_eval_episodes"]
+            )
 
+    # Apply SPoSE input override if specified
+    if args["spose_input"]:
+        # Load SPoSE data and use as input
+        if not args["simple_mode"]:  # Simple mode doesn't have SPoSE data
+            representations_for_spose = np.load(f"data/backbone_reps/{args["backbone"]}.npz") if "backbone" in args else representations
+            if args["input_type"] != "all": 
+                representations_for_spose = {args["input_type"]: representations_for_spose[args["input_type"]]}
+            
+            X, Y = prepare_things_spose(representations_for_spose, data_root=Path("data/external"))
+            feature_dim = Y.shape[1]  # Use SPoSE dimensions as features
+            args["backbone"] = "spose"
+            
+            # Create new datasets using SPoSE as input
+            spose_representations = {"spose": Y.numpy()}
+            
+            train_episode_dataset = ThingsEpisodeDataset(
+                representations=spose_representations,
+                data_root=Path("data/external"),
+                seq_len=args["sequence_length"],
+                scale=args["scale"],
+                fixed_label=args["fixed_label"],
+                weighted=args["weighted"],
+                train_dims=train_dims,
+                epoch_size=args["training_steps"]
+            )
+            
+            eval_episode_dataset = ThingsEpisodeDataset(
+                representations=spose_representations,
+                data_root=Path("data/external"),
+                seq_len=args["sequence_length"],
+                scale=args["scale"],
+                fixed_label=args["fixed_label"],
+                weighted=args["weighted"],
+                train_dims=eval_dims,
+                epoch_size=args["num_eval_episodes"]
+            )
+
+    # Create DataLoaders
+    train_loader = DataLoader(
+        train_episode_dataset,
+        batch_size=args["batch_size"],
+        num_workers=min(4, os.cpu_count()),
+        pin_memory=torch.cuda.is_available(),
+        shuffle=True,
+        drop_last=True
+    )
+    
+    eval_loader = DataLoader(
+        eval_episode_dataset,
+        batch_size=args["batch_size"],
+        num_workers=min(2, os.cpu_count()),
+        pin_memory=torch.cuda.is_available(),
+        shuffle=False,
+        drop_last=False
+    )
 
     config = TransformerConfig(
-        input_size=data.feature_dim,
+        input_size=feature_dim,
         embedding=args["embedding"],
         hidden_size=args["hidden_size"],
         num_attention_heads=args["num_attention_heads"],
@@ -160,38 +345,13 @@ def main(
 
     if args["compile"]: model.compile(fullgraph=True, mode="max-autotune")
 
-    # no weight decay on bias and layernorm parameters
-    no_decay = ["ln1", "ln2", "bias", "final_ln"]
-    optimizer_grouped_parameters = [
-        {
-            "params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)],
-            "weight_decay": args["weight_decay"],
-        },
-        {
-            "params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)],
-            "weight_decay": 0.0,
-        },
-    ]
-
-    optimizer = AdamW(optimizer_grouped_parameters, lr=args["lr"])
-
-    scheduler = None
-    if not args["constant_lr"]:
-        def lr_lambda(current_step):
-            if current_step < args["warmup_steps"]:
-                return float(current_step) / float(max(1, args["warmup_steps"]))
-            progress = float(current_step - args["warmup_steps"]) / float(max(1, args["training_steps"] - args["warmup_steps"]))
-            return 0.5 * (1.0 + math.cos(math.pi * progress))
-
-        scheduler = LambdaLR(optimizer, lr_lambda)
+    optimizer = AdamWScheduleFree(model.parameters(),lr=args["lr"],weight_decay=args["weight_decay"], warmup_steps=args["warmup_steps"])
 
     start_step = 0
     if args["resume_from_checkpoint"]:
         checkpoint = torch.load(args["resume_from_checkpoint"], map_location=device)
         model.load_state_dict(checkpoint["model_state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        if scheduler and "scheduler_state_dict" in checkpoint and checkpoint["scheduler_state_dict"] is not None:
-            scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
         start_step = checkpoint["step"] + 1
         print(f"Resuming training from step {start_step}")
 
@@ -213,39 +373,25 @@ def main(
 
     pbar = trange(start_step, args["training_steps"], desc="Training Steps")
     
-    if args["sae_mode"]:
-        train_dims = torch.tensor(list(range(data.Y.shape[1])), device=device)
-        eval_dims_tensor = torch.tensor(list(range(eval_data.Y.shape[1])), device=device)
-    elif args["simple_mode"]:
-        # For simple mode, we can sample from a very large range since functions are generated on the fly
-        max_functions = 1000000  # Large number for effectively infinite functions
-        train_dims = torch.arange(max_functions, device=device)
-        eval_dims_tensor = torch.arange(args["eval_dims"][0] if args["eval_dims"] else 0, 
-                                      args["eval_dims"][-1] + 1 if args["eval_dims"] else 3, device=device)
-    else:
-        num_dims = list(range(data.Y.shape[1]))
-        train_dims = torch.tensor([d for d in num_dims if d not in args["eval_dims"]], device=device)
-        eval_dims_tensor = torch.tensor(args["eval_dims"], device=device)
-
     accumulated_train_loss = 0.0
     accumulated_train_correct = 0
     accumulated_train_total = 0
 
+    train_iterator = iter(train_loader)
+
     for training_step in pbar:
         model.train()
+        optimizer.train()
 
-        sampled_dims = torch.randint(len(train_dims), (args["batch_size"],))
-        X_batch = []
-        Y_batch = []
+        # Get next batch from DataLoader
+        try:
+            X_batch, Y_batch = next(train_iterator)
+        except StopIteration:
+            train_iterator = iter(train_loader)
+            X_batch, Y_batch = next(train_iterator)
 
-        for i in range(args["batch_size"]):
-            dim = train_dims[sampled_dims[i]]
-            X_episode, Y_episode = data.sample_episode(dim, args["sequence_length"], args["fixed_label"], args["weighted"])
-            X_batch.append(X_episode)
-            Y_batch.append(Y_episode)
-
-        X_batch = torch.stack(X_batch).to(device)
-        Y_batch = torch.stack(Y_batch).to(device)
+        X_batch = X_batch.to(device)
+        Y_batch = Y_batch.to(device)
 
         logits = model(X_batch, Y_batch).squeeze(-1)
         loss =  F.binary_cross_entropy_with_logits(logits, Y_batch)
@@ -254,7 +400,6 @@ def main(
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
-        if scheduler: scheduler.step()
 
         accumulated_train_loss += loss.item()
         predictions = (torch.sigmoid(logits) > 0.5).float()
@@ -272,22 +417,15 @@ def main(
         if (training_step + 1) % args["eval_interval_steps"] == 0:
             with torch.no_grad():
                 model.eval()
+                optimizer.eval()
                 eval_losses = []
                 correct_predictions = 0
                 total_predictions = 0
 
-                # collect episodes first, then process in batches
-                X_eval_batch_list,Y_eval_batch_list = [], []
-
-                for i in range(args["num_eval_episodes"]):
-                    dim = eval_dims_tensor[i % len(eval_dims_tensor)] # cycle through eval_dims
-                    X_episode, Y_episode = eval_data.sample_episode(dim, args["sequence_length"], args["fixed_label"], args["weighted"])
-                    X_eval_batch_list.append(X_episode)
-                    Y_eval_batch_list.append(Y_episode)
-
-                for i in range(0, args["num_eval_episodes"], args["batch_size"]):
-                    batch_X = torch.stack(X_eval_batch_list[i:i+args["batch_size"]]).to(device)
-                    batch_Y = torch.stack(Y_eval_batch_list[i:i+args["batch_size"]]).to(device)
+                # Use DataLoader for evaluation
+                for batch_X, batch_Y in eval_loader:
+                    batch_X = batch_X.to(device)
+                    batch_Y = batch_Y.to(device)
 
                     logits_eval = model(batch_X, batch_Y).squeeze(-1)
                     loss_eval =  F.binary_cross_entropy_with_logits(logits_eval, batch_Y)
@@ -312,12 +450,13 @@ def main(
                     }, best_checkpoint_path)
 
         if (training_step + 1) % args["checkpoint_interval_steps"] == 0:
+            model.eval()
+            optimizer.eval()
             checkpoint_path = os.path.join(full_checkpoint_dir, "latest.pt")
             torch.save({
                 'step': training_step,
                 'model_state_dict': {k: v.cpu() for k, v in model.state_dict().items()},
                 'optimizer_state_dict': optimizer.state_dict(),
-                'scheduler_state_dict': scheduler.state_dict() if scheduler else None,
                 'config': config,
             }, checkpoint_path)
 
