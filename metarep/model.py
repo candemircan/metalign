@@ -59,7 +59,7 @@ class SelfAttention(nn.Module):
 
         self.qkv = nn.Linear(hidden_size, hidden_size * 3, bias=bias)
         self.o_proj = nn.Linear(hidden_size, hidden_size, bias=bias)
-        self.qkv_split = Rearrange('batch sequence (three head head_dim) -> three batch head sequence head_dim', three=3, head=num_attention_heads)
+        self.qkv_split = Rearrange('batch sequence (qkv head head_dim) -> qkv batch head sequence head_dim', qkv=3, head=num_attention_heads)
         self.o_proj_transpose = Rearrange('batch head sequence head_dim -> batch sequence (head head_dim)')
 
 
@@ -142,7 +142,7 @@ class Transformer(torch.nn.Module):
         # one-hot encode previous targets
         target_onehot = F.one_hot(prev_targets.long(), num_classes=2).float()
 
-        # replace the first position with 0s, our BOS token is always 0
+        # replace the first position with 0s, our BOS token is always [0., 0.]
         target_onehot[:, 0] = 0.
 
         # concatenate target encoding with input features
@@ -150,9 +150,11 @@ class Transformer(torch.nn.Module):
 
     def forward(self,
                 x: torch.Tensor, # (batch_size, seq_len, feature_dim) - input features
-                y: torch.Tensor # (batch_size, seq_len) - binary targets for each position
+                y: torch.Tensor| None, # (batch_size, seq_len) - binary targets for each position - or None, used to just get the representations
                 ) -> torch.Tensor:
 
+        # prepend BOS tokens to all tokens if y is None, else use y as is
+        y = y if y is not None else torch.zeros(x.shape[0], x.shape[1], device=x.device)
         x = self._prep_inputs(x, y)  # (batch_size, seq_len, input_size)
 
         x = self.embedding(x)

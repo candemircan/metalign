@@ -41,7 +41,7 @@ def main(
     seed: int = 1234, # random seed for reproducibility
     lr: float = 0.0025,  # learning rate for the optimizer
     weight_decay: float = 0,  # weight decay for the optimizer
-    warmup_steps: int = 10000,  # number of warmup steps for the learning rate scheduler
+    warmup_steps: int = 1000,  # number of warmup steps for the learning rate scheduler
     name: str = None,  # name of the model. If provided, it will be used to log the model.
     num_components: int = None,  # number of components to use for dimensionality reduction. If None, the original data is used.
     log_interval_steps: int = 10,  # log training loss every N steps
@@ -369,7 +369,9 @@ def main(
         # in this case, gotta also run bin/sync_wandb.sh from the login node
         device_name = os.uname()[1]
         wandb.init(project=args["wandb_name"], name=config.name, config=args, tags=args["tags"], mode="offline" if "juwels" in device_name else "online")
-        wandb.watch(model, log='all', log_freq=args["log_interval_steps"] * 10)
+        # only watch if not compiled, as we get an error otherwise
+        if not args["compile"]:
+            wandb.watch(model, log='all', log_freq=args["log_interval_steps"] * 10)
 
     pbar = trange(start_step, args["training_steps"], desc="Training Steps")
     
@@ -409,7 +411,7 @@ def main(
         if (training_step + 1) % args["log_interval_steps"] == 0:
             avg_train_loss = accumulated_train_loss / args["log_interval_steps"]
             train_accuracy = accumulated_train_correct / accumulated_train_total
-            if args["wandb_log"]: wandb.log({"loss_train": avg_train_loss, "accuracy_train": train_accuracy, "lr": optimizer.param_groups[0]["lr"]}, step=training_step)
+            if args["wandb_log"]: wandb.log({"loss_train": avg_train_loss, "accuracy_train": train_accuracy}, step=training_step)
             accumulated_train_loss = 0.0
             accumulated_train_correct = 0
             accumulated_train_total = 0
