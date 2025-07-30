@@ -123,7 +123,7 @@ class Transformer(torch.nn.Module):
         if config.positional_embedding_type == "learned":
             self.pos_encoder = LearnedPositionalEmbedding(seq_len=config.sequence_length, hidden_size=config.hidden_size)
         elif config.positional_embedding_type == "sinusoidal":
-            self.pos_encoder = SinusoidalPositionalEncoding(d_model=config.hidden_size, vocab_size=config.sequence_length, dropout=config.pe_dropout)
+            self.pos_encoder = SinusoidalPositionalEncoding(d_model=config.hidden_size, max_len=config.sequence_length, dropout=config.pe_dropout)
         elif config.positional_embedding_type == "rope":
             self.pos_encoder = RotaryPositionalEmbeddings(dim=config.hidden_size // config.num_attention_heads, max_seq_len=config.sequence_length)
 
