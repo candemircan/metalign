@@ -14,13 +14,11 @@ dependencies = [
     "h5py == 3.14.0", 
     "wandb == 0.21.0", 
     "nnsight == 0.4.8",
-    "quarto-cli == 1.7.32",
     "flash-attn == 2.8.1 ; sys_platform == 'linux'",
-    "xformers; sys_platform == 'linux'",
     ]
 
 [project.optional-dependencies]
-dev = ["pytest", "pre-commit", "ruff","ipykernel", "jupyter-cache", "textual", "tomli-w","shiny == 1.4.0"]
+dev = ["pytest", "pre-commit", "ruff","ipykernel", "textual", "tomli-w","shiny == 1.4.0"]
 
 [tool.setuptools]
 packages = ["metarep"]

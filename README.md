@@ -27,8 +27,6 @@ For setup, you need to do the following things:
     ```bash
     uv run bin/script.py
     ```
-    
-    *Note*: The `bin/*qmd` files contain the visualisations, and they need to be rendered with `quarto render file.qmd`. This generates the HTML files with the visualisations and places them under `logs/`. If you want to run them all, just run `quarto render .`.
 
 ## Folder Structure
 

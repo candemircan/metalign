@@ -7,6 +7,11 @@ repos:
     - id: ruff
       args: [ --config=pyproject.toml, --fix, --exit-non-zero-on-fix]
 
+repos:
+- repo: https://github.com/fastai/nbdev
+  rev: 2.2.10
+  hooks:
+  - id: nbdev_clean
 
 - repo: local
   hooks:

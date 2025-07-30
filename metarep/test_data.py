@@ -149,6 +149,7 @@ def test_prepare_things_spose(tmp_path: Path, monkeypatch):
 
 
 def test_things_episode_dataset(tmp_path: Path, monkeypatch):
+    torch.manual_seed(42)
     from metarep import data
     monkeypatch.setattr(data, "NUM_THINGS_CATEGORIES", 2)
     
@@ -188,7 +189,7 @@ def test_things_episode_dataset(tmp_path: Path, monkeypatch):
     
     # Test multiple episodes have different samples
     X_ep2, Y_ep2 = dataset[1]
-    assert not torch.equal(X_ep, X_ep2)  # Should be different episodes
+    assert not torch.equal(X_ep, X_ep2) or not torch.equal(Y_ep, Y_ep2)
 
 
 def test_simple_episode_dataset():

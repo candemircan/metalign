@@ -160,7 +160,6 @@ example*
 !data/example_transformer_config.toml
 .github/instructions
 wandb
-*ipynb
 /.quarto/
 .jupyter_cache
 
