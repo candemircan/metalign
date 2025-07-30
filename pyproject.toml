@@ -30,6 +30,7 @@ build-backend = "uv_build"
 [tool.uv]
 no-build-isolation-package = ["flash-attn"]
 
+
 [tool.uv.build-backend]
 module-name = "metarep"
 module-root = ""
@@ -38,6 +39,7 @@ module-root = ""
 line-length = 200
 lint.ignore = ["E731", "E501", "E701", "E702", "F403"]
 lint.extend-select = ["I"]
+extend-include = ["*.ipynb"]
 target-version = "py312"
 
 [tool.ruff.lint.isort]
