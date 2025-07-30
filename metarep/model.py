@@ -11,7 +11,7 @@ from einops.layers.torch import Rearrange
 from torch import nn
 from torch.nn import functional as F
 
-from .positional_encoding import RotaryPositionalEmbeddings, SinusoidalPositionalEncoding
+from .positional_encoding import LearnedPositionalEmbedding, RotaryPositionalEmbeddings, SinusoidalPositionalEncoding
 
 
 @dataclass
@@ -94,17 +94,6 @@ class TransformerBlock(nn.Module):
         x = x + attn_output
         x = x + self.mlp(self.ln2(x))
         return x
-
-class LearnedPositionalEmbedding(nn.Module):
-    def __init__(self, seq_len: int, hidden_size: int):
-        super().__init__()
-        self.embedding = nn.Embedding(seq_len, hidden_size)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        seq_len = x.shape[1]
-        position_ids = torch.arange(seq_len, device=x.device)
-        pos_embeds = self.embedding(position_ids)
-        return x + pos_embeds
 
 
 class Transformer(torch.nn.Module):

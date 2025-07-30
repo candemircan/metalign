@@ -3,7 +3,7 @@ RoPE is taken from torchtune and the sinusoidal positional encoding is taken fro
 Both are slightly modified.
 """
 
-__all__ = ["RotaryPositionalEmbeddings", "SinusoidalPositionalEncoding"]
+__all__ = ["RotaryPositionalEmbeddings", "SinusoidalPositionalEncoding", "LearnedPositionalEmbedding"]
 
 import math
 from typing import Optional
@@ -143,3 +143,15 @@ class SinusoidalPositionalEncoding(nn.Module):
         "x: (batch, seq_len, d_model)"
         x = x + self.pe[:, :x.size(1)]
         return self.dropout(x)
+    
+
+class LearnedPositionalEmbedding(nn.Module):
+    def __init__(self, seq_len: int, hidden_size: int):
+        super().__init__()
+        self.embedding = nn.Embedding(seq_len, hidden_size)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        seq_len = x.shape[1]
+        position_ids = torch.arange(seq_len, device=x.device)
+        pos_embeds = self.embedding(position_ids)
+        return x + pos_embeds
