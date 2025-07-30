@@ -9,7 +9,6 @@ import torch
 import wandb
 from fastcore.script import Param, bool_arg, call_parse
 from schedulefree import AdamWScheduleFree
-from sklearn.decomposition import PCA
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
 from tqdm import trange
@@ -25,7 +24,7 @@ def main(
     input_type: str = "all",  # can be one of "all", "cls", "register", "patch". If "all", all representations are concatenated. "registers" is possible only if the model is trained with registers.
     wandb_log: bool_arg = True,  # whether to log the model to wandb. If False, no logging is done.
     wandb_name: str = "metarep",  # name of the wandb project. Used to log the model.
-    embedding: bool = False,  # whether to use an embedding layer at the beginning of the model
+    embedding: bool_arg = True,  # whether to use an embedding layer at the beginning of the model
     hidden_size: int = 768,  # hidden size of the transformer model. if this is different from the input size, an embedding layer must be used
     num_attention_heads: int = 12,  # number of attention heads in the transformer model
     intermediate_size: int = 3072,  # size of the intermediate layer in the MLP of the transformer model
@@ -34,16 +33,16 @@ def main(
     bias: bool_arg = True,  # whether to use bias in the linear layers of the transformer model
     logit_bias: bool_arg = True,  # whether to use bias in the final linear layer of the transformer model. If False, the final layer will not have a bias term.
     attention_dropout: float = 0.0,  # dropout rate for the attention layers in the transformer model
+    pe_dropout: float = 0.0,  # dropout rate for the positional encoding in the transformer model. Used only with the sinusoidal positional encoding.
     sequence_length: int = 120,  # maximum number of position embeddings in the transformer model
     config_file: str = None,  # path to a config file. If provided, any parameters in the file will override the corresponding command line arguments. See "data/example_transformer_config.toml" for an example config file.
     batch_size: int = 256,  # batch size for training the model
     training_steps: int = 1000000,  # number of training steps per epoch
     seed: int = 1234, # random seed for reproducibility
     lr: float = 0.0025,  # learning rate for the optimizer
-    weight_decay: float = 0,  # weight decay for the optimizer
+    weight_decay: float = 0.,  # weight decay for the optimizer
     warmup_steps: int = 1000,  # number of warmup steps for the learning rate scheduler
     name: str = None,  # name of the model. If provided, it will be used to log the model.
-    num_components: int = None,  # number of components to use for dimensionality reduction. If None, the original data is used.
     log_interval_steps: int = 10,  # log training loss every N steps
     eval_interval_steps: int = 100,  # evaluate the model every eval_interval_steps steps
     num_eval_episodes: int = 128,  # number of episodes to sample for evaluation
@@ -53,10 +52,9 @@ def main(
     checkpoint_interval_steps: int = 1000, # save checkpoint every N steps
     resume_from_checkpoint: str = None, # path to a checkpoint to resume from
     scale: bool_arg = True,  # whether to scale the input data to have zero mean and unit variance
-    spose_input: bool = False, # if True, use the SPoSE as input. Used for overfitting and debugging. The functions are also sampled from this. Therefore, this must be trivially easy. It will override `backbone` and `input_type`.
     fixed_label: bool = False,  # if True, the positives are always 1 and the negatives are always 0. If False, for a given sequence, they are reversed with 50% probability.
     weighted: bool = False, #  If True, sample positive and negative instances weighted by their magnitude. Otherwise, sample uniformly.
-    positional_embedding_type: str = "learned",  # only 'learned' is supported now
+    positional_embedding_type: str = "learned",  # needs to be one of "learned", "sinusoidal", or "rope"
     compile: bool = False,  # whether to compile the model with torch.compile
     sae_mode: bool = False,  # whether to use SAE training mode with separate train/test datasets
     sae_train_backbone: str = "coco_dinov2_vitb14_reg",  # for SAE mode: backbone for train data.
@@ -68,7 +66,6 @@ def main(
 ):
     """
     train a meta-learning transformer model over function learning tasks.
-    supports both regular training and SAE training modes.
     """
     args = locals()
     if config_file:
@@ -189,120 +186,6 @@ def main(
             epoch_size=args["num_eval_episodes"]
         )
 
-    # Apply PCA if specified
-    if args["num_components"] is not None:
-        pca = PCA(n_components=args["num_components"], random_state=args["seed"])
-        
-        if args["simple_mode"]:
-            # For simple mode, we need to update the dataset's scaling parameters
-            feature_dim = args["num_components"]
-            train_episode_dataset.feature_dim = feature_dim
-            eval_episode_dataset.feature_dim = feature_dim
-        elif args["sae_mode"]:
-            # Transform SAE inputs and update datasets
-            train_inputs_pca = pca.fit_transform(train_inputs)
-            test_inputs_pca = pca.transform(test_inputs)
-            feature_dim = args["num_components"]
-            
-            # Update datasets with PCA-transformed inputs
-            train_episode_dataset = SAEEpisodeDataset(
-                inputs=train_inputs_pca,
-                sae_features=args["train_sae_features"],
-                data_root=Path("data/sae"),
-                seq_len=args["sequence_length"],
-                scale=args["scale"],
-                min_nonzero=args["min_nonzero"],
-                fixed_label=args["fixed_label"],
-                weighted=args["weighted"],
-                train_dims=train_dims,
-                epoch_size=args["training_steps"]
-            )
-            
-            eval_episode_dataset = SAEEpisodeDataset(
-                inputs=test_inputs_pca,
-                sae_features=args["test_sae_features"],
-                data_root=Path("data/sae"),
-                seq_len=args["sequence_length"],
-                scale=args["scale"],
-                min_nonzero=args["min_nonzero"],
-                fixed_label=args["fixed_label"],
-                weighted=args["weighted"],
-                train_dims=eval_dims,
-                epoch_size=args["num_eval_episodes"]
-            )
-        else:
-            # For THINGS, apply PCA to representation data
-            if args["input_type"] == "all":
-                all_data = np.concatenate([representations[key] for key in representations.keys()], axis=1)
-            else:
-                all_data = representations[args["input_type"]]
-            
-            all_data_pca = pca.fit_transform(all_data)
-            feature_dim = args["num_components"]
-            
-            # Create new representations dict with PCA data
-            pca_representations = {"pca": all_data_pca}
-            
-            # Update datasets with PCA data
-            train_episode_dataset = ThingsEpisodeDataset(
-                representations=pca_representations,
-                data_root=Path("data/external"),
-                seq_len=args["sequence_length"],
-                scale=args["scale"],
-                fixed_label=args["fixed_label"],
-                weighted=args["weighted"],
-                train_dims=train_dims,
-                epoch_size=args["training_steps"]
-            )
-            
-            eval_episode_dataset = ThingsEpisodeDataset(
-                representations=pca_representations,
-                data_root=Path("data/external"),
-                seq_len=args["sequence_length"],
-                scale=args["scale"],
-                fixed_label=args["fixed_label"],
-                weighted=args["weighted"],
-                train_dims=eval_dims,
-                epoch_size=args["num_eval_episodes"]
-            )
-
-    # Apply SPoSE input override if specified
-    if args["spose_input"]:
-        # Load SPoSE data and use as input
-        if not args["simple_mode"]:  # Simple mode doesn't have SPoSE data
-            representations_for_spose = np.load(f"data/backbone_reps/{args["backbone"]}.npz") if "backbone" in args else representations
-            if args["input_type"] != "all": 
-                representations_for_spose = {args["input_type"]: representations_for_spose[args["input_type"]]}
-            
-            X, Y = prepare_things_spose(representations_for_spose, data_root=Path("data/external"))
-            feature_dim = Y.shape[1]  # Use SPoSE dimensions as features
-            args["backbone"] = "spose"
-            
-            # Create new datasets using SPoSE as input
-            spose_representations = {"spose": Y.numpy()}
-            
-            train_episode_dataset = ThingsEpisodeDataset(
-                representations=spose_representations,
-                data_root=Path("data/external"),
-                seq_len=args["sequence_length"],
-                scale=args["scale"],
-                fixed_label=args["fixed_label"],
-                weighted=args["weighted"],
-                train_dims=train_dims,
-                epoch_size=args["training_steps"]
-            )
-            
-            eval_episode_dataset = ThingsEpisodeDataset(
-                representations=spose_representations,
-                data_root=Path("data/external"),
-                seq_len=args["sequence_length"],
-                scale=args["scale"],
-                fixed_label=args["fixed_label"],
-                weighted=args["weighted"],
-                train_dims=eval_dims,
-                epoch_size=args["num_eval_episodes"]
-            )
-
     # Create DataLoaders
     train_loader = DataLoader(
         train_episode_dataset,
@@ -385,7 +268,7 @@ def main(
         model.train()
         optimizer.train()
 
-        # Get next batch from DataLoader
+        # get next batch from DataLoader
         try:
             X_batch, Y_batch = next(train_iterator)
         except StopIteration:

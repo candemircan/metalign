@@ -11,6 +11,8 @@ from einops.layers.torch import Rearrange
 from torch import nn
 from torch.nn import functional as F
 
+from .positional_encoding import RotaryPositionalEmbeddings, SinusoidalPositionalEncoding
+
 
 @dataclass
 class TransformerConfig:
@@ -24,6 +26,7 @@ class TransformerConfig:
     bias: bool = True
     logit_bias: bool = True
     attention_dropout: float = 0.0
+    pe_dropout: float = 0.0
     sequence_length: int = 100
     name: Optional[str] = None
     positional_embedding_type: str = "learned"
@@ -32,8 +35,8 @@ class TransformerConfig:
         if self.hidden_size % self.num_attention_heads != 0:
             raise ValueError(f"hidden_size ({self.hidden_size}) must be divisible by num_attention_heads ({self.num_attention_heads})")
 
-        if self.positional_embedding_type != "learned":
-            raise ValueError(f"positional_embedding_type must be 'learned', but got '{self.positional_embedding_type}'")
+        if self.positional_embedding_type not in ["learned", "sinusoidal", "rope"]:
+            raise ValueError(f"positional_embedding_type must be one of 'learned', 'sinusoidal', or 'rope', but got '{self.positional_embedding_type}'")
 
 
 class MLP(nn.Module):
@@ -50,12 +53,13 @@ class MLP(nn.Module):
 
 
 class SelfAttention(nn.Module):
-    def __init__(self, hidden_size: int, num_attention_heads: int, bias: bool = False, attention_dropout: float = 0.0):
+    def __init__(self, hidden_size: int, num_attention_heads: int, bias: bool = False, attention_dropout: float = 0.0, positional_encoder: nn.Module = None):
         super().__init__()
         self.hidden_size = hidden_size
         self.num_heads = num_attention_heads
         self.head_dim = hidden_size // num_attention_heads
         self.attention_dropout = attention_dropout
+        self.positional_encoder = positional_encoder
 
         self.qkv = nn.Linear(hidden_size, hidden_size * 3, bias=bias)
         self.o_proj = nn.Linear(hidden_size, hidden_size, bias=bias)
@@ -67,6 +71,9 @@ class SelfAttention(nn.Module):
         qkv = self.qkv(x)
         q, k, v = self.qkv_split(qkv)
 
+        if isinstance(self.positional_encoder, RotaryPositionalEmbeddings):
+            q, k = self.positional_encoder(q, k)
+
         attn_output = F.scaled_dot_product_attention(q, k, v, is_causal=True, dropout_p=self.attention_dropout if self.training else 0.0)
 
         attn_output = self.o_proj_transpose(attn_output)
@@ -75,9 +82,9 @@ class SelfAttention(nn.Module):
 
 
 class TransformerBlock(nn.Module):
-    def __init__(self, hidden_size: int, num_attention_heads: int, intermediate_size: int, hidden_act: str, bias: bool = False, attention_dropout: float = 0.0):
+    def __init__(self, hidden_size: int, num_attention_heads: int, intermediate_size: int, hidden_act: str, bias: bool = False, attention_dropout: float = 0.0, positional_encoder: nn.Module = None):
         super().__init__()
-        self.self_attn = SelfAttention(hidden_size, num_attention_heads, bias=bias, attention_dropout=attention_dropout)
+        self.self_attn = SelfAttention(hidden_size, num_attention_heads, bias=bias, attention_dropout=attention_dropout, positional_encoder=positional_encoder)
         self.mlp = MLP(hidden_size, intermediate_size, hidden_act, bias=bias)
         self.ln1 = nn.LayerNorm(hidden_size)
         self.ln2 = nn.LayerNorm(hidden_size)
@@ -113,7 +120,13 @@ class Transformer(torch.nn.Module):
         if config.embedding: self.embedding = nn.Linear(actual_input_size, config.hidden_size, bias=config.bias)
         else: self.embedding = nn.Identity()
 
-        self.pos_encoder = LearnedPositionalEmbedding(seq_len=config.sequence_length, hidden_size=config.hidden_size)
+        if config.positional_embedding_type == "learned":
+            self.pos_encoder = LearnedPositionalEmbedding(seq_len=config.sequence_length, hidden_size=config.hidden_size)
+        elif config.positional_embedding_type == "sinusoidal":
+            self.pos_encoder = SinusoidalPositionalEncoding(d_model=config.hidden_size, vocab_size=config.sequence_length, dropout=config.pe_dropout)
+        elif config.positional_embedding_type == "rope":
+            self.pos_encoder = RotaryPositionalEmbeddings(dim=config.hidden_size // config.num_attention_heads, max_seq_len=config.sequence_length)
+
 
         self.layers = nn.ModuleList([
             TransformerBlock(
@@ -122,7 +135,8 @@ class Transformer(torch.nn.Module):
                 intermediate_size=config.intermediate_size,
                 hidden_act=config.hidden_act,
                 bias=config.bias,
-                attention_dropout=config.attention_dropout
+                attention_dropout=config.attention_dropout,
+                positional_encoder=self.pos_encoder if config.positional_embedding_type == "rope" else None
             ) for _ in range(config.num_layers)
         ])
         self.final_ln = nn.LayerNorm(config.hidden_size)
@@ -158,7 +172,7 @@ class Transformer(torch.nn.Module):
         x = self._prep_inputs(x, y)  # (batch_size, seq_len, input_size)
 
         x = self.embedding(x)
-        x = self.pos_encoder(x)
+        if self.config.positional_embedding_type != "rope": x = self.pos_encoder(x)
 
         for layer in self.layers:
             x = layer(x)
