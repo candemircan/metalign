@@ -1,9 +1,8 @@
 """
-RoPE is taken from torchtune and the sinusoidal positional encoding is taken from torch tutorials.
-Both are slightly modified.
+RoPE is taken from torchtune and modified
 """
 
-__all__ = ["RotaryPositionalEmbeddings", "SinusoidalPositionalEncoding", "LearnedPositionalEmbedding"]
+__all__ = ["RotaryPositionalEmbeddings"]
 
 import math
 from typing import Optional
@@ -121,37 +120,3 @@ class RotaryPositionalEmbeddings(nn.Module):
         q_out = self._apply_rope(q, rope_cache)
         k_out = self._apply_rope(k, rope_cache)
         return q_out, k_out
-
-class SinusoidalPositionalEncoding(nn.Module):
-    """
-    sinusoidal positional encoding, adapted from
-    https://pytorch.org/tutorials/beginner/transformer_tutorial.html
-    """
-    def __init__(self, d_model:int, dropout:float=0., max_len:int=120):
-        "d_model: embedding dimension, dropout: dropout rate, max_len: max sequence length"
-        super().__init__()
-        self.dropout = nn.Dropout(p=dropout)
-
-        position = torch.arange(max_len).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2) * (-math.log(10000.0) / d_model))
-        pe = torch.zeros(1, max_len, d_model)
-        pe[0, :, 0::2] = torch.sin(position * div_term)
-        pe[0, :, 1::2] = torch.cos(position * div_term)
-        self.register_buffer('pe', pe)
-
-    def forward(self, x):
-        "x: (batch, seq_len, d_model)"
-        x = x + self.pe[:, :x.size(1)]
-        return self.dropout(x)
-    
-
-class LearnedPositionalEmbedding(nn.Module):
-    def __init__(self, seq_len: int, hidden_size: int):
-        super().__init__()
-        self.embedding = nn.Embedding(seq_len, hidden_size)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        seq_len = x.shape[1]
-        position_ids = torch.arange(seq_len, device=x.device)
-        pos_embeds = self.embedding(position_ids)
-        return x + pos_embeds
