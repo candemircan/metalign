@@ -40,9 +40,69 @@ For setup, you need to do the following things:
 
 ## To Do
 
-- Should start thinking about the axes of ablations. Here are a few that come to mind:
+### Alignment Evaluations
 
-    - **The number of training functions**: how does test performance change with the number of training functions? Some general trends are expected, and this is perhaps rather boring. Two things can be interesting here: i) we find a "breakthrough" point where the performance increases significantly, and ii) we find a point where the performance saturates, i.e. adding more training functions does not improve the performance significantly.
-    - **Similarity of test functions to training functions**: how similar are the test functions to the training functions? How well does this predict the performance of the model? I expect this to be quite a straightforward positive correlation.
-    - **The number and the diversity of images**: Currently, we use the same images from the THINGS dataset both for training and testing (though under different functions). Can the model also do well on held-out functions that use held-out images? Does a model simply trained on THINGS images do well on other images, such as CoCO? What about the other way around? Basically, how important is image diverstiy? Not sure at the moment how to best phrase this question.
-    - **The diversity of the training functions**: this one is more interesting, and has multiple sub-questions. If we fix the average similarity between training and test functions, how does the diversity of the training functions affect the performance? Does this matter more for test functions that are less similar to the training functions? What is the average effect of inter-function training function similarity on test performance, both behaviourally and in terms of representations?
+#### Similarity
+
+- odd-one-out judgements on THINGS
+- odd-one-out judgements on Levels (Imagenet)
+- odd-one-out judgements on Stuff
+
+#### Learning
+
+- our category learning task
+
+#### fMRI
+
+- THINGS fMRI recordings
+- BOLD 5000 fMRI excluding the CoCo images
+
+#### Misc.
+
+- THINGS memorability ratings
+- Texture bias
+
+### Down-stream evaluations
+
+*This is taken directly from Lukas's paper.*
+
+#### One-shot and Ten-shot classification
+
+- Birds
+- Caltech101
+- Cars
+- Cifar100
+- Colon
+- DTD
+- Flowers
+- ImageNet-1k
+- Pets
+- Places365
+- US Merced
+
+#### Distribution shift
+
+- BREEDS benchmark with linear probes
+
+#### Model robustness
+
+- ImageNet-A
+
+### Ablation Experiments
+
+#### Ablation Over Types of Functions
+
+- Train over functions that came from i) 1st block ii) middle block SAEs
+- Train over functions that are  sampled from the neurons of the representations
+
+#### Ablation Over Number of Functions
+
+- Sample 20, 40, 60, 80 % of the functions and train on those. Are the results any different?
+- Say we keep 50% of the functions. Sample different distributions of functions such that the average pairwise similarity between functions vary. What's the effect of different distributions on alignment and downstream?
+
+### Considerations
+
+- You want to do this mainly on DINO V2 CLS representations. However, also test on OpenCLIP (from which the SAE representations are extracted) as well as an ImageNet supervised ViT.
+- Are we set on CoCo for training? At least use Open Images validation split for validation. Another option is to train on Open Images and then we can use CoCo brain data as well. Here, the issue is that the Open Image dataset is massive (6M), and not as popular as CoCo. You can already predict the brain responses to CoCo anyway  if you don't want to enforce all images being non overlapping between train and evals.
+- Yet another option is to train on ImageNet. This would introduce overlap of images between train and eval. The images would be more representative of the types of images you get in both human and ML evals, though you definitely lose on image diversity.
+- Currently, I train transformers with a hidden size of up to 128. Likely, this is not enough for ML tasks. Training has now stabilised, and you should next try 256, 512, and 768.
