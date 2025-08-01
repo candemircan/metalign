@@ -4,7 +4,6 @@ RoPE is taken from torchtune and modified
 
 __all__ = ["RotaryPositionalEmbeddings"]
 
-import math
 from typing import Optional
 
 import torch
