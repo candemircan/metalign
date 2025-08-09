@@ -18,4 +18,5 @@ if [[ -z "$config_file" ]]; then
     exit 1
 fi
 
+export OMP_NUM_THREADS=8
 uv run torchrun --nproc_per_node=1 bin/train.py --config_file "$config_file"

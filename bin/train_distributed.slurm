@@ -15,4 +15,5 @@ fi
 
 module load CUDA/12
 
+export OMP_NUM_THREADS=8
 uv run torchrun --nproc_per_node=4 bin/train.py --config_file "$config_file"

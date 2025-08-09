@@ -12,6 +12,7 @@ if [ "$#" -ne 4 ]; then
 fi
 
 module load CUDA/12
+export OMP_NUM_THREADS=8
 
 srun --exclusive -n 1 --gres=gpu:1  --cpus-per-task=4 uv run torchrun --nproc_per_node=1 bin/train.py --config_file $1 &
 srun --exclusive -n 1 --gres=gpu:1  --cpus-per-task=4 uv run torchrun --nproc_per_node=1 bin/train.py --config_file $2 &
