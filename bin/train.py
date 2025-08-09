@@ -167,7 +167,7 @@ def main(
         # hacky way to see if i'm training on juwels, which does not have internet in compute nodes
         # in this case, gotta also run bin/sync_wandb.sh from the login node
         device_name = os.uname()[1]
-        wandb.init(project=args["wandb_name"], name=config.name, config=args, tags=args["tags"], mode="offline" if "juwels" in device_name else "online")
+        wandb.init(project=args["wandb_name"], name=args["name"], config=args, tags=args["tags"], mode="offline" if "juwels" in device_name else "online")
 
     
     accumulated_train_loss = 0.0
