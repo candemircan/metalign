@@ -1,27 +1,27 @@
 [project]
-name = "metarep"
+name = "metalign"
 requires-python = "==3.12.5"
 version = "0.0.1"
 dependencies = [
-    "torch == 2.7.1", 
-    "seaborn == 0.13.2",
-    "schedulefree == 1.4.1", 
-    "fastcore == 1.8.4", 
-    "einops == 0.8.1", 
-    "torchvision == 0.22.1", 
+    "torch", 
+    "seaborn",
+    "schedulefree", 
+    "fastcore", 
+    "einops", 
+    "torchvision", 
     "scikit-learn", 
-    "vit_prisma @ git+https://github.com/Prisma-Multimodal/ViT-Prisma.git@97dd26fc01dfd856060c4a234b882c6f16836c15", 
-    "h5py == 3.14.0", 
-    "wandb == 0.21.0", 
-    "nnsight == 0.4.8",
+    "h5py", 
+    "wandb", 
+    "nnsight",
     "flash-attn == 2.8.1 ; sys_platform == 'linux'",
+    "vit_prisma @ git+https://github.com/Prisma-Multimodal/ViT-Prisma.git@97dd26fc01dfd856060c4a234b882c6f16836c15", 
     ]
 
 [project.optional-dependencies]
-dev = ["pytest", "pre-commit", "ruff","ipykernel", "textual", "tomli-w","shiny == 1.4.0"]
+dev = ["pytest", "pre-commit", "ruff","ipykernel", "textual", "tomli-w","shiny"]
 
 [tool.setuptools]
-packages = ["metarep"]
+packages = ["metalign"]
 
 [build-system]
 requires = ["uv_build>=0.7.21,<0.8.0"]
@@ -32,7 +32,7 @@ no-build-isolation-package = ["flash-attn"]
 
 
 [tool.uv.build-backend]
-module-name = "metarep"
+module-name = "metalign"
 module-root = ""
 
 [tool.ruff]

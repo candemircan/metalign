@@ -16,7 +16,7 @@ from PIL import Image
 from scipy.stats import gaussian_kde
 from shiny import App, reactive, render, ui
 
-from metarep.data import h5_to_numpy
+from metalign.data import h5_to_numpy
 
 
 def image_to_base64(img_path, max_size=200):

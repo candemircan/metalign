@@ -10,9 +10,22 @@ from fastcore.script import call_parse
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from metarep.data import Coco, Things
+from metalign.data import Coco, Things
 
 _ = torch.set_grad_enabled(False)
+
+
+def _extract_and_save(model, dataloader, save_path, device):
+    """Helper function to extract CLS tokens and save them."""
+    all_cls_tokens = []
+    for images in tqdm(dataloader, desc=f"Extracting to {save_path}"):
+        images = images.to(device)
+        output = model.forward_features(images)
+        all_cls_tokens.append(output["x_norm_clstoken"].cpu())
+    
+    cls_reps = torch.cat(all_cls_tokens, dim=0).numpy()
+    np.savez_compressed(save_path, data=cls_reps)
+    print(f"Saved representations to {save_path}")
 
 
 @call_parse
@@ -25,24 +38,12 @@ def main(
     force: bool = False # if True, will extract features even if the file already exists. Otherwise, will skip if the file  exists.
 ):
     """
-    extract the backbone representations from a model in a repo.
-    The representations are saved in `data/backbone_reps/{model}.npz` file.
-    The representations are saved as a dictionary with keys:
-    - "cls": the class token representation
-    - "register": the register representations averaged over the registers (if available)
-    - "patch": the patch representations averaged over the patches
-
-    Currently, the extraction keys are formatted after the Dinov2 model only.
+    extract the CLS token representations from a model in a repo.
+    The representations are saved in `data/backbone_reps/{dataset}_{model_name}.npz` file.
+    For the COCO dataset, it creates separate files for train and evaluation sets.
+    The representations are saved as a numpy array in a compressed npz file with the key 'data'.
     """
-    ds_prefix = "things" if dataset == "things" else "coco"
-    save_path = Path("data/backbone_reps") / f"{ds_prefix}_{model_name}.npz"
-    save_path.parent.mkdir(parents=True, exist_ok=True)
-
-    if save_path.exists() and not force:
-        print(f"File {save_path} already exists. Use --force to overwrite.")
-        return
     
-
     device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
 
     if hf_repo is None: model = torch.hub.load(repo, model_name).to(device)
@@ -50,21 +51,36 @@ def main(
     
     model.eval()
 
-    ds = Things() if dataset == "things" else Coco()
-    things_dataloader = DataLoader(ds, batch_size=batch_size, shuffle=False, num_workers=4)
-    representations=dict(cls=[], register=[], patch=[])
+    if dataset == "things":
+        save_path = Path("data/backbone_reps") / f"things_{model_name}.npz"
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        if save_path.exists() and not force:
+            print(f"File {save_path} already exists. Use --force to overwrite.")
+            return
+        
+        ds = Things()
+        dataloader = DataLoader(ds, batch_size=batch_size, shuffle=False, num_workers=4)
+        _extract_and_save(model, dataloader, save_path, device)
 
-    for images in tqdm(things_dataloader, desc="extracting representations"):
-        images = images.to(device)
-        output = model.forward_features(images)
+    elif dataset == "coco":
+        # Handle train set
+        save_path_train = Path("data/backbone_reps") / f"coco_train_{model_name}.npz"
+        save_path_train.parent.mkdir(parents=True, exist_ok=True)
+        if not save_path_train.exists() or force:
+            ds_train = Coco(train=True)
+            dataloader_train = DataLoader(ds_train, batch_size=batch_size, shuffle=False, num_workers=4)
+            _extract_and_save(model, dataloader_train, save_path_train, device)
+        else:
+            print(f"File {save_path_train} already exists. Use --force to overwrite.")
 
-        representations["cls"].append(output["x_norm_clstoken"].cpu())
-        if "x_norm_regtokens" in output.keys(): representations["register"].append(output["x_norm_regtokens"].mean(dim=1).cpu())
-        representations["patch"].append(output["x_norm_patchtokens"].mean(dim=1).cpu())
-
-    if len(representations["register"]) == 0: del representations["register"]
-    for key in representations.keys():
-        representations[key] = torch.cat(representations[key], dim=0).numpy()
-
-    
-    np.savez_compressed(save_path, **representations)
+        # Handle eval set
+        save_path_eval = Path("data/backbone_reps") / f"coco_eval_{model_name}.npz"
+        save_path_eval.parent.mkdir(parents=True, exist_ok=True)
+        if not save_path_eval.exists() or force:
+            ds_eval = Coco(train=False)
+            dataloader_eval = DataLoader(ds_eval, batch_size=batch_size, shuffle=False, num_workers=4)
+            _extract_and_save(model, dataloader_eval, save_path_eval, device)
+        else:
+            print(f"File {save_path_eval} already exists. Use --force to overwrite.")
+    else:
+        raise ValueError(f"Unknown dataset: {dataset}. Must be 'things' or 'coco'.")

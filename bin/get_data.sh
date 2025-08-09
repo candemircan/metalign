@@ -29,8 +29,23 @@ fi
 ## COCO ##
 
 # coco images
-if [ ! -d "data/external/coco" ]; then
-    wget -O data/external/coco.zip http://images.cocodataset.org/zips/train2017.zip
-    unzip data/external/coco.zip -d data/external/coco
-    rm data/external/coco.zip
+if [ ! -d "data/external/coco/train2017" ]; then
+    wget -O data/external/coco_train.zip http://images.cocodataset.org/zips/train2017.zip
+    unzip data/external/coco_train.zip -d data/external/
+    mv data/external/train2017 data/external/coco/
+    rm data/external/coco_train.zip
+fi
+
+if [ ! -d "data/external/coco/val2017" ]; then
+    wget -O data/external/coco_val.zip http://images.cocodataset.org/zips/val2017.zip
+    unzip data/external/coco_val.zip -d data/external/
+    mv data/external/val2017 data/external/coco/
+    rm data/external/coco_val.zip
+fi
+
+if [ ! -d "data/external/coco/test2017" ]; then
+    wget -O data/external/coco_test.zip http://images.cocodataset.org/zips/test2017.zip
+    unzip data/external/coco_test.zip -d data/external/
+    mv data/external/test2017 data/external/coco/
+    rm data/external/coco_test.zip
 fi

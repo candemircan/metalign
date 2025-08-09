@@ -10,29 +10,29 @@ from einops.layers.torch import Rearrange
 from torch import nn
 from torch.nn import functional as F
 
-from .positional_encoding import RotaryPositionalEmbeddings
+from .rope import RotaryPositionalEmbeddings
 
 
 @dataclass
 class TransformerConfig:
-    input_size: int
-    embedding: bool
-    hidden_size: int
-    num_attention_heads: int
-    intermediate_size: int
-    num_layers: int
-    hidden_act: str
-    bias: bool
-    logit_bias: bool
-    attention_dropout: float
-    sequence_length: int
+    input_size: int = 512
+    embedding: bool = True
+    hidden_size: int = 128
+    num_attention_heads: int = 4
+    intermediate_size: int = 512
+    num_layers: int = 2
+    hidden_act: str = "gelu"
+    bias: bool = True
+    logit_bias: bool = True
+    attention_dropout: float = 0.1
+    sequence_length: int = 120
 
     def __post_init__(self):
         if self.hidden_size % self.num_attention_heads != 0:
             raise ValueError(f"hidden_size ({self.hidden_size}) must be divisible by num_attention_heads ({self.num_attention_heads})")
 
 class MLP(nn.Module):
-    def __init__(self, hidden_size:int, intermediate_size:int, hidden_act: str, bias: bool = False):
+    def __init__(self, hidden_size:int, intermediate_size:int, hidden_act: str, bias: bool):
         super().__init__()
         self.act_fn = getattr(F, hidden_act, None)
         if self.act_fn is None: raise ValueError(f"Activation function '{hidden_act}' is not supported.")
@@ -45,7 +45,7 @@ class MLP(nn.Module):
 
 
 class SelfAttention(nn.Module):
-    def __init__(self, hidden_size: int, num_attention_heads: int, bias: bool = False, attention_dropout: float = 0.0, rope: nn.Module = None):
+    def __init__(self, hidden_size: int, num_attention_heads: int, bias: bool, attention_dropout: float, rope: nn.Module):
         super().__init__()
         self.hidden_size = hidden_size
         self.num_heads = num_attention_heads
@@ -73,7 +73,7 @@ class SelfAttention(nn.Module):
 
 
 class TransformerBlock(nn.Module):
-    def __init__(self, hidden_size: int, num_attention_heads: int, intermediate_size: int, hidden_act: str, bias: bool = False, attention_dropout: float = 0.0, rope: nn.Module = None):
+    def __init__(self, hidden_size: int, num_attention_heads: int, intermediate_size: int, hidden_act: str, bias: bool, attention_dropout: float, rope: nn.Module):
         super().__init__()
         self.self_attn = SelfAttention(hidden_size, num_attention_heads, bias=bias, attention_dropout=attention_dropout, rope=rope)
         self.mlp = MLP(hidden_size, intermediate_size, hidden_act, bias=bias)
@@ -87,8 +87,8 @@ class TransformerBlock(nn.Module):
         return x
 
 
-class Transformer(torch.nn.Module):
-    def __init__(self, config: TransformerConfig=TransformerConfig()):
+class Transformer(nn.Module):
+    def __init__(self, config: TransformerConfig):
         super().__init__()
         self.config = config
 

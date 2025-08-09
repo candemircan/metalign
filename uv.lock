@@ -944,7 +944,7 @@ wheels = [
 ]
 
 [[package]]
-name = "metarep"
+name = "metalign"
 version = "0.0.1"
 source = { editable = "." }
 dependencies = [
@@ -975,25 +975,25 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "einops", specifier = "==0.8.1" },
-    { name = "fastcore", specifier = "==1.8.4" },
+    { name = "einops" },
+    { name = "fastcore" },
     { name = "flash-attn", marker = "sys_platform == 'linux'", specifier = "==2.8.1" },
-    { name = "h5py", specifier = "==3.14.0" },
+    { name = "h5py" },
     { name = "ipykernel", marker = "extra == 'dev'" },
-    { name = "nnsight", specifier = "==0.4.8" },
+    { name = "nnsight" },
     { name = "pre-commit", marker = "extra == 'dev'" },
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "ruff", marker = "extra == 'dev'" },
-    { name = "schedulefree", specifier = "==1.4.1" },
+    { name = "schedulefree" },
     { name = "scikit-learn" },
-    { name = "seaborn", specifier = "==0.13.2" },
-    { name = "shiny", marker = "extra == 'dev'", specifier = "==1.4.0" },
+    { name = "seaborn" },
+    { name = "shiny", marker = "extra == 'dev'" },
     { name = "textual", marker = "extra == 'dev'" },
     { name = "tomli-w", marker = "extra == 'dev'" },
-    { name = "torch", specifier = "==2.7.1" },
-    { name = "torchvision", specifier = "==0.22.1" },
+    { name = "torch" },
+    { name = "torchvision" },
     { name = "vit-prisma", git = "https://github.com/Prisma-Multimodal/ViT-Prisma.git?rev=97dd26fc01dfd856060c4a234b882c6f16836c15" },
-    { name = "wandb", specifier = "==0.21.0" },
+    { name = "wandb" },
 ]
 provides-extras = ["dev"]
 

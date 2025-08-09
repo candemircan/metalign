@@ -14,10 +14,61 @@ from tqdm import tqdm
 from vit_prisma.models.model_loader import load_hooked_model
 from vit_prisma.sae import SparseAutoencoder
 
-from metarep.data import Coco, Things
+from metalign.data import Coco, Things
 
 warnings.filterwarnings("ignore", module="kaleido") # idk what this is, but it is annoying
 _ = torch.set_grad_enabled(False) 
+
+def _extract_and_save(
+    model,
+    sae,
+    dataloader,
+    sae_file_path,
+    raw_file_path,
+    device,
+    force
+):
+    if sae_file_path.exists() and force: os.remove(sae_file_path)
+    elif sae_file_path.exists() and not force:
+        print(f"SAE file {sae_file_path} already exists. Use --force to overwrite.")
+        return
+
+    if raw_file_path.exists() and force: os.remove(raw_file_path)
+    elif raw_file_path.exists() and not force:
+        print(f"Raw activations file {raw_file_path} already exists. Use --force to overwrite.")
+        return
+
+    image_offset = 0
+    with h5py.File(sae_file_path, 'w') as sae_f, h5py.File(raw_file_path, 'w') as raw_f:
+        for batch in tqdm(dataloader, desc=f"Processing images for {sae_file_path.stem}"):
+            images = batch.to(device)
+            _, cache = model.run_with_cache(images, names_filter=sae.cfg.hook_point)
+            hook_point_activation = cache[sae.cfg.hook_point].to(device)
+
+            raw_acts = hook_point_activation[:, 0, :]
+            feature_acts = sae.encode(raw_acts)[1] 
+
+            nonzero_mask = feature_acts != 0
+            nonzero_coords = nonzero_mask.nonzero(as_tuple=False)
+            nonzero_values = feature_acts[nonzero_mask]
+
+            batch_img_indices = nonzero_coords[:, 0]
+            counts = torch.bincount(batch_img_indices, minlength=feature_acts.shape[0])
+
+            split_indices = torch.split(nonzero_coords[:, 1], counts.tolist())
+            split_activations = torch.split(nonzero_values, counts.tolist())
+
+            for i in range(feature_acts.shape[0]):
+                global_image_index = image_offset + i
+                
+                indices_data = split_indices[i].cpu().numpy()
+                activations_data = split_activations[i].cpu().numpy()
+                raw_data = raw_acts[i].cpu().numpy()
+
+                sae_f.create_dataset(f'{global_image_index}/indices', data=indices_data)
+                sae_f.create_dataset(f'{global_image_index}/activations', data=activations_data)
+                raw_f.create_dataset(f'{global_image_index}', data=raw_data)
+            image_offset += feature_acts.shape[0]
 
 @call_parse
 def main(
@@ -30,16 +81,13 @@ def main(
     if dataset not in ["things", "coco"]:
         raise ValueError("Dataset must be either 'things' or 'coco'.")
     
-    dir_path = Path("data/sae")
-    dir_path.mkdir(parents=True, exist_ok=True)
-    file_path = dir_path / f"{dataset}_{repo_id.split('/')[-1]}.h5"
+    sae_dir_path = Path("data/sae")
+    sae_dir_path.mkdir(parents=True, exist_ok=True)
+    raw_dir_path = Path("data/backbone_reps")
+    raw_dir_path.mkdir(parents=True, exist_ok=True)
+    
+    repo_id_suffix = repo_id.split('/')[-1]
 
-    if file_path.exists() and force: os.remove(file_path)
-    elif file_path.exists() and not force:
-        print(f"File {file_path} already exists. Use --force to overwrite.")
-        return
-
-    # model loading
     device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
     sae_path = hf_hub_download(repo_id, "weights.pt")
     hf_hub_download(repo_id, "config.json")
@@ -49,48 +97,24 @@ def main(
     model.eval()
     sae.eval()
 
-    # data
-    dataset = Things() if dataset == "things" else Coco()
-    dataset_loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4)
+    if dataset == "things":
+        ds = Things()
+        dataloader = DataLoader(ds, batch_size=batch_size, shuffle=False, num_workers=4)
+        sae_file_path = sae_dir_path / f"things_{repo_id_suffix}.h5"
+        raw_file_path = raw_dir_path / f"things_{model_name}_raw.h5"
+        _extract_and_save(model, sae, dataloader, sae_file_path, raw_file_path, device, force)
     
-    image_offset = 0
-    with h5py.File(file_path, 'w') as f:
-        for batch in tqdm(dataset_loader, desc="Processing images"):
-            images = batch.to(device)
-            _, cache = model.run_with_cache(images, names_filter=sae.cfg.hook_point)
-            hook_point_activation = cache[sae.cfg.hook_point].to(device)
+    elif dataset == "coco":
+        # Process training data
+        ds_train = Coco(train=True)
+        dataloader_train = DataLoader(ds_train, batch_size=batch_size, shuffle=False, num_workers=4)
+        sae_file_path_train = sae_dir_path / f"coco_train_{repo_id_suffix}.h5"
+        raw_file_path_train = raw_dir_path / f"coco_train_{model_name}_raw.h5"
+        _extract_and_save(model, sae, dataloader_train, sae_file_path_train, raw_file_path_train, device, force)
 
-            # 0 is the CLS token
-            raw_acts = hook_point_activation[:, 0, :]
-            # the first of the tuple is the input to the SAE, the second is the feature activations
-            feature_acts = sae.encode(raw_acts)[1] 
-
-            # Find non-zero activations for the entire batch
-            nonzero_mask = feature_acts != 0
-            # nonzero_coords is (n_nonzero, 2), where cols are (img_idx_in_batch, feature_idx)
-            nonzero_coords = nonzero_mask.nonzero(as_tuple=False)
-            nonzero_values = feature_acts[nonzero_mask]
-
-
-            # image index for each non-zero value (0th column of nonzero_coords)
-            batch_img_indices = nonzero_coords[:, 0]
-            
-            #  how many non-zero elements belong to each image in the batch
-            counts = torch.bincount(batch_img_indices, minlength=feature_acts.shape[0])
-
-            # split the results into a list of tensors, one for each image
-            split_indices = torch.split(nonzero_coords[:, 1], counts.tolist())
-            split_activations = torch.split(nonzero_values, counts.tolist())
-
-
-            for i in range(feature_acts.shape[0]):
-                global_image_index = image_offset + i
-                
-                indices_data = split_indices[i].cpu().numpy() if torch.is_tensor(split_indices[i]) else split_indices[i]
-                activations_data = split_activations[i].cpu().numpy() if torch.is_tensor(split_activations[i]) else split_activations[i]
-                raw_data = raw_acts[i].cpu().numpy()
-
-                f.create_dataset(f'{global_image_index}/indices', data=indices_data)
-                f.create_dataset(f'{global_image_index}/activations', data=activations_data)
-                f.create_dataset(f'{global_image_index}/raw', data=raw_data)
-            image_offset += feature_acts.shape[0]
+        # Process eval data
+        ds_eval = Coco(train=False)
+        dataloader_eval = DataLoader(ds_eval, batch_size=batch_size, shuffle=False, num_workers=4)
+        sae_file_path_eval = sae_dir_path / f"coco_eval_{repo_id_suffix}.h5"
+        raw_file_path_eval = raw_dir_path / f"coco_eval_{model_name}_raw.h5"
+        _extract_and_save(model, sae, dataloader_eval, sae_file_path_eval, raw_file_path_eval, device, force)

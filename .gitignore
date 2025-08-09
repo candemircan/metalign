@@ -162,7 +162,4 @@ example*
 wandb
 /.quarto/
 .jupyter_cache
-
-example*
-
 example*
