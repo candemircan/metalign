@@ -80,7 +80,7 @@ def main(
     torch.manual_seed(args["seed"])
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = True # this might introduce some non-determinism in exchange for speed
-    if torch.cuda.is_available(): torch.cuda.manual_seed_all(args["seed"])
+    torch.cuda.manual_seed_all(args["seed"])
 
     if ddp_rank == 0:
         full_checkpoint_dir = f"data/checkpoints/{args['checkpoint_dir']}" if args["name"] is None else f"data/checkpoints/{args['name']}"
@@ -122,7 +122,7 @@ def main(
         train_episode_dataset,
         batch_size=per_device_batch_size,
         num_workers=min(4, os.cpu_count()),
-        pin_memory=torch.cuda.is_available(),
+        pin_memory=True,
         shuffle=False,
         drop_last=True,
         sampler=train_sampler
@@ -132,7 +132,7 @@ def main(
         eval_episode_dataset,
         batch_size=per_device_batch_size,
         num_workers=min(2, os.cpu_count()),
-        pin_memory=torch.cuda.is_available(),
+        pin_memory=True,
         shuffle=False,
         drop_last=False,
         sampler=eval_sampler
@@ -226,7 +226,7 @@ def main(
                     batch_X = batch_X.to(device)
                     batch_Y = batch_Y.to(device)
 
-                    with autocast(dtype=torch.bfloat16, enabled=torch.cuda.is_available()):
+                    with autocast(dtype=torch.bfloat16, device_type="cuda"):
                         logits_eval = model(batch_X, batch_Y).squeeze(-1)
                         loss_eval =  F.binary_cross_entropy_with_logits(logits_eval, batch_Y)
                     eval_losses.append(loss_eval.item())
