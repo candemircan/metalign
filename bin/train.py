@@ -123,7 +123,6 @@ def main(
         batch_size=per_device_batch_size,
         num_workers=min(4, os.cpu_count()),
         pin_memory=True,
-        shuffle=False,
         drop_last=True,
         sampler=train_sampler
     )
@@ -133,7 +132,6 @@ def main(
         batch_size=per_device_batch_size,
         num_workers=min(2, os.cpu_count()),
         pin_memory=True,
-        shuffle=False,
         drop_last=False,
         sampler=eval_sampler
     )
