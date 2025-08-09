@@ -9,8 +9,11 @@ import torch
 import wandb
 from fastcore.script import Param, bool_arg, call_parse
 from schedulefree import AdamWScheduleFree
+from torch.amp import autocast
 from torch.nn import functional as F
+from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
+from torch.utils.data.distributed import DistributedSampler
 
 from metalign.data import FunctionDataset
 from metalign.model import Transformer, TransformerConfig
@@ -30,7 +33,6 @@ def main(
     bias: bool_arg = True,  # whether to use bias in the linear layers of the transformer model
     logit_bias: bool_arg = True,  # whether to use bias in the final linear layer of the transformer model. If False, the final layer will not have a bias term.
     attention_dropout: float = 0.0,  # dropout rate for the attention layers in the transformer model
-    pe_dropout: float = 0.0,  # dropout rate for the positional encoding in the transformer model. Used only with the sinusoidal positional encoding.
     sequence_length: int = 120,  # maximum number of position embeddings in the transformer model
     config_file: str = None,  # path to a config file. If provided, any parameters in the file will override the corresponding command line arguments. See "data/example_transformer_config.toml" for an example config file.
     batch_size: int = 256,  # batch size for training the model
@@ -49,20 +51,29 @@ def main(
     scale: bool_arg = True,  # whether to scale the input data to have zero mean and unit variance
     compile: bool_arg = True,  # whether to compile the model with torch.compile
     train_backbone: str = "coco_train_dinov2_vitb14_reg",  # backbone for train data. the name must match data/backbone_reps/{train_backbone}.npz
-    eval_backbone: str = "things_dinov2_vitb14_reg",  # backbone for eval data. the name must match data/backbone_reps/{eval_backbone}.npz
+    eval_backbone: str = "coco_eval_dinov2_vitb14_reg",  # backbone for eval data. the name must match data/backbone_reps/{eval_backbone}.npz
     train_features: str = "coco_train_sae-top_k-64-cls_only-layer_11-hook_resid_post",  # features for training data. the name must match data/sae/{train_features}.h5
-    eval_features: str = "things_sae-top_k-64-cls_only-layer_11-hook_resid_post",  # features for eval data. the name must match data/sae/{eval_features}.h5
+    eval_features: str = "coco_eval_sae-top_k-64-cls_only-layer_11-hook_resid_post",  # features for eval data. the name must match data/sae/{eval_features}.h5
     min_nonzero: int = 120,  # minimum number of non-zero activations per column to keep it in the final array
 ):
     """
     train a meta-learning transformer model over function learning tasks.
     """
+    assert torch.cuda.is_available(), "DDP requires CUDA"
+    torch.distributed.init_process_group(backend='nccl')
+    ddp_rank = int(os.environ['RANK'])
+    ddp_local_rank = int(os.environ['LOCAL_RANK'])
+    ddp_world_size = int(os.environ['WORLD_SIZE'])
+    device = f'cuda:{ddp_local_rank}'
+    torch.cuda.set_device(device)
+
     args = locals()
     if config_file:
         with open(config_file, "rb") as f:
             config_data = tomllib.load(f)
         args.update(config_data)
-    pprint(args)
+    
+    if ddp_rank == 0: pprint(args)
 
     random.seed(args["seed"])
     np.random.seed(args["seed"])
@@ -71,8 +82,9 @@ def main(
     torch.backends.cudnn.benchmark = True # this might introduce some non-determinism in exchange for speed
     if torch.cuda.is_available(): torch.cuda.manual_seed_all(args["seed"])
 
-    full_checkpoint_dir = f"data/checkpoints/{args['checkpoint_dir']}" if args["name"] is None else f"data/checkpoints/{args['name']}"
-    if not os.path.exists(full_checkpoint_dir): os.makedirs(full_checkpoint_dir)
+    if ddp_rank == 0:
+        full_checkpoint_dir = f"data/checkpoints/{args['checkpoint_dir']}" if args["name"] is None else f"data/checkpoints/{args['name']}"
+        if not os.path.exists(full_checkpoint_dir): os.makedirs(full_checkpoint_dir)
 
     train_inputs = np.load(f"data/backbone_reps/{args['train_backbone']}.npz")['data']
     eval_inputs = np.load(f"data/backbone_reps/{args['eval_backbone']}.npz")['data']
@@ -101,22 +113,29 @@ def main(
         epoch_size=args["num_eval_episodes"]
     )
 
+    per_device_batch_size = args["batch_size"] // ddp_world_size
+    
+    train_sampler = DistributedSampler(train_episode_dataset, num_replicas=ddp_world_size, rank=ddp_rank, shuffle=True)
+    eval_sampler = DistributedSampler(eval_episode_dataset, num_replicas=ddp_world_size, rank=ddp_rank, shuffle=False)
+
     train_loader = DataLoader(
         train_episode_dataset,
-        batch_size=args["batch_size"],
+        batch_size=per_device_batch_size,
         num_workers=min(4, os.cpu_count()),
         pin_memory=torch.cuda.is_available(),
-        shuffle=True,
-        drop_last=True
+        shuffle=False,
+        drop_last=True,
+        sampler=train_sampler
     )
     
     eval_loader = DataLoader(
         eval_episode_dataset,
-        batch_size=args["batch_size"],
+        batch_size=per_device_batch_size,
         num_workers=min(2, os.cpu_count()),
         pin_memory=torch.cuda.is_available(),
         shuffle=False,
-        drop_last=False
+        drop_last=False,
+        sampler=eval_sampler
     )
 
     config = TransformerConfig(
@@ -134,18 +153,17 @@ def main(
     )
 
     model = Transformer(config)
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
     model.to(device)
+    model = DDP(model, device_ids=[ddp_local_rank])
 
     if args["compile"]: model.compile(fullgraph=True, mode="max-autotune")
 
     optimizer = AdamWScheduleFree(model.parameters(),lr=args["lr"],weight_decay=args["weight_decay"], warmup_steps=args["warmup_steps"])
 
     best_eval_accuracy = -1.0
-    best_checkpoint_path = f"{full_checkpoint_dir}/best.pt"
+    if ddp_rank == 0: best_checkpoint_path = f"{full_checkpoint_dir}/best.pt"
 
-    if args["wandb_log"]:
+    if args["wandb_log"] and ddp_rank == 0:
         # hacky way to see if i'm training on juwels, which does not have internet in compute nodes
         # in this case, gotta also run bin/sync_wandb.sh from the login node
         device_name = os.uname()[1]
@@ -174,8 +192,9 @@ def main(
         X_batch = X_batch.to(device)
         Y_batch = Y_batch.to(device)
 
-        logits = model(X_batch, Y_batch).squeeze(-1)
-        loss =  F.binary_cross_entropy_with_logits(logits, Y_batch)
+        with autocast(dtype=torch.bfloat16, device_type="cuda"):
+            logits = model(X_batch, Y_batch).squeeze(-1)
+            loss =  F.binary_cross_entropy_with_logits(logits, Y_batch)
 
         optimizer.zero_grad()
         loss.backward()
@@ -190,7 +209,7 @@ def main(
         if (training_step + 1) % args["log_interval_steps"] == 0:
             avg_train_loss = accumulated_train_loss / args["log_interval_steps"]
             train_accuracy = accumulated_train_correct / accumulated_train_total
-            if args["wandb_log"]: wandb.log({"loss_train": avg_train_loss, "accuracy_train": train_accuracy}, step=training_step)
+            if args["wandb_log"] and ddp_rank == 0: wandb.log({"loss_train": avg_train_loss, "accuracy_train": train_accuracy}, step=training_step)
             accumulated_train_loss = 0.0
             accumulated_train_correct = 0
             accumulated_train_total = 0
@@ -207,8 +226,9 @@ def main(
                     batch_X = batch_X.to(device)
                     batch_Y = batch_Y.to(device)
 
-                    logits_eval = model(batch_X, batch_Y).squeeze(-1)
-                    loss_eval =  F.binary_cross_entropy_with_logits(logits_eval, batch_Y)
+                    with autocast(dtype=torch.bfloat16, enabled=torch.cuda.is_available()):
+                        logits_eval = model(batch_X, batch_Y).squeeze(-1)
+                        loss_eval =  F.binary_cross_entropy_with_logits(logits_eval, batch_Y)
                     eval_losses.append(loss_eval.item())
 
                     predictions = (torch.sigmoid(logits_eval) > 0.5).float()
@@ -217,26 +237,27 @@ def main(
 
                 avg_eval_loss = np.mean(eval_losses)
                 eval_accuracy = correct_predictions / total_predictions
-                if args["wandb_log"]: wandb.log({"loss_eval": avg_eval_loss, "accuracy_eval": eval_accuracy}, step=training_step)
+                if args["wandb_log"] and ddp_rank == 0: wandb.log({"loss_eval": avg_eval_loss, "accuracy_eval": eval_accuracy}, step=training_step)
 
-                if eval_accuracy > best_eval_accuracy:
+                if ddp_rank == 0 and eval_accuracy > best_eval_accuracy:
                     best_eval_accuracy = eval_accuracy
                     torch.save({
-                        'model_state_dict': {k: v.cpu() for k, v in model.state_dict().items()},
+                        'model_state_dict': {k: v.cpu() for k, v in model.module.state_dict().items()},
                         'eval_accuracy': eval_accuracy,
                         'step': training_step,
                         'config': config,
                     }, best_checkpoint_path)
 
-        if (training_step + 1) % args["checkpoint_interval_steps"] == 0:
+        if ddp_rank == 0 and (training_step + 1) % args["checkpoint_interval_steps"] == 0:
             model.eval()
             optimizer.eval()
             checkpoint_path = os.path.join(full_checkpoint_dir, "latest.pt")
             torch.save({
                 'step': training_step,
-                'model_state_dict': {k: v.cpu() for k, v in model.state_dict().items()},
+                'model_state_dict': {k: v.cpu() for k, v in model.module.state_dict().items()},
                 'optimizer_state_dict': optimizer.state_dict(),
                 'config': config,
             }, checkpoint_path)
 
-    if args["wandb_log"]: wandb.finish()
+    torch.distributed.destroy_process_group()
+    if args["wandb_log"] and ddp_rank == 0: wandb.finish()

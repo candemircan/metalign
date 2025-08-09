@@ -14,8 +14,8 @@ config_file="$1"
 
 # Check if the arguments are provided
 if [[ -z "$config_file" ]]; then
-    echo "Error: You need to provide a config file as a positional argument. e.g. sbatch bin/train.slurm data/example_transformer_config.toml"
+    echo "Error: You need to provide a config file as a positional argument. e.g. sbatch bin/train_single.slurm <config1>"
     exit 1
 fi
 
-uv run bin/train.py --config_file "$config_file"
+uv run torchrun --nproc_per_node=1 bin/train.py --config_file "$config_file"
