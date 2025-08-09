@@ -154,9 +154,9 @@ def main(
 
     model = Transformer(config)
     model.to(device)
+    if args["compile"]: model.compile(fullgraph=True, mode="max-autotune")
     model = DDP(model, device_ids=[ddp_local_rank])
 
-    if args["compile"]: model.compile(fullgraph=True, mode="max-autotune")
 
     optimizer = AdamWScheduleFree(model.parameters(),lr=args["lr"],weight_decay=args["weight_decay"], warmup_steps=args["warmup_steps"])
 
