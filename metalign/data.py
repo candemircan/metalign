@@ -2,7 +2,7 @@
 common datasets and processing utils  used throughout the project
 """
 
-__all__ = ["ImageDataset", "Things", "Coco", "h5_to_numpy", "image_transform","FunctionDataset"]
+__all__ = ["ImageDataset", "Things", "Coco", "h5_to_numpy", "image_transform","FunctionDataset", "prepare_things_spose"]
 
 from pathlib import Path
 from typing import Sequence
@@ -14,7 +14,7 @@ from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
 
-from .constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD, NUM_COCO_TRAIN_IMAGES, NUM_THINGS_IMAGES
+from .constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD, NUM_COCO_TRAIN_IMAGES, NUM_THINGS_CATEGORIES, NUM_THINGS_IMAGES
 
 
 def _convert_to_rgb(img):
@@ -204,3 +204,37 @@ class FunctionDataset(Dataset):
 
         if torch.rand(1).item() < 0.5: Y_episode = 1 - Y_episode
         return X_episode, Y_episode
+    
+
+
+def prepare_things_spose(
+    representations: np.ndarray, # directly from np.load("data/backbone_reps/{backbone}.npy")
+    data_root: Path = Path("data/external"), # the root directory of the THINGS dataset, which contains the images and the unique_id.txt file
+    return_tensors: str = "pt", # the type of tensors to return, can be "pt" for PyTorch tensors or "np" for NumPy arrays
+) -> tuple[torch.Tensor, torch.Tensor] | tuple[np.ndarray, np.ndarray]:
+    """
+    Match the representations from the backbone with the SPoSE embeddings for the THINGS dataset.
+
+    Only use the first image of each category. The ordering is done based on the `unique_id.txt` file, which matches `spose_embedding_66d_sorted.txt`
+    """
+    img_names = sorted((data_root / "THINGS").glob("*/*.jpg"))
+    unique_ids = [line.strip() for line in open(data_root / "unique_id.txt", "r")]
+
+    assert all(img_name.parent.name in unique_ids for img_name in img_names), "Not all parent folders in img_names are in unique_ids"
+
+    img_idx = []
+    parent_name_list = [img_name.parent.name for img_name in img_names]
+    for unique_id in unique_ids:
+        img_idx.append(parent_name_list.index(unique_id)) # always gets the first item
+
+    assert 0 in img_idx, "The first image must be in there"
+    assert len(img_idx) == NUM_THINGS_CATEGORIES, f"Expected {NUM_THINGS_CATEGORIES} categories, found {len(img_idx)}"
+
+    X = representations[img_idx]
+    Y = np.loadtxt(data_root / "spose_embedding_66d_sorted.txt").astype(np.float32)
+
+    if return_tensors == "pt": X, Y = torch.from_numpy(X), torch.from_numpy(Y)
+    elif return_tensors == "np": pass
+    else: raise ValueError(f"Unknown return_tensors type: {return_tensors}. Must be 'pt' or 'np'.")
+    
+    return X, Y
