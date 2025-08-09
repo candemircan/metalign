@@ -2,8 +2,8 @@
 
 # no internet in the compute nodes, so gotta sync from the login node
 # run it in a tmux session
-RUN_DURATION_SECONDS=$((12 * 3600)) # 12 hours
-SYNC_INTERVAL_SECONDS=60 # Sync every
+RUN_DURATION_SECONDS=$((24 * 3600)) # 12 hours
+SYNC_INTERVAL_SECONDS=120 # Sync every
 SHARED_WANDB_BASE_DIR="wandb"
 
 START_TIME=$(date +%s)
