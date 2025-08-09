@@ -206,40 +206,63 @@ def main(
         accumulated_train_correct += (predictions == Y_batch).sum().item()
         accumulated_train_total += Y_batch.numel()
 
-        if (training_step + 1) % args["log_interval_steps"] == 0:
-            avg_train_loss = accumulated_train_loss / args["log_interval_steps"]
-            train_accuracy = accumulated_train_correct / accumulated_train_total
-            if args["wandb_log"] and ddp_rank == 0: wandb.log({"loss_train": avg_train_loss, "accuracy_train": train_accuracy}, step=training_step)
-            accumulated_train_loss = 0.0
-            accumulated_train_correct = 0
-            accumulated_train_total = 0
+    if (training_step + 1) % args["log_interval_steps"] == 0:
+        metrics = torch.tensor([accumulated_train_loss, accumulated_train_correct, accumulated_train_total], device=device)
+        
+        # sum this tensor across all processes in the DDP group
+        torch.distributed.all_reduce(metrics, op=torch.distributed.ReduceOp.SUM)
 
-        if (training_step + 1) % args["eval_interval_steps"] == 0:
-            with torch.no_grad():
-                model.eval()
-                optimizer.eval()
-                eval_losses = []
-                correct_predictions = 0
-                total_predictions = 0
+        # on the main process, calculate the global average and log
+        if args["wandb_log"] and ddp_rank == 0:
+            # log_interval_steps is multiplied by ddp_world_size because each process ran that many steps
+            global_loss = metrics[0].item() / (args["log_interval_steps"] * ddp_world_size)
+            global_accuracy = metrics[1].item() / metrics[2].item()
+            
+            wandb.log({"loss_train": global_loss, "accuracy_train": global_accuracy}, step=training_step)
 
-                for batch_X, batch_Y in eval_loader:
-                    batch_X = batch_X.to(device)
-                    batch_Y = batch_Y.to(device)
+        # reset local accumulators on all processes
+        accumulated_train_loss = 0.0
+        accumulated_train_correct = 0
+        accumulated_train_total = 0
 
-                    with autocast(dtype=torch.bfloat16, device_type="cuda"):
-                        logits_eval = model(batch_X, batch_Y).squeeze(-1)
-                        loss_eval =  F.binary_cross_entropy_with_logits(logits_eval, batch_Y)
-                    eval_losses.append(loss_eval.item())
+    if (training_step + 1) % args["eval_interval_steps"] == 0:
+        with torch.no_grad():
+            model.eval()
+            optimizer.eval()
+            
+            local_sum_eval_loss = 0.0
+            local_correct_predictions = 0
+            local_total_predictions = 0
 
-                    predictions = (torch.sigmoid(logits_eval) > 0.5).float()
-                    correct_predictions += (predictions == batch_Y).sum().item()
-                    total_predictions += batch_Y.numel()
+            for batch_X, batch_Y in eval_loader:
+                batch_X = batch_X.to(device)
+                batch_Y = batch_Y.to(device)
 
-                avg_eval_loss = np.mean(eval_losses)
-                eval_accuracy = correct_predictions / total_predictions
-                if args["wandb_log"] and ddp_rank == 0: wandb.log({"loss_eval": avg_eval_loss, "accuracy_eval": eval_accuracy}, step=training_step)
+                with autocast(dtype=torch.bfloat16, device_type="cuda"):
+                    logits_eval = model(batch_X, batch_Y).squeeze(-1)
+                    loss_eval =  F.binary_cross_entropy_with_logits(logits_eval, batch_Y)
+                
+                local_sum_eval_loss += loss_eval.item() * batch_Y.numel()
+                predictions = (torch.sigmoid(logits_eval) > 0.5).float()
+                local_correct_predictions += (predictions == batch_Y).sum().item()
+                local_total_predictions += batch_Y.numel()
 
-                if ddp_rank == 0 and eval_accuracy > best_eval_accuracy:
+            metrics = torch.tensor([local_sum_eval_loss, local_correct_predictions, local_total_predictions], device=device)
+            torch.distributed.all_reduce(metrics, op=torch.distributed.ReduceOp.SUM)
+
+            if args["wandb_log"] and ddp_rank == 0:
+                global_sum_loss = metrics[0].item()
+                global_correct = metrics[1].item()
+                global_total = metrics[2].item()
+
+                avg_eval_loss = global_sum_loss / global_total
+                eval_accuracy = global_correct / global_total
+                
+                wandb.log({"loss_eval": avg_eval_loss, "accuracy_eval": eval_accuracy}, step=training_step)
+
+            if ddp_rank == 0:
+                eval_accuracy = metrics[1].item() / metrics[2].item()
+                if eval_accuracy > best_eval_accuracy:
                     best_eval_accuracy = eval_accuracy
                     torch.save({
                         'model_state_dict': {k: v.cpu() for k, v in model.module.state_dict().items()},

@@ -15,6 +15,11 @@ from .rope import RotaryPositionalEmbeddings
 
 @dataclass
 class TransformerConfig:
+    """
+    Configuration used to initialize the transformer model
+
+    The defaults here are kinda random. They exist just to make testing easy. 
+    """
     input_size: int = 512
     embedding: bool = True
     hidden_size: int = 128
