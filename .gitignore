@@ -163,3 +163,4 @@ wandb
 /.quarto/
 .jupyter_cache
 example*
+.neptune
