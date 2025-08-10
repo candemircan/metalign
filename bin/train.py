@@ -55,6 +55,8 @@ def main(
     train_features: str = "coco_train_sae-top_k-64-cls_only-layer_11-hook_resid_post",  # features for training data. the name must match data/sae/{train_features}.h5
     eval_features: str = "coco_eval_sae-top_k-64-cls_only-layer_11-hook_resid_post",  # features for eval data. the name must match data/sae/{eval_features}.h5
     min_nonzero: int = 120,  # minimum number of non-zero activations per column to keep it in the final array
+    early_stopping_patience: int = 10, # number of evaluation intervals to wait for improvement before stopping
+    early_stopping_min_delta: float = 0.01, # minimum change in evaluation accuracy to be considered an improvement
 ):
     """
     train a meta-learning transformer model over function learning tasks.
@@ -160,6 +162,7 @@ def main(
     optimizer = AdamWScheduleFree(model.parameters(),lr=args["lr"],weight_decay=args["weight_decay"], warmup_steps=args["warmup_steps"])
 
     best_eval_accuracy = -1.0
+    early_stopping_counter = 0
     if ddp_rank == 0: best_checkpoint_path = f"{full_checkpoint_dir}/best.pt"
 
     if args["wandb_log"] and ddp_rank == 0:
@@ -249,19 +252,29 @@ def main(
                 metrics = torch.tensor([local_sum_eval_loss, local_correct_predictions, local_total_predictions], device=device)
                 torch.distributed.all_reduce(metrics, op=torch.distributed.ReduceOp.SUM)
 
-                if args["wandb_log"] and ddp_rank == 0:
+                if ddp_rank == 0:
                     global_sum_loss = metrics[0].item()
                     global_correct = metrics[1].item()
                     global_total = metrics[2].item()
-
-                    avg_eval_loss = global_sum_loss / global_total
                     eval_accuracy = global_correct / global_total
-                    
-                    wandb.log({"loss_eval": avg_eval_loss, "accuracy_eval": eval_accuracy}, step=training_step)
 
-                if ddp_rank == 0:
-                    eval_accuracy = metrics[1].item() / metrics[2].item()
-                    if eval_accuracy > best_eval_accuracy:
+                    if args["wandb_log"]:
+                        avg_eval_loss = global_sum_loss / global_total
+                        wandb.log({"loss_eval": avg_eval_loss, "accuracy_eval": eval_accuracy}, step=training_step)
+
+                    if training_step > args["warmup_steps"]:
+                        if eval_accuracy - best_eval_accuracy > args["early_stopping_min_delta"]:
+                            best_eval_accuracy = eval_accuracy
+                            early_stopping_counter = 0
+                            torch.save({
+                                'model_state_dict': {k: v.cpu() for k, v in model.module.state_dict().items()},
+                                'eval_accuracy': eval_accuracy,
+                                'step': training_step,
+                                'config': config,
+                            }, best_checkpoint_path)
+                        else:
+                            early_stopping_counter += 1
+                    elif eval_accuracy > best_eval_accuracy:
                         best_eval_accuracy = eval_accuracy
                         torch.save({
                             'model_state_dict': {k: v.cpu() for k, v in model.module.state_dict().items()},
@@ -269,6 +282,10 @@ def main(
                             'step': training_step,
                             'config': config,
                         }, best_checkpoint_path)
+
+            if ddp_rank == 0 and early_stopping_counter >= args["early_stopping_patience"]:
+                print(f"early stopping at step {training_step} due to no improvement in eval accuracy for {args['early_stopping_patience']} evaluation intervals.")
+                break
 
             if ddp_rank == 0 and (training_step + 1) % args["checkpoint_interval_steps"] == 0:
                 model.eval()
