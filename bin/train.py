@@ -55,7 +55,7 @@ def main(
     train_features: str = "coco_train_sae-top_k-64-cls_only-layer_11-hook_resid_post",  # features for training data. the name must match data/sae/{train_features}.h5
     eval_features: str = "coco_eval_sae-top_k-64-cls_only-layer_11-hook_resid_post",  # features for eval data. the name must match data/sae/{eval_features}.h5
     min_nonzero: int = 120,  # minimum number of non-zero activations per column to keep it in the final array
-    early_stopping_patience: int = 10, # number of evaluation intervals to wait for improvement before stopping
+    early_stopping_patience: int = 20, # number of evaluation intervals to wait for improvement before stopping
     early_stopping_min_delta: float = 0.01, # minimum change in evaluation accuracy to be considered an improvement
 ):
     """
@@ -127,7 +127,8 @@ def main(
         num_workers=min(4, os.cpu_count()),
         pin_memory=True,
         drop_last=True,
-        sampler=train_sampler
+        sampler=train_sampler,
+        persistent_workers=True
     )
     
     eval_loader = DataLoader(
@@ -136,7 +137,8 @@ def main(
         num_workers=min(2, os.cpu_count()),
         pin_memory=True,
         drop_last=False,
-        sampler=eval_sampler
+        sampler=eval_sampler,
+        persistent_workers=True
     )
 
     config = TransformerConfig(
@@ -252,6 +254,7 @@ def main(
                 metrics = torch.tensor([local_sum_eval_loss, local_correct_predictions, local_total_predictions], device=device)
                 torch.distributed.all_reduce(metrics, op=torch.distributed.ReduceOp.SUM)
 
+                stop_training = torch.tensor(0, device=device)
                 if ddp_rank == 0:
                     global_sum_loss = metrics[0].item()
                     global_correct = metrics[1].item()
@@ -282,10 +285,14 @@ def main(
                             'step': training_step,
                             'config': config,
                         }, best_checkpoint_path)
+                    
+                    if early_stopping_counter >= args["early_stopping_patience"]:
+                        print(f"early stopping at step {training_step} due to no improvement in eval accuracy for {args['early_stopping_patience']} evaluation intervals.")
+                        stop_training.fill_(1)
 
-            if ddp_rank == 0 and early_stopping_counter >= args["early_stopping_patience"]:
-                print(f"early stopping at step {training_step} due to no improvement in eval accuracy for {args['early_stopping_patience']} evaluation intervals.")
-                break
+            torch.distributed.broadcast(stop_training, src=0)
+
+            if stop_training.item() == 1: break
 
             if ddp_rank == 0 and (training_step + 1) % args["checkpoint_interval_steps"] == 0:
                 model.eval()
