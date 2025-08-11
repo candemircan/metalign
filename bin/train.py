@@ -6,8 +6,8 @@ from pprint import pprint
 
 import numpy as np
 import torch
-import wandb
-from fastcore.script import Param, bool_arg, call_parse
+import trackio
+from fastcore.script import bool_arg, call_parse
 from schedulefree import AdamWScheduleFree
 from torch.amp import autocast
 from torch.nn import functional as F
@@ -22,8 +22,8 @@ torch.set_float32_matmul_precision('high')
 
 @call_parse
 def main(
-    wandb_log: bool_arg = True,  # whether to log the model to wandb. If False, no logging is done.
-    wandb_name: str = "metalign",  # name of the wandb project. Used to log the model.
+    trackio_log: bool_arg = True,  # whether to log the model to trackio. If False, no logging is done.
+    trackio_name: str = "metalign",  # name of the trackio project. Used to log the model.
     embedding: bool_arg = True,  # whether to use an embedding layer at the beginning of the model
     hidden_size: int = 768,  # hidden size of the transformer model. if this is different from the input size, an embedding layer must be used
     num_attention_heads: int = 12,  # number of attention heads in the transformer model
@@ -45,13 +45,12 @@ def main(
     log_interval_steps: int = 10,  # log training loss every N steps
     eval_interval_steps: int = 100,  # evaluate the model every eval_interval_steps steps
     num_eval_episodes: int = 128,  # number of episodes to sample for evaluation
-    tags: Param(help="tags to use for the wandb run. If empty, no tags are used.", type=str, nargs="*") = [],  # type: ignore
     checkpoint_dir: str = "checkpoints", # directory to save checkpoints. this will be placed under data/checkpoints/{name} if name is provided. If name is None, it will be saved under data/checkpoints
     checkpoint_interval_steps: int = 1000, # save checkpoint every N steps
     scale: bool_arg = True,  # whether to scale the input data to have zero mean and unit variance
     compile: bool_arg = True,  # whether to compile the model with torch.compile
-    train_backbone: str = "coco_train_dinov2_vitb14_reg",  # backbone for train data. the name must match data/backbone_reps/{train_backbone}.npz
-    eval_backbone: str = "coco_eval_dinov2_vitb14_reg",  # backbone for eval data. the name must match data/backbone_reps/{eval_backbone}.npz
+    train_backbone: str = "coco_train_dinov2-base",  # backbone for train data. the name must match data/backbone_reps/{train_backbone}.h5
+    eval_backbone: str = "coco_eval_dinov2-base",  # backbone for eval data. the name must match data/backbone_reps/{eval_backbone}.h5
     train_features: str = "coco_train_sae-top_k-64-cls_only-layer_11-hook_resid_post",  # features for training data. the name must match data/sae/{train_features}.h5
     eval_features: str = "coco_eval_sae-top_k-64-cls_only-layer_11-hook_resid_post",  # features for eval data. the name must match data/sae/{eval_features}.h5
     min_nonzero: int = 120,  # minimum number of non-zero activations per column to keep it in the final array
@@ -89,8 +88,11 @@ def main(
         full_checkpoint_dir = f"data/checkpoints/{args['checkpoint_dir']}" if args["name"] is None else f"data/checkpoints/{args['name']}"
         if not os.path.exists(full_checkpoint_dir): os.makedirs(full_checkpoint_dir)
 
-    train_inputs = np.load(f"data/backbone_reps/{args['train_backbone']}.npz")['data']
-    eval_inputs = np.load(f"data/backbone_reps/{args['eval_backbone']}.npz")['data']
+    import h5py
+    with h5py.File(f"data/backbone_reps/{args['train_backbone']}.h5", 'r') as f:
+        train_inputs = f['representations'][:]
+    with h5py.File(f"data/backbone_reps/{args['eval_backbone']}.h5", 'r') as f:
+        eval_inputs = f['representations'][:]
     
     # Get feature dimension from input data
     feature_dim = train_inputs.shape[1]
@@ -167,11 +169,8 @@ def main(
     early_stopping_counter = 0
     if ddp_rank == 0: best_checkpoint_path = f"{full_checkpoint_dir}/best.pt"
 
-    if args["wandb_log"] and ddp_rank == 0:
-        # hacky way to see if i'm training on juwels, which does not have internet in compute nodes
-        # in this case, gotta also run bin/sync_wandb.sh from the login node
-        device_name = os.uname()[1]
-        wandb.init(project=args["wandb_name"], name=args["name"], config=args, tags=args["tags"], mode="offline" if "juwels" in device_name else "online")
+    if args["trackio_log"] and ddp_rank == 0:
+        trackio.init(project=args["trackio_name"], name=args["name"], config=args)
 
     
     accumulated_train_loss = 0.0
@@ -217,12 +216,12 @@ def main(
             torch.distributed.all_reduce(metrics, op=torch.distributed.ReduceOp.SUM)
 
             # on the main process, calculate the global average and log
-            if args["wandb_log"] and ddp_rank == 0:
+            if args["trackio_log"] and ddp_rank == 0:
                 # log_interval_steps is multiplied by ddp_world_size because each process ran that many steps
                 global_loss = metrics[0].item() / (args["log_interval_steps"] * ddp_world_size)
                 global_accuracy = metrics[1].item() / metrics[2].item()
                 
-                wandb.log({"loss_train": global_loss, "accuracy_train": global_accuracy}, step=training_step)
+                trackio.log({"loss_train": global_loss, "accuracy_train": global_accuracy}, step=training_step)
 
             # reset local accumulators on all processes
             accumulated_train_loss = 0.0
@@ -261,9 +260,9 @@ def main(
                     global_total = metrics[2].item()
                     eval_accuracy = global_correct / global_total
 
-                    if args["wandb_log"]:
+                    if args["trackio_log"]:
                         avg_eval_loss = global_sum_loss / global_total
-                        wandb.log({"loss_eval": avg_eval_loss, "accuracy_eval": eval_accuracy}, step=training_step)
+                        trackio.log({"loss_eval": avg_eval_loss, "accuracy_eval": eval_accuracy}, step=training_step)
 
                     if training_step > args["warmup_steps"]:
                         if eval_accuracy - best_eval_accuracy > args["early_stopping_min_delta"]:
@@ -306,4 +305,4 @@ def main(
                 }, checkpoint_path)
 
     torch.distributed.destroy_process_group()
-    if args["wandb_log"] and ddp_rank == 0: wandb.finish()
+    if args["trackio_log"] and ddp_rank == 0: trackio.finish()

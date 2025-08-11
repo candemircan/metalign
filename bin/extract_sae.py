@@ -13,6 +13,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from vit_prisma.models.model_loader import load_hooked_model
 from vit_prisma.sae import SparseAutoencoder
+from vit_prisma.transforms import get_clip_val_transforms
 
 from metalign.data import Coco, Things
 
@@ -99,22 +100,24 @@ def main(
     save_model_name = model_name.split("/")[-1]
 
     if dataset == "things":
-        ds = Things()
+        clip_transforms = get_clip_val_transforms()
+        ds = Things(transform=clip_transforms)
         dataloader = DataLoader(ds, batch_size=batch_size, shuffle=False, num_workers=4)
         sae_file_path = sae_dir_path / f"things_{repo_id_suffix}.h5"
         raw_file_path = raw_dir_path / f"things_{save_model_name}_raw.h5"
         _extract_and_save(model, sae, dataloader, sae_file_path, raw_file_path, device, force)
     
     elif dataset == "coco":
+        clip_transforms = get_clip_val_transforms()
         # Process training data
-        ds_train = Coco(train=True)
+        ds_train = Coco(train=True, transform=clip_transforms)
         dataloader_train = DataLoader(ds_train, batch_size=batch_size, shuffle=False, num_workers=4)
         sae_file_path_train = sae_dir_path / f"coco_train_{repo_id_suffix}.h5"
         raw_file_path_train = raw_dir_path / f"coco_train_{save_model_name}_raw.h5"
         _extract_and_save(model, sae, dataloader_train, sae_file_path_train, raw_file_path_train, device, force)
 
         # Process eval data
-        ds_eval = Coco(train=False)
+        ds_eval = Coco(train=False, transform=clip_transforms)
         dataloader_eval = DataLoader(ds_eval, batch_size=batch_size, shuffle=False, num_workers=4)
         sae_file_path_eval = sae_dir_path / f"coco_eval_{repo_id_suffix}.h5"
         raw_file_path_eval = raw_dir_path / f"coco_eval_{save_model_name}_raw.h5"

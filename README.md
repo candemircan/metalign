@@ -46,7 +46,6 @@ For setup, you need to do the following things:
 
 - odd-one-out judgements on THINGS
 - odd-one-out judgements on Levels (Imagenet)
-- odd-one-out judgements on Stuff
 
 #### Learning
 
@@ -59,7 +58,6 @@ For setup, you need to do the following things:
 
 #### Misc.
 
-- THINGS memorability ratings
 - Texture bias
 
 ### Down-stream evaluations

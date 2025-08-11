@@ -104,11 +104,13 @@ class ImageDataset(Dataset):
     Images are sorted by name.
 
     By default, ImageNet style transformations are applied to the images, including resizing, cropping, normalization, and conversion to tensor.
+    If a processor is provided, it will be used instead of transforms. If a custom transform is provided, it will override the default.
     """
 
-    def __init__(self, root: Path, glob_pattern: str = "*.jpg", total_images: int | None = None):
+    def __init__(self, root: Path, glob_pattern: str = "*.jpg", total_images: int | None = None, processor=None, transform=None):
         self.images = sorted(root.glob(glob_pattern))
-        self.transform = image_transform()
+        self.processor = processor
+        self.transform = transform if transform is not None else image_transform()
 
         if total_images is not None:
             assert len(self.images) == total_images, f"Expected {total_images} images, found {len(self.images)} in {root} with pattern {glob_pattern}"
@@ -119,7 +121,12 @@ class ImageDataset(Dataset):
     def __getitem__(self, idx):
         img_path = self.images[idx]
         with Image.open(img_path) as image:
-            image = self.transform(image)
+            if self.processor is not None:
+                # Return PIL image for processor to handle
+                return image.convert('RGB')
+            else:
+                # Apply transforms and return tensor
+                image = self.transform(image)
         return image
 
 
@@ -130,9 +137,8 @@ class Things(ImageDataset):
     The images are expected to be in the format `data/external/THINGS/{category}/{image}.jpg`, which matches the original structure of the THINGS dataset.
     """
 
-    def __init__(self, root: Path = Path("data/external/THINGS"), total_images: int = NUM_THINGS_IMAGES):
-        super().__init__(root=root, glob_pattern="*/*.jpg", total_images=total_images)
-
+    def __init__(self, root: Path = Path("data/external/THINGS"), total_images: int = NUM_THINGS_IMAGES, processor=None, transform=None):
+        super().__init__(root=root, glob_pattern="*/*.jpg", total_images=total_images, processor=processor, transform=transform)
 
 class Coco(ImageDataset):
     """
@@ -141,14 +147,16 @@ class Coco(ImageDataset):
     The images are expected to be in the format `data/external/coco/{split}/{image}.jpg`, which matches the original structure of the COCO dataset.
     """
 
-    def __init__(self, root: Path = Path("data/external/coco"), train: bool = True):
+    def __init__(self, root: Path = Path("data/external/coco"), train: bool = True, processor=None, transform=None):
         if train:
-            super().__init__(root=root / "train2017", glob_pattern="*.jpg", total_images=NUM_COCO_TRAIN_IMAGES)
+            super().__init__(root=root / "train2017", glob_pattern="*.jpg", total_images=NUM_COCO_TRAIN_IMAGES, processor=processor, transform=transform)
         else:
+            # For eval, manually set images from val and test directories
             val_images = sorted((root / "val2017").glob("*.jpg"))
             test_images = sorted((root / "test2017").glob("*.jpg"))
             self.images = val_images + test_images
-            self.transform = image_transform()
+            self.processor = processor
+            self.transform = transform if transform is not None else image_transform()
 
 
 class FunctionDataset(Dataset):
@@ -208,7 +216,7 @@ class FunctionDataset(Dataset):
 
 
 def prepare_things_spose(
-    representations: np.ndarray, # directly from np.load("data/backbone_reps/{backbone}.npy")
+    representations: np.ndarray, # directly loaded from h5py.File(path, 'r')['representations'][:]
     data_root: Path = Path("data/external"), # the root directory of the THINGS dataset, which contains the images and the unique_id.txt file
     return_tensors: str = "pt", # the type of tensors to return, can be "pt" for PyTorch tensors or "np" for NumPy arrays
 ) -> tuple[torch.Tensor, torch.Tensor] | tuple[np.ndarray, np.ndarray]:

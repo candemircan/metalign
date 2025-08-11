@@ -144,7 +144,7 @@ class Transformer(nn.Module):
 
     def forward(self,
                 x: torch.Tensor, # (batch_size, seq_len, feature_dim) - input features
-                y: torch.Tensor | None, # (batch_size, seq_len) - binary targets for each position - or None, used to just get the representations
+                y: torch.Tensor | None = None, # (batch_size, seq_len) - binary targets for each position - or None, used to just get the representations
                 ) -> torch.Tensor:
 
         # prepend BOS tokens to all tokens if y is None, else use y as is

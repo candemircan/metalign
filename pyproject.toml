@@ -11,8 +11,9 @@ dependencies = [
     "torchvision", 
     "scikit-learn", 
     "h5py", 
-    "wandb", 
+    "trackio", 
     "nnsight",
+    "transformers",
     "flash-attn ; sys_platform == 'linux'",
     "vit_prisma @ git+https://github.com/Prisma-Multimodal/ViT-Prisma.git@97dd26fc01dfd856060c4a234b882c6f16836c15", 
     ]
@@ -45,4 +46,3 @@ include = ["bin/*.ipynb"]
 
 [tool.ruff.lint.isort]
 extra-standard-library = ["tomllib"]
-known-third-party = ["wandb"]

@@ -34,24 +34,6 @@ if [ ! -d "data/external/THINGS_odd_one_out" ]; then
     rm data/external/THINGS_odd_one_out.zip
 fi
 
-## STUFF ##
-
-# stuff odd-one-out
-if [ ! -d "data/external/STUFF_odd_one_out" ]; then
-    mkdir -p data/external/STUFF_odd_one_out
-    wget -O data/external/STUFF_odd_one_out/train_90.txt https://osf.io/m437z/download
-    wget -O data/external/STUFF_odd_one_out/test_10.txt https://osf.io/35qsb/download
-
-fi
-
-# stuff images
-if [ ! -d "data/external/STUFF" ]; then
-    wget -O data/external/stuff.zip https://osf.io/b73xv/download
-    unzip -P stuff4all data/external/stuff.zip -d data/external/
-    mv data/external/STUFF_dataset_600_images data/external/STUFF
-    rm data/external/stuff.zip
-fi
-
 ## COCO ##
 
 # coco images

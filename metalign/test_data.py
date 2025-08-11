@@ -39,6 +39,39 @@ def test_things_dataset(things_root: Path):
     assert image_2.shape == (3, 224, 224)
 
 
+def test_things_dataset_with_processor(things_root: Path):
+    # Mock processor that just returns PIL images
+    class MockProcessor:
+        def __call__(self, images, return_tensors=None):
+            return {"pixel_values": torch.stack([torch.randn(3, 224, 224) for _ in images])}
+    
+    mock_processor = MockProcessor()
+    dataset = Things(root=things_root, total_images=3, processor=mock_processor)
+    
+    assert len(dataset) == 3
+    
+    image = dataset[0]  # Should return PIL Image when processor is used
+    assert isinstance(image, Image.Image)
+
+
+def test_things_dataset_with_custom_transform(things_root: Path):
+    from torchvision import transforms
+    
+    # Create a custom transform that resizes to a different size
+    custom_transform = transforms.Compose([
+        transforms.Resize((128, 128)),
+        transforms.ToTensor()
+    ])
+    
+    dataset = Things(root=things_root, total_images=3, transform=custom_transform)
+    
+    assert len(dataset) == 3
+    
+    image = dataset[0]
+    assert isinstance(image, torch.Tensor)
+    assert image.shape == (3, 128, 128)  # Should be the custom size
+
+
 def test_coco_dataset(tmp_path: Path, monkeypatch):
     from metalign import data
     monkeypatch.setattr(data, "NUM_COCO_TRAIN_IMAGES", 2)
@@ -146,3 +179,20 @@ def test_function_dataset(tmp_path: Path):
     assert Y_ep.shape[0] == X_ep.shape[0]
     assert isinstance(X_ep, torch.Tensor)
     assert isinstance(Y_ep, torch.Tensor)
+
+
+def test_backbone_representations_loading(tmp_path: Path):
+    # Create dummy backbone representations file
+    backbone_path = tmp_path / "backbone_reps.h5"
+    dummy_reps = np.random.rand(50, 768).astype(np.float32)
+    
+    with h5py.File(backbone_path, 'w') as f:
+        f.create_dataset('representations', data=dummy_reps, compression='gzip')
+    
+    # Test loading
+    with h5py.File(backbone_path, 'r') as f:
+        loaded_reps = f['representations'][:]
+    
+    assert np.array_equal(loaded_reps, dummy_reps)
+    assert loaded_reps.shape == (50, 768)
+    assert loaded_reps.dtype == np.float32
