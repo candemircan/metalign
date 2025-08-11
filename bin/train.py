@@ -4,6 +4,7 @@ import tomllib
 from pathlib import Path
 from pprint import pprint
 
+import h5py
 import numpy as np
 import torch
 import trackio
@@ -88,7 +89,6 @@ def main(
         full_checkpoint_dir = f"data/checkpoints/{args['checkpoint_dir']}" if args["name"] is None else f"data/checkpoints/{args['name']}"
         if not os.path.exists(full_checkpoint_dir): os.makedirs(full_checkpoint_dir)
 
-    import h5py
     with h5py.File(f"data/backbone_reps/{args['train_backbone']}.h5", 'r') as f:
         train_inputs = f['representations'][:]
     with h5py.File(f"data/backbone_reps/{args['eval_backbone']}.h5", 'r') as f:
