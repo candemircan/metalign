@@ -7,7 +7,6 @@ from pathlib import Path
 import h5py
 import torch
 from fastcore.script import call_parse
-from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AutoImageProcessor, AutoModel
 
@@ -16,12 +15,22 @@ from metalign.data import Coco, Things
 _ = torch.set_grad_enabled(False)
 
 
-def _extract_and_save(model, processor, dataloader, save_path, device):
+def _extract_and_save(model, processor, dataset, save_path, device, batch_size):
     """Helper function to extract CLS tokens and save them."""
     all_cls_tokens = []
-    for images in tqdm(dataloader, desc=f"Extracting to {save_path}"):
-        # Process images using the model's processor
-        inputs = processor(images, return_tensors="pt")
+    num_batches = (len(dataset) + batch_size - 1) // batch_size
+    
+    for batch_idx in tqdm(range(num_batches), desc=f"Extracting to {save_path}"):
+        start_idx = batch_idx * batch_size
+        end_idx = min(start_idx + batch_size, len(dataset))
+        
+        # Collect batch of PIL images
+        batch_images = []
+        for i in range(start_idx, end_idx):
+            batch_images.append(dataset[i])
+        
+        # Process the batch
+        inputs = processor(images=batch_images, return_tensors="pt")
         inputs = {k: v.to(device) for k, v in inputs.items()}
         
         with torch.no_grad():
@@ -66,8 +75,7 @@ def main(
             return
         
         ds = Things(processor=processor)
-        dataloader = DataLoader(ds, batch_size=batch_size, shuffle=False, num_workers=4)
-        _extract_and_save(model, processor, dataloader, save_path, device)
+        _extract_and_save(model, processor, ds, save_path, device, batch_size)
 
     elif dataset == "coco":
         # Handle train set
@@ -75,8 +83,7 @@ def main(
         save_path_train.parent.mkdir(parents=True, exist_ok=True)
         if not save_path_train.exists() or force:
             ds_train = Coco(train=True, processor=processor)
-            dataloader_train = DataLoader(ds_train, batch_size=batch_size, shuffle=False, num_workers=4)
-            _extract_and_save(model, processor, dataloader_train, save_path_train, device)
+            _extract_and_save(model, processor, ds_train, save_path_train, device, batch_size)
         else:
             print(f"File {save_path_train} already exists. Use --force to overwrite.")
 
@@ -85,8 +92,7 @@ def main(
         save_path_eval.parent.mkdir(parents=True, exist_ok=True)
         if not save_path_eval.exists() or force:
             ds_eval = Coco(train=False, processor=processor)
-            dataloader_eval = DataLoader(ds_eval, batch_size=batch_size, shuffle=False, num_workers=4)
-            _extract_and_save(model, processor, dataloader_eval, save_path_eval, device)
+            _extract_and_save(model, processor, ds_eval, save_path_eval, device, batch_size)
         else:
             print(f"File {save_path_eval} already exists. Use --force to overwrite.")
     else:
