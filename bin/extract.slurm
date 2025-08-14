@@ -8,9 +8,14 @@
 
 module load CUDA/12
 
-srun --exclusive -n 1 --gres=gpu:1  --cpus-per-task=4 uv run bin/extract_backbone.py coco &
-srun --exclusive -n 1 --gres=gpu:1  --cpus-per-task=4 uv run bin/extract_backbone.py things &
-srun --exclusive -n 1 --gres=gpu:1  --cpus-per-task=4 uv run bin/extract_sae.py coco &
-srun --exclusive -n 1 --gres=gpu:1  --cpus-per-task=4 uv run bin/extract_sae.py things &
+for model in facebook/dinov2-with-registers-base google/vit-base-patch16-224; do
+    srun --exclusive -n 1 --gres=gpu:1  --cpus-per-task=4 uv run bin/extract_backbone.py coco --repo_id $model &
+    srun --exclusive -n 1 --gres=gpu:1  --cpus-per-task=4 uv run bin/extract_backbone.py things --repo_id $model &
+done
+
+for layer in 0 6 11; do
+    srun --exclusive -n 1 --gres=gpu:1  --cpus-per-task=4 uv run bin/extract_sae.py coco --repo_id Prisma-Multimodal/sae-top_k-64-cls_only-layer_${layer}-hook_resid_post &
+    srun --exclusive -n 1 --gres=gpu:1  --cpus-per-task=4 uv run bin/extract_sae.py things --repo_id Prisma-Multimodal/sae-top_k-64-cls_only-layer_${layer}-hook_resid_post &
+done
 
 wait

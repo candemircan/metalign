@@ -50,8 +50,8 @@ def main(
     checkpoint_interval_steps: int = 1000, # save checkpoint every N steps
     scale: bool_arg = True,  # whether to scale the input data to have zero mean and unit variance
     compile: bool_arg = True,  # whether to compile the model with torch.compile
-    train_backbone: str = "coco_train_dinov2-base",  # backbone for train data. the name must match data/backbone_reps/{train_backbone}.h5
-    eval_backbone: str = "coco_eval_dinov2-base",  # backbone for eval data. the name must match data/backbone_reps/{eval_backbone}.h5
+    train_backbone: str = "coco_train_dinov2-with-registers-bases",  # backbone for train data. the name must match data/backbone_reps/{train_backbone}.h5
+    eval_backbone: str = "coco_eval_dinov2-with-registers-base",  # backbone for eval data. the name must match data/backbone_reps/{eval_backbone}.h5
     train_features: str = "coco_train_sae-top_k-64-cls_only-layer_11-hook_resid_post",  # features for training data. the name must match data/sae/{train_features}.h5
     eval_features: str = "coco_eval_sae-top_k-64-cls_only-layer_11-hook_resid_post",  # features for eval data. the name must match data/sae/{eval_features}.h5
     min_nonzero: int = 120,  # minimum number of non-zero activations per column to keep it in the final array

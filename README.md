@@ -18,7 +18,7 @@ For setup, you need to do the following things:
     bash setup.sh
     ```
 
-3. The project uses a lot of external data, which is not committed to the repository. You can download the data by running the following script, which requires `wget`.
+3. The project uses a lot of external data, which is not committed to the repository. You can download the data by running the following script, which requires `wget`. There is a part of the script that downloads ImageNet data from Hugging Face, which requires you to have a Hugging Face account, be logged in, and accept the terms of use for the dataset.
     ```bash
     bash bin/get_data.sh
     ```

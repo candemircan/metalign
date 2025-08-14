@@ -47,7 +47,7 @@ def _extract_and_save(model, processor, dataset, save_path, device, batch_size):
 @call_parse
 def main(
     dataset: str, # one of things or coco
-    hf_repo: str = "facebook/dinov2-base", # HuggingFace repo for the backbone model
+    repo_id: str = "facebook/dinov2-with-registers-base", # HuggingFace repo for the backbone model
     batch_size: int = 64, # batch size for the backbone model, for feature extraction
     force: bool = False # if True, will extract features even if the file already exists. Otherwise, will skip if the file  exists.
 ):
@@ -60,12 +60,12 @@ def main(
     
     device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
 
-    model = AutoModel.from_pretrained(hf_repo).to(device)
-    processor = AutoImageProcessor.from_pretrained(hf_repo)
+    model = AutoModel.from_pretrained(repo_id).to(device)
+    processor = AutoImageProcessor.from_pretrained(repo_id)
     model.eval()
     
     # Extract model name from repo for file naming
-    model_name = hf_repo.split('/')[-1]
+    model_name = repo_id.split('/')[-1]
 
     if dataset == "things":
         save_path = Path("data/backbone_reps") / f"things_{model_name}.h5"
