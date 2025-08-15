@@ -34,11 +34,6 @@ def _extract_and_save(
         print(f"SAE file {sae_file_path} already exists. Use --force to overwrite.")
         return
 
-    if raw_file_path.exists() and force: os.remove(raw_file_path)
-    elif raw_file_path.exists() and not force:
-        print(f"Raw activations file {raw_file_path} already exists. Use --force to overwrite.")
-        return
-
     image_offset = 0
     with h5py.File(sae_file_path, 'w') as sae_f, h5py.File(raw_file_path, 'w') as raw_f:
         for batch in tqdm(dataloader, desc=f"Processing images for {sae_file_path.stem}"):
@@ -97,7 +92,7 @@ def main(
     model = load_hooked_model(model_name, device=device).to(device)
     model.eval()
     sae.eval()
-    save_model_name = model_name.split("/")[-1]
+    save_model_name = f"{model_name.split("/")[-1]}_{repo_id_suffix}"
 
     if dataset == "things":
         clip_transforms = get_clip_val_transforms()
