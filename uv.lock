@@ -1136,7 +1136,7 @@ requires-dist = [
     { name = "torch" },
     { name = "torchvision" },
     { name = "trackio" },
-    { name = "transformers", specifier = ">=4.55.2" },
+    { name = "transformers", git = "https://github.com/huggingface/transformers.git?rev=4912d5b490a39d621b9d6f1b80df446d99e6239a" },
     { name = "vit-prisma", git = "https://github.com/Prisma-Multimodal/ViT-Prisma.git?rev=97dd26fc01dfd856060c4a234b882c6f16836c15" },
 ]
 provides-extras = ["dev"]
@@ -2449,8 +2449,8 @@ wheels = [
 
 [[package]]
 name = "transformers"
-version = "4.55.2"
-source = { registry = "https://pypi.org/simple" }
+version = "4.56.0.dev0"
+source = { git = "https://github.com/huggingface/transformers.git?rev=4912d5b490a39d621b9d6f1b80df446d99e6239a#4912d5b490a39d621b9d6f1b80df446d99e6239a" }
 dependencies = [
     { name = "filelock" },
     { name = "huggingface-hub" },
@@ -2462,10 +2462,6 @@ dependencies = [
     { name = "safetensors" },
     { name = "tokenizers" },
     { name = "tqdm" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/70/a5/d8b8a1f3a051daeb5f11253bb69fc241f193d1c0566e299210ed9220ff4e/transformers-4.55.2.tar.gz", hash = "sha256:a45ec60c03474fd67adbce5c434685051b7608b3f4f167c25aa6aeb1cad16d4f", size = 9571466, upload-time = "2025-08-13T18:25:43.767Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/db/5a/022ac010bedfb5119734cf9d743cf1d830cb4c604f53bb1552216f4344dc/transformers-4.55.2-py3-none-any.whl", hash = "sha256:097e3c2e2c0c9681db3da9d748d8f9d6a724c644514673d0030e8c5a1109f1f1", size = 11269748, upload-time = "2025-08-13T18:25:40.394Z" },
 ]
 
 [[package]]
