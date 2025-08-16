@@ -1,5 +1,4 @@
 import os
-import random
 import tomllib
 from pathlib import Path
 from pprint import pprint
@@ -78,8 +77,6 @@ def main(
 
     if ddp_rank == 0: pprint(args)
 
-    random.seed(args["seed"])
-    np.random.seed(args["seed"])
     torch.manual_seed(args["seed"])
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = True # this might introduce some non-determinism in exchange for speed
@@ -89,10 +86,20 @@ def main(
         full_checkpoint_dir = f"data/checkpoints/{args['checkpoint_dir']}" if args["name"] is None else f"data/checkpoints/{args['name']}"
         if not os.path.exists(full_checkpoint_dir): os.makedirs(full_checkpoint_dir)
 
-    with h5py.File(f"data/backbone_reps/{args['train_backbone']}.h5", 'r') as f:
-        train_inputs = f['representations'][:]
-    with h5py.File(f"data/backbone_reps/{args['eval_backbone']}.h5", 'r') as f:
-        eval_inputs = f['representations'][:]
+    def load_backbone_representations(file_path):
+        with h5py.File(file_path, 'r') as f:
+            if 'representations' in f: 
+                return f['representations'][:]
+            else:
+                # handle SAE raw format: data stored as individual datasets with numeric keys
+                keys = sorted([int(k) for k in f.keys() if k.isdigit()])
+                reps = []
+                for key in keys:
+                    reps.append(f[str(key)][:])
+                return np.array(reps)
+
+    train_inputs = load_backbone_representations(f"data/backbone_reps/{args['train_backbone']}.h5")
+    eval_inputs = load_backbone_representations(f"data/backbone_reps/{args['eval_backbone']}.h5")
     
     # Get feature dimension from input data
     feature_dim = train_inputs.shape[1]
@@ -268,6 +275,7 @@ def main(
                         if eval_accuracy - best_eval_accuracy > args["early_stopping_min_delta"]:
                             best_eval_accuracy = eval_accuracy
                             early_stopping_counter = 0
+                            trackio.log({"best_eval_accuracy": best_eval_accuracy}, step=training_step)
                             torch.save({
                                 'model_state_dict': {k: v.cpu() for k, v in model.module.state_dict().items()},
                                 'eval_accuracy': eval_accuracy,
