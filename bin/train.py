@@ -275,7 +275,6 @@ def main(
                         if eval_accuracy - best_eval_accuracy > args["early_stopping_min_delta"]:
                             best_eval_accuracy = eval_accuracy
                             early_stopping_counter = 0
-                            trackio.log({"best_eval_accuracy": best_eval_accuracy}, step=training_step)
                             torch.save({
                                 'model_state_dict': {k: v.cpu() for k, v in model.module.state_dict().items()},
                                 'eval_accuracy': eval_accuracy,
@@ -286,6 +285,7 @@ def main(
                             early_stopping_counter += 1
                     elif eval_accuracy > best_eval_accuracy:
                         best_eval_accuracy = eval_accuracy
+                        trackio.log({"best_eval_accuracy": best_eval_accuracy}, step=training_step)
                         torch.save({
                             'model_state_dict': {k: v.cpu() for k, v in model.module.state_dict().items()},
                             'eval_accuracy': eval_accuracy,
