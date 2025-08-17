@@ -58,9 +58,7 @@ if [ ! -d "data/external/coco/test2017" ]; then
     rm data/external/coco_test.zip
 fi
 
-## ImageNet ##
-
 ## Levels ##
-
 wget -O data/external/levels.pkl https://gin.g-node.org/fborn/Dataset_Levels/raw/master/processed_data/pruned_dataset.pkl
+## ImageNet ##
 uv run huggingface-cli download --repo-type dataset timm/imagenet-1k-wds

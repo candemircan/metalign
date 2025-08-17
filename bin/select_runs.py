@@ -16,7 +16,15 @@ def main(
     db_name: str = "metalign.db",
 ):
     "Finds the best run for each model, removes checkpoints of other runs, and copies the best run configs."
-    hf_root = os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface"))
+    
+    hf_root = os.environ.get("HF_HOME")
+    if not hf_root:
+        xdg_cache_home = os.environ.get("XDG_CACHE_HOME")
+        if xdg_cache_home:
+            hf_root = os.path.join(xdg_cache_home, "huggingface")
+        else:
+            hf_root = os.path.expanduser("~/.cache/huggingface")
+    
     db_path = Path(hf_root) / "trackio" / db_name
     if not db_path.exists():
         print(f"Database not found at {db_path}")
@@ -55,7 +63,6 @@ def main(
                     with open(toml_file, "rb") as f:
                         config = tomllib.load(f)
                     if config.get("name") == folder.name:
-                        # simply copy the config file
                         shutil.copy(toml_file, folder / "config.toml")
                         found_config = True
                         break
