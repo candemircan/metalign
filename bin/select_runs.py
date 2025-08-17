@@ -55,8 +55,8 @@ def main(
                     with open(toml_file, "rb") as f:
                         config = tomllib.load(f)
                     if config.get("name") == folder.name:
-                        with open(config_file, "w") as f:
-                            f.write(tomllib.dumps(config))
+                        # simply copy the config file
+                        shutil.copy(toml_file, folder / "config.toml")
                         found_config = True
                         break
                 if not found_config:
