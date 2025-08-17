@@ -18,7 +18,14 @@ For setup, you need to do the following things:
     bash setup.sh
     ```
 
-3. The project uses a lot of external data, which is not committed to the repository. You can download the data by running the following script, which requires `wget`. There is a part of the script that downloads ImageNet data from Hugging Face, which requires you to have a Hugging Face account, be logged in, and accept the terms of use for the dataset.
+3. The project currently uses the following gated repositories:
+
+    - [imagenet-1k-wds](https://huggingface.co/datasets/timm/imagenet-1k-wds)
+    - [dinov3](https://huggingface.co/facebook/dinov3-vitb16-pretrain-lvd1689m/tree/main)
+
+    You need to log in to Hugging Face website, and accept the terms and conditions. Then you need to verify yourself via the CLI (`uv run hf auth login`).
+
+3. The project uses a lot of external data, which is not committed to the repository. You can download the data by running the following script, which requires `wget`.
     ```bash
     bash bin/get_data.sh
     ```
