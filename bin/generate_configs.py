@@ -24,13 +24,13 @@ def main(output_dir: Path = Path("data/configs")):
         "num_attention_heads": 12,
         "intermediate_size": 3072,
         "weight_decay": 1e-4,
-        "num_layers": 3
+        "num_layers": 3,
+        "batch_size": 256,
     }
 
     param_grid = {
-        "lr": [0.0001 ,0.00025, 0.0005, 0.001, 0.0025], 
-        "batch_size": [4096, 8192],
-        "model_name": ["dinov3-vitb16-pretrain-lvd1689m", "vit-base-patch16-224", "CLIP-ViT-B-32-DataComp.XL-s13B-b90K_sae-top_k-64-cls_only-layer_11-hook_resid_post_raw"]
+        "lr": [0.000025, 0.00005, 0.0001 ,0.00025, 0.0005], 
+        "model_name": ["dinov3-vitb16-pretrain-lvd1689m", "vit-base-patch16-224", "CLIP-ViT-B-32-DataComp.XL-s13B-b90K_sae-top_k-64-cls_only-layer_11-hook_resid_post_raw", "openai/clip-vit-base-patch16"]
     }
 
     keys, values = zip(*param_grid.items())
@@ -43,7 +43,7 @@ def main(output_dir: Path = Path("data/configs")):
         config.update(params) 
         short_model_name = config["model_name"].split("-")[0]               
         lr_str = f"{config['lr']:.0e}".replace("-0", "-")
-        config["name"] = f"{short_model_name}_learning_rate_{lr_str}_batch_size_{config['batch_size']}"
+        config["name"] = f"[MAIN]_{short_model_name}_learning_rate_{lr_str}_batch_size_{config['batch_size']}"
         config["train_backbone"] = f"coco_train_{config['model_name']}"
         config["eval_backbone"] = f"coco_eval_{config['model_name']}"
         file_path = output_dir / f"{i}.toml"

@@ -1100,6 +1100,7 @@ dependencies = [
     { name = "schedulefree" },
     { name = "scikit-learn" },
     { name = "seaborn" },
+    { name = "tomli-w" },
     { name = "torch" },
     { name = "torchvision" },
     { name = "trackio" },
@@ -1114,7 +1115,6 @@ dev = [
     { name = "pytest" },
     { name = "ruff" },
     { name = "shiny" },
-    { name = "tomli-w" },
 ]
 
 [package.metadata]
@@ -1132,7 +1132,7 @@ requires-dist = [
     { name = "scikit-learn" },
     { name = "seaborn" },
     { name = "shiny", marker = "extra == 'dev'" },
-    { name = "tomli-w", marker = "extra == 'dev'" },
+    { name = "tomli-w" },
     { name = "torch" },
     { name = "torchvision" },
     { name = "trackio" },

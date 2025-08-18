@@ -12,6 +12,7 @@ dependencies = [
     "scikit-learn", 
     "h5py", 
     "trackio", 
+    "tomli-w",
     "nnsight",
     "flash-attn ; sys_platform == 'linux'",
     "transformers @git+https://github.com/huggingface/transformers.git@4912d5b490a39d621b9d6f1b80df446d99e6239a",
@@ -19,7 +20,7 @@ dependencies = [
     ]
 
 [project.optional-dependencies]
-dev = ["pytest", "pre-commit", "ruff","ipykernel", "tomli-w","shiny"]
+dev = ["pytest", "pre-commit", "ruff","ipykernel","shiny"]
 
 [tool.setuptools]
 packages = ["metalign"]

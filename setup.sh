@@ -21,5 +21,3 @@ uv sync --no-install-package flash-attn
 uv sync --all-extras
 uv run pre-commit install
 uv run pre-commit run --all-files
-
-echo -e "\nexample*" >> .gitignore

@@ -46,13 +46,12 @@ def main(
     eval_interval_steps: int = 100,  # evaluate the model every eval_interval_steps steps
     num_eval_episodes: int = 128,  # number of episodes to sample for evaluation
     checkpoint_dir: str = "checkpoints", # directory to save checkpoints. this will be placed under data/checkpoints/{name} if name is provided. If name is None, it will be saved under data/checkpoints
-    checkpoint_interval_steps: int = 1000, # save checkpoint every N steps
     scale: bool_arg = True,  # whether to scale the input data to have zero mean and unit variance
     compile: bool_arg = True,  # whether to compile the model with torch.compile
     train_backbone: str = "coco_train_dinov3-vitb16-pretrain-lvd1689m",  # backbone for train data. the name must match data/backbone_reps/{train_backbone}.h5
     eval_backbone: str = "coco_eval_dinov3-vitb16-pretrain-lvd1689m",  # backbone for eval data. the name must match data/backbone_reps/{eval_backbone}.h5
     train_features: str = "coco_train_sae-top_k-64-cls_only-layer_11-hook_resid_post",  # features for training data. the name must match data/sae/{train_features}.h5
-    eval_features: str = "coco_eval_sae-top_k-64-cls_only-layer_11-hook_resid_post",  # features for eval data. the name must match data/sae/{eval_features}.h5
+    eval_features: str = "coco_eval_sae-top_k-64-cls_only-layer_10-hook_resid_post",  # features for eval data. the name must match data/sae/{eval_features}.h5
     min_nonzero: int = 120,  # minimum number of non-zero activations per column to keep it in the final array
     early_stopping_patience: int = 20, # number of evaluation intervals to wait for improvement before stopping
     early_stopping_min_delta: float = 0.01, # minimum change in evaluation accuracy to be considered an improvement
@@ -300,17 +299,5 @@ def main(
             torch.distributed.broadcast(stop_training, src=0)
 
             if stop_training.item() == 1: break
-
-            if ddp_rank == 0 and (training_step + 1) % args["checkpoint_interval_steps"] == 0:
-                model.eval()
-                optimizer.eval()
-                checkpoint_path = os.path.join(full_checkpoint_dir, "latest.pt")
-                torch.save({
-                    'step': training_step,
-                    'model_state_dict': {k: v.cpu() for k, v in model.module.state_dict().items()},
-                    'optimizer_state_dict': optimizer.state_dict(),
-                    'config': config,
-                }, checkpoint_path)
-
     torch.distributed.destroy_process_group()
     if args["trackio_log"] and ddp_rank == 0: trackio.finish()
