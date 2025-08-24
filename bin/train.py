@@ -55,6 +55,7 @@ def main(
     min_nonzero: int = 120,  # minimum number of non-zero activations per column to keep it in the final array
     early_stopping_patience: int = 20, # number of evaluation intervals to wait for improvement before stopping
     early_stopping_min_delta: float = 0.01, # minimum change in evaluation accuracy to be considered an improvement
+    early_stopping_min_threshold: float = 0.75, # minimum evaluation accuracy to start considering early stopping
 ):
     """
     train a meta-learning transformer model over function learning tasks.
@@ -270,12 +271,12 @@ def main(
                         avg_eval_loss = global_sum_loss / global_total
                         trackio.log({"loss_eval": avg_eval_loss, "accuracy_eval": eval_accuracy}, step=training_step)
 
-                    if training_step > args["warmup_steps"]:
+                    if best_eval_accuracy > args["early_stopping_min_threshold"]:
                         if eval_accuracy - best_eval_accuracy > args["early_stopping_min_delta"]:
                             best_eval_accuracy = eval_accuracy
                             early_stopping_counter = 0
                             torch.save({
-                                'model_state_dict': {k: v.cpu() for k, v in model.module.state_dict().items()},
+                                'state_dict': {k: v.cpu() for k, v in model.module.state_dict().items()},
                                 'eval_accuracy': eval_accuracy,
                                 'step': training_step,
                                 'config': config,
@@ -286,7 +287,7 @@ def main(
                         best_eval_accuracy = eval_accuracy
                         trackio.log({"best_eval_accuracy": best_eval_accuracy}, step=training_step)
                         torch.save({
-                            'model_state_dict': {k: v.cpu() for k, v in model.module.state_dict().items()},
+                            'state_dict': {k: v.cpu() for k, v in model.module.state_dict().items()},
                             'eval_accuracy': eval_accuracy,
                             'step': training_step,
                             'config': config,
