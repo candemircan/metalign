@@ -22,6 +22,7 @@ torch.set_float32_matmul_precision('high')
 
 @call_parse
 def main(
+    config_file: str = None,  # path to a config file. If provided, any parameters in the file will override the corresponding command line arguments.
     trackio_log: bool_arg = True,  # whether to log the model to trackio. If False, no logging is done.
     trackio_name: str = "metalign",  # name of the trackio project. Used to log the model.
     embedding: bool_arg = True,  # whether to use an embedding layer at the beginning of the model
@@ -34,7 +35,6 @@ def main(
     logit_bias: bool_arg = True,  # whether to use bias in the final linear layer of the transformer model. If False, the final layer will not have a bias term.
     attention_dropout: float = 0.0,  # dropout rate for the attention layers in the transformer model
     sequence_length: int = 120,  # maximum number of position embeddings in the transformer model
-    config_file: str = None,  # path to a config file. If provided, any parameters in the file will override the corresponding command line arguments. See "data/example_transformer_config.toml" for an example config file.
     batch_size: int = 256,  # batch size for training the model
     training_steps: int = 1000000,  # number of training steps per epoch
     seed: int = 1234, # random seed for reproducibility
@@ -46,14 +46,14 @@ def main(
     eval_interval_steps: int = 100,  # evaluate the model every eval_interval_steps steps
     num_eval_episodes: int = 128,  # number of episodes to sample for evaluation
     checkpoint_dir: str = "checkpoints", # directory to save checkpoints. this will be placed under data/checkpoints/{name} if name is provided. If name is None, it will be saved under data/checkpoints
-    scale: bool_arg = True,  # whether to scale the input data to have zero mean and unit variance
+    scale: bool = False,  # whether to scale the input data to have zero mean and unit variance
     compile: bool_arg = True,  # whether to compile the model with torch.compile
     train_backbone: str = "coco_train_dinov3-vitb16-pretrain-lvd1689m",  # backbone for train data. the name must match data/backbone_reps/{train_backbone}.h5
     eval_backbone: str = "coco_eval_dinov3-vitb16-pretrain-lvd1689m",  # backbone for eval data. the name must match data/backbone_reps/{eval_backbone}.h5
     train_features: str = "coco_train_sae-top_k-64-cls_only-layer_11-hook_resid_post",  # features for training data. the name must match data/sae/{train_features}.h5
-    eval_features: str = "coco_eval_sae-top_k-64-cls_only-layer_10-hook_resid_post",  # features for eval data. the name must match data/sae/{eval_features}.h5
+    eval_features: str = "coco_eval_sae-top_k-64-cls_only-layer_11-hook_resid_post",  # features for eval data. the name must match data/sae/{eval_features}.h5
     min_nonzero: int = 120,  # minimum number of non-zero activations per column to keep it in the final array
-    early_stopping_patience: int = 50, # number of evaluation intervals to wait for improvement before stopping
+    early_stopping_patience: int = 500, # number of evaluation intervals to wait for improvement before stopping
     early_stopping_min_delta: float = 0.01, # minimum change in evaluation accuracy to be considered an improvement
     early_stopping_min_threshold: float = 0.75, # minimum evaluation accuracy to start considering early stopping
     early_stopping_max_steps: int = 20000, # after this, early stopping will be considered even if the min_threshold is not reached

@@ -107,7 +107,4 @@ For setup, you need to do the following things:
 
 ### Considerations
 
-- You want to do this mainly on DINO V2 CLS representations. However, also test on OpenCLIP (from which the SAE representations are extracted) as well as an ImageNet supervised ViT.
-- Are we set on CoCo for training? At least use Open Images validation split for validation. Another option is to train on Open Images and then we can use CoCo brain data as well. Here, the issue is that the Open Image dataset is massive (6M), and not as popular as CoCo. You can already predict the brain responses to CoCo anyway  if you don't want to enforce all images being non overlapping between train and evals.
-- Yet another option is to train on ImageNet. This would introduce overlap of images between train and eval. The images would be more representative of the types of images you get in both human and ML evals, though you definitely lose on image diversity.
-- Currently, I train transformers with a hidden size of up to 128. Likely, this is not enough for ML tasks. Training has now stabilised, and you should next try 256, 512, and 768.
+- Are we set on CoCo for training?nother option is to train on Open Images and then we can use CoCo brain data as well. Here, the issue is that the Open Image dataset is massive (6M), and not as popular as CoCo. You can already predict the brain responses to CoCo anyway  if you don't want to enforce all images being non overlapping between train and evals.
