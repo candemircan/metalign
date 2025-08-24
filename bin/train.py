@@ -53,9 +53,10 @@ def main(
     train_features: str = "coco_train_sae-top_k-64-cls_only-layer_11-hook_resid_post",  # features for training data. the name must match data/sae/{train_features}.h5
     eval_features: str = "coco_eval_sae-top_k-64-cls_only-layer_10-hook_resid_post",  # features for eval data. the name must match data/sae/{eval_features}.h5
     min_nonzero: int = 120,  # minimum number of non-zero activations per column to keep it in the final array
-    early_stopping_patience: int = 20, # number of evaluation intervals to wait for improvement before stopping
+    early_stopping_patience: int = 50, # number of evaluation intervals to wait for improvement before stopping
     early_stopping_min_delta: float = 0.01, # minimum change in evaluation accuracy to be considered an improvement
     early_stopping_min_threshold: float = 0.75, # minimum evaluation accuracy to start considering early stopping
+    early_stopping_max_steps: int = 20000, # after this, early stopping will be considered even if the min_threshold is not reached
 ):
     """
     train a meta-learning transformer model over function learning tasks.
@@ -271,7 +272,7 @@ def main(
                         avg_eval_loss = global_sum_loss / global_total
                         trackio.log({"loss_eval": avg_eval_loss, "accuracy_eval": eval_accuracy}, step=training_step)
 
-                    if best_eval_accuracy > args["early_stopping_min_threshold"]:
+                    if best_eval_accuracy > args["early_stopping_min_threshold"] or training_step >= args["early_stopping_max_steps"]:
                         if eval_accuracy - best_eval_accuracy > args["early_stopping_min_delta"]:
                             best_eval_accuracy = eval_accuracy
                             early_stopping_counter = 0
@@ -285,7 +286,6 @@ def main(
                             early_stopping_counter += 1
                     elif eval_accuracy > best_eval_accuracy:
                         best_eval_accuracy = eval_accuracy
-                        trackio.log({"best_eval_accuracy": best_eval_accuracy}, step=training_step)
                         torch.save({
                             'state_dict': {k: v.cpu() for k, v in model.module.state_dict().items()},
                             'eval_accuracy': eval_accuracy,

@@ -30,7 +30,7 @@ def main(output_dir: Path = Path("data/configs")):
 
     param_grid = {
         "lr": [0.000025, 0.00005, 0.0001 ,0.00025, 0.0005], 
-        "model_name": ["dinov3-vitb16-pretrain-lvd1689m", "vit-base-patch16-224", "CLIP-ViT-B-32-DataComp.XL-s13B-b90K_sae-top_k-64-cls_only-layer_11-hook_resid_post_raw", "clip-vit-base-patch16", "siglip2-base-patch16-224"]
+        "model_name": ["dinov3-vitb16-pretrain-lvd1689m", "CLIP-ViT-B-32-DataComp.XL-s13B-b90K_sae-top_k-64-cls_only-layer_11-hook_resid_post_raw",  "siglip2-base-patch16-224"]
     }
 
     keys, values = zip(*param_grid.items())

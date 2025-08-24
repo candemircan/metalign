@@ -41,7 +41,6 @@ def _extract_and_save(model, processor, dataset, save_path, device, batch_size):
     cls_reps = torch.cat(all_cls_tokens, dim=0).numpy()
     with h5py.File(save_path, 'w') as f:
         f.create_dataset('representations', data=cls_reps, compression='gzip')
-    print(f"Saved representations to {save_path}")
 
 
 @call_parse
