@@ -47,7 +47,7 @@ def _extract_and_save(model, processor, dataset, save_path, device, batch_size):
 @call_parse
 def main(
     dataset: str, # one of things or coco
-    repo_id: str = "facebook/dinov2-with-registers-base", # HuggingFace repo for the backbone model
+    repo_id: str = "facebook/dinov3-vitb16-pretrain-lvd1689m", # HuggingFace repo for the backbone model
     batch_size: int = 64, # batch size for the backbone model, for feature extraction
     force: bool = False # if True, will extract features even if the file already exists. Otherwise, will skip if the file  exists.
 ):
@@ -62,7 +62,7 @@ def main(
 
     model = AutoModel.from_pretrained(repo_id).to(device)
     processor = AutoImageProcessor.from_pretrained(repo_id)
-    if model.config.architectures[0] == "CLIPModel" or model.config.model_type == "siglip": model = model.vision_model
+    if model.config.model_type in ["clip", "siglip"]: model = model.vision_model
     model.eval()
     
     # Extract model name from repo for file naming
