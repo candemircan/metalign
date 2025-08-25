@@ -162,7 +162,7 @@ class Coco(ImageDataset):
 class FunctionDataset(Dataset):
     "Episode-based dataset for given features, optimized for DataLoader usage."
     def __init__(self, inputs: np.ndarray, features_path: Path,
-                 seq_len: int = 120, scale: bool = True, min_nonzero: int = 120, train_dims: list = None, 
+                 seq_len: int = 120, scale: bool = False, min_nonzero: int = 120, train_dims: list = None, 
                  epoch_size: int = 100000):
         X = torch.tensor(inputs, dtype=torch.float32)
         

@@ -15,7 +15,7 @@ def main(output_dir: Path = Path("data/configs")):
         "bias": True,
         "sequence_length": 120,
         "logit_bias": True,
-        "scale": True,
+        "scale": False,
         "compile": True,
         "warmup_steps": 1000,
         "training_steps": 1000000,
