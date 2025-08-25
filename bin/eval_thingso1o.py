@@ -16,8 +16,7 @@ _ = torch.set_grad_enabled(False)
 
 def calculate_accuracy(reps, X, y, batch_size=2048):
     "Calculate triplet accuracy from representations"
-    num_correct = 0
-    num_total = 0
+    num_correct, num_total = 0, 0
             
     for i in tqdm(range(0, len(X), batch_size)):
         X_batch = X[i:i+batch_size]

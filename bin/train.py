@@ -34,7 +34,7 @@ def main(
     bias: bool_arg = True,  # whether to use bias in the linear layers of the transformer model
     logit_bias: bool_arg = True,  # whether to use bias in the final linear layer of the transformer model. If False, the final layer will not have a bias term.
     attention_dropout: float = 0.0,  # dropout rate for the attention layers in the transformer model
-    sequence_length: int = 120,  # maximum number of position embeddings in the transformer model
+    sequence_length: int = 120,  # maximum number of position embeddings in the transformer model, also the sequence length of the input data
     batch_size: int = 256,  # batch size for training the model
     training_steps: int = 1000000,  # number of training steps per epoch
     seed: int = 1234, # random seed for reproducibility
