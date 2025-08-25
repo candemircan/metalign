@@ -49,8 +49,8 @@ def main(
     """
     
     checkpoint_path = Path("data/checkpoints") / checkpoint_name
-    model_name = checkpoint_name.split("_")[0]
-    things_reps = glob(f"data/backbone_reps/things*{model_name}*.h5")[0]
+    model_name = checkpoint_name.split("_")[1]
+    things_reps = glob(f"data/backbone_reps/things_{model_name}*.h5")[0]
 
     df = pd.read_table("data/external/THINGS_odd_one_out/triplets_large_final_correctednc_correctedorder.csv")
     og_reps, _ = prepare_things_spose(h5py.File(things_reps, 'r')["representations"][:])
