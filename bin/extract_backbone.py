@@ -35,7 +35,10 @@ def _extract_and_save(model, processor, dataset, save_path, device, batch_size):
         
         with torch.no_grad():
             outputs = model(**inputs)
-            cls_tokens = outputs.last_hidden_state[:, 0]  # CLS token is first token
+            if model.config.model_type == "siglip":
+                cls_tokens = outputs.pooler_output # last hidden state from siglip worked very poorly
+            else:
+                cls_tokens = outputs.last_hidden_state[:, 0]  # CLS token is first token
         all_cls_tokens.append(cls_tokens.cpu())
     
     cls_reps = torch.cat(all_cls_tokens, dim=0).numpy()
