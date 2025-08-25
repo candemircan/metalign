@@ -2,7 +2,7 @@
 common datasets and processing utils  used throughout the project
 """
 
-__all__ = ["ImageDataset", "Things", "Coco", "h5_to_numpy", "image_transform","FunctionDataset", "prepare_things_spose"]
+__all__ = ["ImageDataset", "Things", "Coco", "h5_to_numpy", "image_transform","FunctionDataset", "prepare_things_spose", "load_backbone_representations"]
 
 from pathlib import Path
 from typing import Sequence
@@ -246,3 +246,16 @@ def prepare_things_spose(
     else: raise ValueError(f"Unknown return_tensors type: {return_tensors}. Must be 'pt' or 'np'.")
     
     return X, Y
+
+
+def load_backbone_representations(file_path):
+    with h5py.File(file_path, 'r') as f:
+        if 'representations' in f: 
+            return f['representations'][:]
+        else:
+            # handle SAE raw format: data stored as individual datasets with numeric keys
+            keys = sorted([int(k) for k in f.keys() if k.isdigit()])
+            reps = []
+            for key in keys:
+                reps.append(f[str(key)][:])
+            return np.array(reps)

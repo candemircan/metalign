@@ -2,14 +2,13 @@ import json
 from glob import glob
 from pathlib import Path
 
-import h5py
 import pandas as pd
 import torch
 from fastcore.script import call_parse
 from torch.nn import functional as F
 from tqdm import tqdm
 
-from metalign.data import prepare_things_spose
+from metalign.data import load_backbone_representations, prepare_things_spose
 from metalign.model import Transformer
 
 _ = torch.set_grad_enabled(False)
@@ -53,7 +52,7 @@ def main(
     things_reps = glob(f"data/backbone_reps/things_{model_name}*.h5")[0]
 
     df = pd.read_table("data/external/THINGS_odd_one_out/triplets_large_final_correctednc_correctedorder.csv")
-    og_reps, _ = prepare_things_spose(h5py.File(things_reps, 'r')["representations"][:])
+    og_reps, _ = prepare_things_spose(load_backbone_representations(things_reps))
 
     ckpt = torch.load(checkpoint_path / "best.pt", weights_only=False)
     config, state_dict = ckpt['config'], ckpt['state_dict']

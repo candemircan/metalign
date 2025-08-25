@@ -3,8 +3,6 @@ import tomllib
 from pathlib import Path
 from pprint import pprint
 
-import h5py
-import numpy as np
 import torch
 import trackio
 from fastcore.script import bool_arg, call_parse
@@ -15,7 +13,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 
-from metalign.data import FunctionDataset
+from metalign.data import FunctionDataset, load_backbone_representations
 from metalign.model import Transformer, TransformerConfig
 
 torch.set_float32_matmul_precision('high')
@@ -86,18 +84,6 @@ def main(
     if ddp_rank == 0:
         full_checkpoint_dir = f"data/checkpoints/{args['checkpoint_dir']}" if args["name"] is None else f"data/checkpoints/{args['name']}"
         if not os.path.exists(full_checkpoint_dir): os.makedirs(full_checkpoint_dir)
-
-    def load_backbone_representations(file_path):
-        with h5py.File(file_path, 'r') as f:
-            if 'representations' in f: 
-                return f['representations'][:]
-            else:
-                # handle SAE raw format: data stored as individual datasets with numeric keys
-                keys = sorted([int(k) for k in f.keys() if k.isdigit()])
-                reps = []
-                for key in keys:
-                    reps.append(f[str(key)][:])
-                return np.array(reps)
 
     train_inputs = load_backbone_representations(f"data/backbone_reps/{args['train_backbone']}.h5")
     eval_inputs = load_backbone_representations(f"data/backbone_reps/{args['eval_backbone']}.h5")
