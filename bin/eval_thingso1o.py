@@ -13,7 +13,7 @@ from metalign.model import Transformer
 
 _ = torch.set_grad_enabled(False)
 
-def calculate_accuracy(reps, X, y, batch_size=2048):
+def _calculate_accuracy(reps, X, y, batch_size=2048):
     "Calculate triplet accuracy from representations"
     num_correct, num_total = 0, 0
             
@@ -65,8 +65,8 @@ def main(
     X = df[["image1", "image2", "image3"]].values - 1 # 0 index
     y = df["choice"].values -1 # 0 index
     
-    og_acc = calculate_accuracy(og_reps, X, y, batch_size=batch_size)
-    metalign_acc = calculate_accuracy(metaligned_reps, X, y, batch_size=batch_size)
+    og_acc = _calculate_accuracy(og_reps, X, y, batch_size=batch_size)
+    metalign_acc = _calculate_accuracy(metaligned_reps, X, y, batch_size=batch_size)
 
     eval_path = Path("data/evals/things010")
     eval_path.mkdir(parents=True, exist_ok=True)

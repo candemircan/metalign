@@ -248,7 +248,10 @@ def prepare_things_spose(
     return X, Y
 
 
-def load_backbone_representations(file_path):
+def load_backbone_representations(file_path: str) -> np.ndarray:
+    """
+    some backbone reps are saved under the key 'representations', while others (e.g. SAE raw format) have individual datasets with numeric keys. this function handles both cases.
+    """
     with h5py.File(file_path, 'r') as f:
         if 'representations' in f: 
             return f['representations'][:]

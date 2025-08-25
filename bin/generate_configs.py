@@ -25,7 +25,8 @@ def main(output_dir: Path = Path("data/configs")):
         "intermediate_size": 3072,
         "weight_decay": 1e-4,
         "num_layers": 3,
-        "batch_size": 4096
+        "batch_size": 4096,
+        "tags": ["main"]
     }
 
     param_grid = {

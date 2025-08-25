@@ -4,8 +4,8 @@ from pathlib import Path
 from pprint import pprint
 
 import torch
-import trackio
-from fastcore.script import bool_arg, call_parse
+import wandb
+from fastcore.script import Param, bool_arg, call_parse
 from schedulefree import AdamWScheduleFree
 from torch.amp import autocast
 from torch.nn import functional as F
@@ -21,8 +21,8 @@ torch.set_float32_matmul_precision('high')
 @call_parse
 def main(
     config_file: str = None,  # path to a config file. If provided, any parameters in the file will override the corresponding command line arguments.
-    trackio_log: bool_arg = True,  # whether to log the model to trackio. If False, no logging is done.
-    trackio_name: str = "metalign",  # name of the trackio project. Used to log the model.
+    wandb_log: bool_arg = True,  # whether to log the model to wandb. If False, no logging is done.
+    wandb_name: str = "metalign",  # name of the wandb project. Used to log the model.
     embedding: bool_arg = True,  # whether to use an embedding layer at the beginning of the model
     hidden_size: int = 768,  # hidden size of the transformer model. if this is different from the input size, an embedding layer must be used
     num_attention_heads: int = 12,  # number of attention heads in the transformer model
@@ -51,6 +51,7 @@ def main(
     train_features: str = "coco_train_sae-top_k-64-cls_only-layer_11-hook_resid_post",  # features for training data. the name must match data/sae/{train_features}.h5
     eval_features: str = "coco_eval_sae-top_k-64-cls_only-layer_11-hook_resid_post",  # features for eval data. the name must match data/sae/{eval_features}.h5
     min_nonzero: int = 120,  # minimum number of non-zero activations per column to keep it in the final array
+    tags: Param(help="tags to use for the wandb run. If empty, no tags are used.", type=str, nargs="*") = [],  # type: ignore
     early_stopping_patience: int = 20, # number of evaluation intervals to wait for improvement before stopping
     early_stopping_min_delta: float = 0.01, # minimum change in evaluation accuracy to be considered an improvement
     early_stopping_min_threshold: float = 0.75, # minimum evaluation accuracy to start considering early stopping
@@ -163,8 +164,12 @@ def main(
     early_stopping_counter = 0
     if ddp_rank == 0: best_checkpoint_path = f"{full_checkpoint_dir}/best.pt"
 
-    if args["trackio_log"] and ddp_rank == 0:
-        trackio.init(project=args["trackio_name"], name=args["name"], config=args)
+    if args["wandb_log"] and ddp_rank == 0:
+        # hacky way to see if i'm training on juwels, which does not have internet in compute nodes
+        # in this case, gotta also run bin/sync_wandb.sh from the login node
+        device_name = os.uname()[1]
+        wandb.init(project=args["wandb_name"], name=args["name"], config=args, tags=args["tags"], mode="offline" if "juwels" in device_name else "online")
+
 
     
     accumulated_train_loss = 0.0
@@ -210,12 +215,12 @@ def main(
             torch.distributed.all_reduce(metrics, op=torch.distributed.ReduceOp.SUM)
 
             # on the main process, calculate the global average and log
-            if args["trackio_log"] and ddp_rank == 0:
+            if args["wandb_log"] and ddp_rank == 0:
                 # log_interval_steps is multiplied by ddp_world_size because each process ran that many steps
                 global_loss = metrics[0].item() / (args["log_interval_steps"] * ddp_world_size)
                 global_accuracy = metrics[1].item() / metrics[2].item()
                 
-                trackio.log({"loss_train": global_loss, "accuracy_train": global_accuracy}, step=training_step)
+                wandb.log({"loss_train": global_loss, "accuracy_train": global_accuracy}, step=training_step)
 
             # reset local accumulators on all processes
             accumulated_train_loss = 0.0
@@ -254,9 +259,9 @@ def main(
                     global_total = metrics[2].item()
                     eval_accuracy = global_correct / global_total
 
-                    if args["trackio_log"]:
+                    if args["wandb_log"]:
                         avg_eval_loss = global_sum_loss / global_total
-                        trackio.log({"loss_eval": avg_eval_loss, "accuracy_eval": eval_accuracy}, step=training_step)
+                        wandb.log({"loss_eval": avg_eval_loss, "accuracy_eval": eval_accuracy}, step=training_step)
 
                     if best_eval_accuracy > args["early_stopping_min_threshold"] or training_step >= args["early_stopping_max_steps"]:
                         if eval_accuracy - best_eval_accuracy > args["early_stopping_min_delta"]:
@@ -287,4 +292,4 @@ def main(
 
             if stop_training.item() == 1: break
     torch.distributed.destroy_process_group()
-    if args["trackio_log"] and ddp_rank == 0: trackio.finish()
+    if args["wandb_log"] and ddp_rank == 0: wandb.finish()
