@@ -53,10 +53,10 @@ def main(
     train_features: str = "coco_train_sae-top_k-64-cls_only-layer_11-hook_resid_post",  # features for training data. the name must match data/sae/{train_features}.h5
     eval_features: str = "coco_eval_sae-top_k-64-cls_only-layer_11-hook_resid_post",  # features for eval data. the name must match data/sae/{eval_features}.h5
     min_nonzero: int = 120,  # minimum number of non-zero activations per column to keep it in the final array
-    early_stopping_patience: int = 500, # number of evaluation intervals to wait for improvement before stopping
+    early_stopping_patience: int = 20, # number of evaluation intervals to wait for improvement before stopping
     early_stopping_min_delta: float = 0.01, # minimum change in evaluation accuracy to be considered an improvement
     early_stopping_min_threshold: float = 0.75, # minimum evaluation accuracy to start considering early stopping
-    early_stopping_max_steps: int = 20000, # after this, early stopping will be considered even if the min_threshold is not reached
+    early_stopping_max_steps: int = 1000, # after this, early stopping will be considered even if the min_threshold is not reached
 ):
     """
     train a meta-learning transformer model over function learning tasks.
