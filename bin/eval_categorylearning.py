@@ -57,7 +57,10 @@ def main(
         acc = np.mean(participant_choices == answers)
         metalign_accuracies.append(acc)
 
-        best_acc = -1        
+        best_acc = -1
+        # no batch dim and back to numpy for the category learner
+        X = X.squeeze().numpy()
+        y = y.squeeze().numpy()       
         for c in c_values:
             learner = CategoryLearner(estimator=LogisticRegression(max_iter=4000, C=c))
             learner.fit(X, y)
