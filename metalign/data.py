@@ -2,7 +2,7 @@
 common datasets and processing utils  used throughout the project
 """
 
-__all__ = ["ImageDataset", "Things", "Coco", "h5_to_numpy", "image_transform","FunctionDataset", "prepare_things_spose", "load_backbone_representations"]
+__all__ = ["ImageDataset", "Things", "Coco", "h5_to_numpy", "image_transform", "FunctionDataset", "prepare_things_spose", "load_backbone_representations"]
 
 from pathlib import Path
 from typing import Sequence

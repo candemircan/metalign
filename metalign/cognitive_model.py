@@ -9,9 +9,7 @@ from sklearn.linear_model import LogisticRegression
 class CategoryLearner:
     def __init__(
         self,
-        estimator=LogisticRegression(
-            max_iter=4000
-        ),  # Linear model to be used for the task. Defaults to `sklearn.linear_model.LogisticRegression`.
+        estimator=LogisticRegression(max_iter=4000),  # Linear model to be used for the task. Defaults to `sklearn.linear_model.LogisticRegression`.
     ):
         """
         A class of agent that is used to model the category-learning learning task

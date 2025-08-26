@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 import torch
 from fastcore.script import call_parse
-from sklearn.linear_model import LogisticRegression
 from tqdm import tqdm
 
 from metalign.cognitive_model import CategoryLearner
@@ -39,8 +38,7 @@ def main(
     metalign_accuracies = []
     base_accuracies = []
 
-    #l2 reg grid
-    c_values = [0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1000.0]
+
     for participant in tqdm(human_data.participant.unique()):
         participant_data = human_data[human_data.participant == participant]
         images = participant_data["image"].tolist()
@@ -57,18 +55,14 @@ def main(
         acc = np.mean(participant_choices == answers)
         metalign_accuracies.append(acc)
 
-        best_acc = -1
         # no batch dim and back to numpy for the category learner
         X = X.squeeze().numpy()
         y = y.squeeze().numpy()       
-        for c in c_values:
-            learner = CategoryLearner(estimator=LogisticRegression(max_iter=4000, C=c))
-            learner.fit(X, y)
-            model_preds = np.argmax(learner.values, axis=1)
-            acc = np.mean(participant_choices == model_preds)
-            if acc > best_acc:
-                best_acc = acc
-        base_accuracies.append(best_acc)
+        learner = CategoryLearner()
+        learner.fit(X, y)
+        model_preds = np.argmax(learner.values, axis=1)
+        acc = np.mean(participant_choices == model_preds)
+        base_accuracies.append(acc)
 
     result_df = pd.DataFrame({"participant": human_data.participant.unique(),"metalign_accuracy": metalign_accuracies,"base_accuracy": base_accuracies})
     eval_path = Path("data/evals/categorylearning")
