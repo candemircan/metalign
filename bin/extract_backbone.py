@@ -64,7 +64,7 @@ def main(
 
     model = AutoModel.from_pretrained(repo_id).to(device)
     processor = AutoImageProcessor.from_pretrained(repo_id)
-    if model.config.model_type in ["clip", "siglip"]: model = model.vision_model
+    if model.config.model_type == "siglip": model = model.vision_model
     model.eval()
     
     # Extract model name from repo for file naming

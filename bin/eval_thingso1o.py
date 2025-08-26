@@ -52,7 +52,7 @@ def main(
     things_reps = glob(f"data/backbone_reps/things_{model_name}*.h5")[0]
 
     df = pd.read_table("data/external/THINGS_odd_one_out/triplets_large_final_correctednc_correctedorder.csv")
-    og_reps, _ = prepare_things_spose(load_backbone_representations(things_reps))
+    backbone_reps, _ = prepare_things_spose(load_backbone_representations(things_reps))
 
     ckpt = torch.load(checkpoint_path / "best.pt", weights_only=False)
     config, state_dict = ckpt['config'], ckpt['state_dict']
@@ -60,12 +60,12 @@ def main(
     model.load_state_dict(state_dict)
     model.eval()
 
-    metaligned_reps = torch.cat([torch.zeros(og_reps.shape[0], 2), og_reps], dim=1) @ model.embedding.weight.T + model.embedding.bias
+    metaligned_reps = torch.cat([torch.zeros(backbone_reps.shape[0], 2), backbone_reps], dim=1) @ model.embedding.weight.T + model.embedding.bias
 
     X = df[["image1", "image2", "image3"]].values - 1 # 0 index
     y = df["choice"].values -1 # 0 index
     
-    og_acc = _calculate_accuracy(og_reps, X, y, batch_size=batch_size)
+    og_acc = _calculate_accuracy(backbone_reps, X, y, batch_size=batch_size)
     metalign_acc = _calculate_accuracy(metaligned_reps, X, y, batch_size=batch_size)
 
     eval_path = Path("data/evals/things010")

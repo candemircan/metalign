@@ -34,6 +34,11 @@ if [ ! -d "data/external/THINGS_odd_one_out" ]; then
     rm data/external/THINGS_odd_one_out.zip
 fi
 
+# things category learning
+if [ ! -f "data/external/category_learning.csv" ]; then
+    wget -O data/external/category_learning.csv https://osf.io/rsd46/download
+fi
+
 ## COCO ##
 
 # coco images
