@@ -25,18 +25,18 @@ def main(
     model_name = checkpoint_name.split("_")[1]
     things_reps = glob(f"data/backbone_reps/things_{model_name}*.h5")[0]
 
-    human_data = pd.read_csv("data/external/category_learning.csv")
-    backbone_reps = load_backbone_representations(things_reps)
-
     ckpt = torch.load(checkpoint_path / "best.pt", weights_only=False)
     config, state_dict = ckpt['config'], ckpt['state_dict']
     model = Transformer(config=config)
     model.load_state_dict(state_dict)
     model.eval()
 
+    human_data = pd.read_csv("data/external/category_learning.csv")
+    backbone_reps = load_backbone_representations(things_reps)
+    metalign_reps = torch.cat([torch.zeros(backbone_reps.shape[0], 2), backbone_reps], dim=1) @ model.embedding.weight.T + model.embedding.bias
+
     imgs = sorted(glob("data/external/THINGS/*/*jpg"))
-    metalign_accuracies = []
-    base_accuracies = []
+    metalign_accuracies, metalign_linear_accuracies, base_accuracies  = [], [], []
 
 
     for participant in tqdm(human_data.participant.unique()):
@@ -55,7 +55,17 @@ def main(
         acc = np.mean(participant_choices == answers)
         metalign_accuracies.append(acc)
 
+        # linear probe on metalign
+        X = metalign_reps[img_locs].numpy()
+        y = participant_data.true_category_binary.values
+        learner = CategoryLearner()
+        learner.fit(X, y)
+        model_preds = np.argmax(learner.values, axis=1)
+        acc = np.mean(participant_choices == model_preds)
+        metalign_linear_accuracies.append(acc)
+
         # no batch dim and back to numpy for the category learner
+        # base
         X = X.squeeze().numpy()
         y = y.squeeze().numpy()       
         learner = CategoryLearner()
@@ -64,11 +74,13 @@ def main(
         acc = np.mean(participant_choices == model_preds)
         base_accuracies.append(acc)
 
-    result_df = pd.DataFrame({"participant": human_data.participant.unique(),"metalign_accuracy": metalign_accuracies,"base_accuracy": base_accuracies})
+
+
+    result_df = pd.DataFrame({"participant": human_data.participant.unique(),"metalign_accuracy": metalign_accuracies, "metalign_linear_accuracy": metalign_linear_accuracies, "base_accuracy": base_accuracies})
     eval_path = Path("data/evals/categorylearning")
     eval_path.mkdir(parents=True, exist_ok=True)
     eval_file = eval_path / f"{checkpoint_name}.csv"
     result_df.to_csv(eval_file, index=False)
     print(f"Average metalign accuracy: {np.mean(metalign_accuracies)}")
+    print(f"Average metalign linear probe accuracy: {np.mean(metalign_linear_accuracies)}")
     print(f"Average base accuracy: {np.mean(base_accuracies)}")
-    print(f"{(result_df.metalign_accuracy > result_df.base_accuracy).mean()} of participants were better modeled by metalign")
