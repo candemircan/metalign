@@ -33,7 +33,7 @@ def main(
 
     human_data = pd.read_csv("data/external/category_learning.csv")
     backbone_reps = load_backbone_representations(things_reps)
-    metalign_reps = torch.cat([torch.zeros(backbone_reps.shape[0], 2), backbone_reps], dim=1) @ model.embedding.weight.T + model.embedding.bias
+    metalign_reps = torch.cat([torch.zeros(backbone_reps.shape[0], 2), torch.from_numpy(backbone_reps)], dim=1) @ model.embedding.weight.T + model.embedding.bias
 
     imgs = sorted(glob("data/external/THINGS/*/*jpg"))
     metalign_accuracies, metalign_linear_accuracies, base_accuracies  = [], [], []
@@ -64,8 +64,8 @@ def main(
         acc = np.mean(participant_choices == model_preds)
         metalign_linear_accuracies.append(acc)
 
-        # no batch dim and back to numpy for the category learner
         # base
+        # no batch dim and back to numpy for the category learner
         X = X.squeeze().numpy()
         y = y.squeeze().numpy()       
         learner = CategoryLearner()
