@@ -1,8 +1,7 @@
 import pytest
 import torch
 
-from metalign.model import MLP, SelfAttention, Transformer, TransformerBlock, TransformerConfig
-from metalign.rope import RotaryPositionalEmbeddings
+from metalign.model import MLP, RotaryPositionalEmbeddings, SelfAttention, Transformer, TransformerBlock, TransformerConfig
 
 
 @pytest.fixture
