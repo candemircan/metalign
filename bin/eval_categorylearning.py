@@ -69,3 +69,6 @@ def main(
     eval_path.mkdir(parents=True, exist_ok=True)
     eval_file = eval_path / f"{checkpoint_name}.csv"
     result_df.to_csv(eval_file, index=False)
+    print(f"Average metalign accuracy: {np.mean(metalign_accuracies)}")
+    print(f"Average base accuracy: {np.mean(base_accuracies)}")
+    print(f"{(result_df.metalign_accuracy > result_df.base_accuracy).mean()} of participants were better modeled by metalign")
