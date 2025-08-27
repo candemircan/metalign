@@ -197,12 +197,13 @@ def test_h5_to_numpy_dense_format_with_filtering(tmp_path: Path):
     np.testing.assert_array_equal(result, expected)
 
 
-def test_function_dataset(tmp_path: Path):
+def test_function_dataset_sparse(tmp_path: Path):
+    """Test FunctionDataset with sparse features (SAE format)."""
     # Create dummy inputs
     inputs = np.random.rand(100, 10).astype(np.float32)
     
-    # Create dummy h5 file
-    features_path = tmp_path / "features.h5"
+    # Create dummy h5 file with sparse activations
+    features_path = tmp_path / "features_sparse.h5"
     with h5py.File(features_path, 'w') as f:
         for i in range(100):
             g = f.create_group(str(i))
@@ -225,6 +226,41 @@ def test_function_dataset(tmp_path: Path):
     assert len(dataset) == 50
     assert dataset.feature_dim == 10
     assert dataset.num_functions > 0
+    assert dataset.is_sparse  # should detect as sparse
+
+    X_ep, Y_ep = dataset[0]
+    assert X_ep.shape[0] <= 20
+    assert X_ep.shape[1] == 10
+    assert Y_ep.shape[0] == X_ep.shape[0]
+    assert isinstance(X_ep, torch.Tensor)
+    assert isinstance(Y_ep, torch.Tensor)
+
+
+def test_function_dataset_dense(tmp_path: Path):
+    """Test FunctionDataset with dense features (raw format)."""
+    # Create dummy inputs
+    inputs = np.random.rand(100, 10).astype(np.float32)
+    
+    # Create dummy h5 file with dense activations
+    features_path = tmp_path / "features_dense.h5"
+    dense_data = np.random.rand(100, 8).astype(np.float32)  # all non-zero
+    
+    with h5py.File(features_path, 'w') as f:
+        for i in range(100):
+            f.create_dataset(str(i), data=dense_data[i])
+
+    dataset = FunctionDataset(
+        inputs=inputs,
+        features_path=features_path,
+        seq_len=20,
+        epoch_size=50,
+        min_nonzero=1
+    )
+
+    assert len(dataset) == 50
+    assert dataset.feature_dim == 10
+    assert dataset.num_functions == 8
+    assert not dataset.is_sparse  # should detect as dense
 
     X_ep, Y_ep = dataset[0]
     assert X_ep.shape[0] <= 20
