@@ -92,6 +92,7 @@ def main(
     # Get feature dimension from input data
     feature_dim = train_inputs.shape[1]
     
+    # control experiments need raw representations as targets, so gotta account for that
     train_features_path = Path(f"data/sae/{args['train_features']}.h5") if "raw" not in args["train_features"] else Path(f"data/backbone_reps/{args['train_features']}.h5")
     eval_features_path = Path(f"data/sae/{args['eval_features']}.h5") if "raw" not in args["eval_features"] else Path(f"data/backbone_reps/{args['eval_features']}.h5")
 
@@ -230,7 +231,7 @@ def main(
         if (training_step + 1) % args["eval_interval_steps"] == 0:
             with torch.no_grad():
                 model.eval()
-                optimizer.eval()
+                optimizer.eval() # schedule free optimizers need this
                 
                 local_sum_eval_loss = 0.0
                 local_correct_predictions = 0
