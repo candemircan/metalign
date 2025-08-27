@@ -9,7 +9,7 @@ from sklearn.linear_model import LogisticRegression
 class CategoryLearner:
     def __init__(
         self,
-        estimator=LogisticRegression(max_iter=4000),  # Linear model to be used for the task. Defaults to `sklearn.linear_model.LogisticRegression`.
+        estimator=LogisticRegression(max_iter=4000),  # Linear model to be used for the task. It can be replaced with any sklearn classifier that has a predict_proba method
     ):
         """
         A class of agent that is used to model the category-learning learning task
@@ -56,10 +56,12 @@ class CategoryLearner:
 
             self.estimator.fit(train_X, self.y[: trial + 1])
 
-    def fit(self, X: np.ndarray, y: np.ndarray):  # Observations  # Category
+    def fit(self,
+            X: np.ndarray, # Observations (shaped num_trials x num_features)
+            y: np.ndarray # Correct categories (shaped num_trials)
+    ):
         """
         Fit the model to the task in a sequential manner like participants did the task.
-        Also save the evolving weights into an array.
         """
 
         self.X = X

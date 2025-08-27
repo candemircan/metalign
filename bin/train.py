@@ -92,8 +92,8 @@ def main(
     # Get feature dimension from input data
     feature_dim = train_inputs.shape[1]
     
-    train_features_path = Path(f"data/sae/{args['train_features']}.h5")
-    eval_features_path = Path(f"data/sae/{args['eval_features']}.h5")
+    train_features_path = Path(f"data/sae/{args['train_features']}.h5") if "raw" not in args["train_features"] else Path(f"data/backbone_reps/{args['train_features']}.h5")
+    eval_features_path = Path(f"data/sae/{args['eval_features']}.h5") if "raw" not in args["eval_features"] else Path(f"data/backbone_reps/{args['eval_features']}.h5")
 
     train_episode_dataset = FunctionDataset(
         inputs=train_inputs,
@@ -196,7 +196,7 @@ def main(
 
         with autocast(dtype=torch.bfloat16, device_type="cuda"):
             logits = model(X_batch, Y_batch).squeeze(-1)
-            loss =  F.binary_cross_entropy_with_logits(logits, Y_batch)
+            loss = F.binary_cross_entropy_with_logits(logits, Y_batch)
 
         optimizer.zero_grad()
         loss.backward()
