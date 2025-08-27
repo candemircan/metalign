@@ -119,7 +119,8 @@ def test_image_transform():
     assert tensor.shape == (3, 224, 224)
 
 
-def test_h5_to_numpy(tmp_path: Path):
+def test_h5_to_numpy_sparse_format(tmp_path: Path):
+    """Test h5_to_numpy with sparse SAE format (original behavior)."""
     data_root = tmp_path / "sae"
     data_root.mkdir()
     
@@ -142,6 +143,58 @@ def test_h5_to_numpy(tmp_path: Path):
     assert result[0, 4] == 3.0
     assert result[1, 1] == 4.0
     assert result[1, 3] == 5.0
+
+
+def test_h5_to_numpy_dense_format(tmp_path: Path):
+    """Test h5_to_numpy with dense raw activations format."""
+    data_root = tmp_path / "backbone_reps"
+    data_root.mkdir()
+    
+    test_file = data_root / "test_raw_model.h5"
+    
+    # Create dense activations
+    dense_data = np.array([
+        [1.0, 2.0, 3.0, 4.0],
+        [5.0, 6.0, 7.0, 8.0],
+        [9.0, 10.0, 11.0, 12.0]
+    ], dtype=np.float32)
+    
+    with h5py.File(test_file, 'w') as f:
+        for i in range(3):
+            f.create_dataset(str(i), data=dense_data[i])
+    
+    result = h5_to_numpy(test_file, min_nonzero=1)
+    
+    assert result.shape == (3, 4)
+    np.testing.assert_array_equal(result, dense_data)
+
+
+def test_h5_to_numpy_dense_format_with_filtering(tmp_path: Path):
+    """Test h5_to_numpy dense format with min_nonzero filtering."""
+    data_root = tmp_path / "backbone_reps"
+    data_root.mkdir()
+    
+    test_file = data_root / "test_raw_filtered.h5"
+    
+    # Create dense data where some columns have zeros
+    dense_data = np.array([
+        [1.0, 0.0, 3.0, 4.0],
+        [5.0, 0.0, 7.0, 8.0],
+        [9.0, 0.0, 11.0, 0.0]  # last column has one zero
+    ], dtype=np.float32)
+    
+    with h5py.File(test_file, 'w') as f:
+        for i in range(3):
+            f.create_dataset(str(i), data=dense_data[i])
+    
+    # Filter out columns with less than 3 non-zero values
+    result = h5_to_numpy(test_file, min_nonzero=3)
+    
+    # Should keep columns 0 and 2 (both have 3 non-zero values)
+    # Column 1 has 0 non-zero values, column 3 has 2 non-zero values
+    expected = dense_data[:, [0, 2]]
+    assert result.shape == (3, 2)
+    np.testing.assert_array_equal(result, expected)
 
 
 def test_function_dataset(tmp_path: Path):
@@ -181,18 +234,34 @@ def test_function_dataset(tmp_path: Path):
     assert isinstance(Y_ep, torch.Tensor)
 
 
-def test_backbone_representations_loading(tmp_path: Path):
-    # Create dummy backbone representations file
+def test_load_backbone_representations_standard_format(tmp_path: Path):
+    """Test loading backbone representations with standard 'representations' key."""
     backbone_path = tmp_path / "backbone_reps.h5"
     dummy_reps = np.random.rand(50, 768).astype(np.float32)
     
     with h5py.File(backbone_path, 'w') as f:
         f.create_dataset('representations', data=dummy_reps, compression='gzip')
     
-    # Test loading
-    with h5py.File(backbone_path, 'r') as f:
-        loaded_reps = f['representations'][:]
+    from metalign.data import load_backbone_representations
+    loaded_reps = load_backbone_representations(str(backbone_path))
     
     assert np.array_equal(loaded_reps, dummy_reps)
     assert loaded_reps.shape == (50, 768)
+    assert loaded_reps.dtype == np.float32
+
+
+def test_load_backbone_representations_sae_raw_format(tmp_path: Path):
+    """Test loading backbone representations with SAE raw format (numeric keys)."""
+    backbone_path = tmp_path / "backbone_reps_raw.h5"
+    dummy_reps = np.random.rand(3, 768).astype(np.float32)
+    
+    with h5py.File(backbone_path, 'w') as f:
+        for i in range(3):
+            f.create_dataset(str(i), data=dummy_reps[i])
+    
+    from metalign.data import load_backbone_representations
+    loaded_reps = load_backbone_representations(str(backbone_path))
+    
+    assert np.array_equal(loaded_reps, dummy_reps)
+    assert loaded_reps.shape == (3, 768)
     assert loaded_reps.dtype == np.float32

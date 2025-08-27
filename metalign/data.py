@@ -50,45 +50,66 @@ def h5_to_numpy(features_path: Path, # path to the h5 file with the features
     """
     Convert features from h5 file to numpy array.
 
-    Features are sparse over observations, but the space is very high dimensional.
-    To save disk space, only non-zero features and their indices are stored in the h5 file.
-    Here, we convert the h5 file to a numpy array, filling in the zeros for the missing indices.
-    If a column has less than `min_nonzero` non-zero features, it is removed from the final array.
+    Handles two formats:
+    1. Sparse SAE format with activations and indices (original behavior)
+    2. Dense raw activations format where each image is stored directly under numeric keys
 
-    The original h5 file is expected to be in the format:
+    For sparse format, features are sparse over observations but high dimensional.
+    Only non-zero features and their indices are stored in the h5 file.
+    We convert to numpy array, filling in zeros for missing indices.
+    If a column has less than `min_nonzero` non-zero features, it is removed.
+
+    Sparse format:
     ```
     {
         "0": {
             "activations": [...], # the features for the first image
             "indices": [...] # the indices of the non-zero features
         },
-        "1": {
-            "activations": [...], # the features for the second image
-            "indices": [...] # the indices of the non-zero features
-        },
         ...
     }
     ```
 
-    The ordering is based on `sorted("data/external/THINGS/*/*jpg)` or `sorted("data/external/coco/train2017/*.jpg")`, depending on the dataset.
+    Dense format:
+    ```
+    {
+        "0": [...], # dense feature vector for first image
+        "1": [...], # dense feature vector for second image
+        ...
+    }
+    ```
+
+    The ordering is based on e.g. `sorted("data/external/THINGS/*/*jpg)` or `sorted("data/external/coco/train2017/*.jpg")`, depending on the dataset.
     """
 
     with h5py.File(features_path, 'r') as features_h5:
-        indices = []
-        for k in features_h5.keys():
-            indices.extend(features_h5[k]["indices"][:].tolist())
+        # check if this is sparse format (has activations/indices) or dense format
+        first_key = str(0)
+        if first_key in features_h5:
+            first_item = features_h5[first_key]
+            if isinstance(first_item, h5py.Group) and "activations" in first_item and "indices" in first_item:
+                # sparse format - original behavior
+                indices = []
+                for k in features_h5.keys():
+                    indices.extend(features_h5[k]["indices"][:].tolist())
 
-        num_cols = max(indices) + 1 if indices else 0
-        activations = np.zeros((len(features_h5), num_cols), dtype=np.float32)
+                num_cols = max(indices) + 1 if indices else 0
+                activations = np.zeros((len(features_h5), num_cols), dtype=np.float32)
 
-        for img in range(len(features_h5)):
-            img_id = str(img)
-            h5_activations = features_h5[img_id]["activations"][:]
-            indices = features_h5[img_id]["indices"][:]
-            filler_activations = np.zeros(num_cols, dtype=np.float32)
-            if indices.size > 0:
-                filler_activations[indices.astype(np.int64)] = h5_activations
-            activations[img, :] = filler_activations
+                for img in range(len(features_h5)):
+                    img_id = str(img)
+                    h5_activations = features_h5[img_id]["activations"][:]
+                    indices = features_h5[img_id]["indices"][:]
+                    filler_activations = np.zeros(num_cols, dtype=np.float32)
+                    if indices.size > 0:
+                        filler_activations[indices.astype(np.int64)] = h5_activations
+                    activations[img, :] = filler_activations
+            else:
+                # dense format - raw activations stored directly
+                keys = sorted([int(k) for k in features_h5.keys() if k.isdigit()])
+                activations = np.array([features_h5[str(key)][:] for key in keys], dtype=np.float32)
+        else:
+            raise ValueError(f"No data found in h5 file {features_path}")
 
     # remove columns with less than min_nonzero non-zero activations
     if activations.shape[1] > 0:
