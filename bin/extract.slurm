@@ -13,7 +13,7 @@ for model in facebook/dinov3-vitb16-pretrain-lvd1689m google/vit-base-patch16-22
     srun --exclusive -n 1 --gres=gpu:1  --cpus-per-task=4 uv run bin/extract_backbone.py things --repo_id $model &
 done
 
-for layer in 0 6 10 11; do
+for layer in 6 11; do
     srun --exclusive -n 1 --gres=gpu:1  --cpus-per-task=4 uv run bin/extract_sae.py coco --repo_id Prisma-Multimodal/sae-top_k-64-cls_only-layer_${layer}-hook_resid_post &
     srun --exclusive -n 1 --gres=gpu:1  --cpus-per-task=4 uv run bin/extract_sae.py things --repo_id Prisma-Multimodal/sae-top_k-64-cls_only-layer_${layer}-hook_resid_post &
 done

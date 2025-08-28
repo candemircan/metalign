@@ -1,4 +1,5 @@
 import itertools
+import tomllib
 from pathlib import Path
 
 import tomli_w
@@ -6,27 +7,11 @@ from fastcore.script import call_parse
 
 
 @call_parse
-def main(output_dir: Path = Path("data/configs")):
+def main(output_dir: Path = Path("data/configs"), base_config_path: Path = Path("data/base_config.toml")):
     "Generates TOML config files for a grid search."
-    
-    base_config = {
-        "embedding": True,
-        "hidden_act": "gelu",
-        "bias": True,
-        "sequence_length": 120,
-        "logit_bias": True,
-        "scale": False,
-        "compile": True,
-        "warmup_steps": 1000,
-        "training_steps": 1000000,
-        "attention_dropout": 0.1,
-        "hidden_size": 768,
-        "num_attention_heads": 12,
-        "intermediate_size": 3072,
-        "weight_decay": 1e-4,
-        "num_layers": 3,
-        "batch_size": 4096,
-    }
+
+    with open(base_config_path, "rb") as f:
+        base_config = tomllib.load(f)
 
     param_grid = {
         "lr": [0.0001 ,0.00025, 0.0005, 0.001], 
@@ -51,12 +36,6 @@ def main(output_dir: Path = Path("data/configs")):
             "tags" : ["raw"],
             "train_features" : "coco_train_CLIP-ViT-B-32-DataComp.XL-s13B-b90K_sae-top_k-64-cls_only-layer_11-hook_resid_post_raw",
             "eval_features" : "coco_eval_CLIP-ViT-B-32-DataComp.XL-s13B-b90K_sae-top_k-64-cls_only-layer_11-hook_resid_post_raw",
-        },
-        "EARLYSAE" : {
-            "prefix" : "earlysae_",
-            "tags" : ["earlysae"],
-            "train_features" : "coco_train_sae-top_k-64-cls_only-layer_0-hook_resid_post",
-            "eval_features" : "coco_eval_sae-top_k-64-cls_only-layer_0-hook_resid_post",
         },
         "MIDSAE": {
             "prefix" : "midsae_",

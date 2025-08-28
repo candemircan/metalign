@@ -157,7 +157,7 @@ logs/**
 figures/**/
 !.gitkeep
 example*
-!data/example_transformer_config.toml
+!data/base_config.toml
 .github/instructions
 wandb
 /.quarto/

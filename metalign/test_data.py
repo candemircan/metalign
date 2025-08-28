@@ -6,7 +6,7 @@ import pytest
 import torch
 from PIL import Image
 
-from metalign.data import Coco, FunctionDataset, ImageDataset, Things, h5_to_numpy, image_transform
+from .data import Coco, FunctionDataset, ImageDataset, Things, h5_to_numpy, image_transform, load_backbone_representations
 
 
 @pytest.fixture
@@ -278,7 +278,6 @@ def test_load_backbone_representations_standard_format(tmp_path: Path):
     with h5py.File(backbone_path, 'w') as f:
         f.create_dataset('representations', data=dummy_reps, compression='gzip')
     
-    from metalign.data import load_backbone_representations
     loaded_reps = load_backbone_representations(str(backbone_path))
     
     assert np.array_equal(loaded_reps, dummy_reps)
@@ -295,7 +294,6 @@ def test_load_backbone_representations_sae_raw_format(tmp_path: Path):
         for i in range(3):
             f.create_dataset(str(i), data=dummy_reps[i])
     
-    from metalign.data import load_backbone_representations
     loaded_reps = load_backbone_representations(str(backbone_path))
     
     assert np.array_equal(loaded_reps, dummy_reps)
