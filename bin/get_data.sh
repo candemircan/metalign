@@ -75,3 +75,6 @@ if [! -d data/external/imagenet]; then
     wget -O data/external/ILSVRC2012_img_val.tar https://image-net.org/data/ILSVRC/2012/ILSVRC2012_img_val.tar --no-check-certificate
     cd data/external
     curl -sSL https://raw.githubusercontent.com/pytorch/examples/main/imagenet/extract_ILSVRC.sh | bash
+
+    cd ../../
+fi
