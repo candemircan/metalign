@@ -34,6 +34,7 @@ if [ ! -f "data/external/THINGS_triplets.csv" ]; then
     rm data/external/THINGS_odd_one_out.zip
     mv data/external/THINGS_odd_one_out/triplets_large_final_correctednc_correctedorder.csv data/external/THINGS_triplets.csv
     rm -r data/external/THINGS_odd_one_out/
+    rm -r __MACOSX/
 fi
 
 # things category learning

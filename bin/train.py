@@ -55,7 +55,7 @@ def main(
     early_stopping_patience: int = 20, # number of evaluation intervals to wait for improvement before stopping
     early_stopping_min_delta: float = 0.01, # minimum change in evaluation accuracy to be considered an improvement
     early_stopping_min_threshold: float = 0.75, # minimum evaluation accuracy to start considering early stopping
-    early_stopping_max_steps: int = 1000, # after this, early stopping will be considered even if the min_threshold is not reached
+    early_stopping_max_steps: int = 1500, # after this, early stopping will be considered even if the min_threshold is not reached
 ):
     """
     train a meta-learning transformer model over function learning tasks.

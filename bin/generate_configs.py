@@ -14,7 +14,7 @@ def main(output_dir: Path = Path("data/configs"), base_config_path: Path = Path(
         base_config = tomllib.load(f)
 
     param_grid = {
-        "lr": [0.0001 ,0.00025, 0.0005, 0.001], 
+        "lr": [2.5e-4, 5e-4, 1e-3],
         "model_name": ["dinov3-vitb16-pretrain-lvd1689m", "CLIP-ViT-B-32-DataComp.XL-s13B-b90K_sae-top_k-64-cls_only-layer_11-hook_resid_post_raw",  "siglip2-base-patch16-224", "vit-base-patch16-224"]
     }
 

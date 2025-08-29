@@ -5,8 +5,20 @@ import numpy as np
 import pytest
 import torch
 from PIL import Image
+from torchvision import transforms
 
-from .data import Coco, FunctionDataset, ImageDataset, Things, h5_to_numpy, image_transform, load_backbone_representations
+from .data import Coco, FunctionDataset, ImageDataset, Things, h5_to_numpy, load_backbone_representations
+
+
+def _test_transform():
+    """Simple transform for testing"""
+    return transforms.Compose([
+        transforms.Resize(256),
+        transforms.CenterCrop(224),
+        lambda img: img.convert('RGB') if img.mode != 'RGB' else img,
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ])
 
 
 @pytest.fixture
@@ -26,7 +38,7 @@ def things_root(tmp_path: Path) -> Path:
     return root
 
 def test_things_dataset(things_root: Path):
-    dataset = Things(root=things_root, total_images=3)
+    dataset = Things(root=things_root, total_images=3, transform=_test_transform())
     
     assert len(dataset) == 3
     
@@ -43,15 +55,16 @@ def test_things_dataset_with_processor(things_root: Path):
     # Mock processor that just returns PIL images
     class MockProcessor:
         def __call__(self, images, return_tensors=None):
-            return {"pixel_values": torch.stack([torch.randn(3, 224, 224) for _ in images])}
+            return {"pixel_values": torch.stack([torch.randn(3, 224, 224)])}
     
     mock_processor = MockProcessor()
     dataset = Things(root=things_root, total_images=3, processor=mock_processor)
     
     assert len(dataset) == 3
     
-    image = dataset[0]  # Should return PIL Image when processor is used
-    assert isinstance(image, Image.Image)
+    result = dataset[0]  # Should return dict from processor
+    assert isinstance(result, dict)
+    assert "pixel_values" in result
 
 
 def test_things_dataset_with_custom_transform(things_root: Path):
@@ -82,7 +95,7 @@ def test_coco_dataset(tmp_path: Path, monkeypatch):
     Image.new("RGB", (100, 100), color="red").save(train_root / "image1.jpg")
     Image.new("RGB", (100, 100), color="green").save(train_root / "image2.jpg")
     
-    dataset = Coco(root=root, train=True)
+    dataset = Coco(root=root, train=True, transform=_test_transform())
     assert len(dataset) == 2
     
     image = dataset[0]
@@ -97,7 +110,7 @@ def test_image_dataset(tmp_path: Path):
     Image.new("RGB", (50, 50), color="blue").save(root / "test.jpg")
     Image.new("RGB", (50, 50), color="yellow").save(root / "test2.jpg")
     
-    dataset = ImageDataset(root=root, glob_pattern="*.jpg", total_images=2)
+    dataset = ImageDataset(root=root, glob_pattern="*.jpg", total_images=2, transform=_test_transform())
     assert len(dataset) == 2
     
     image = dataset[0]
@@ -105,8 +118,8 @@ def test_image_dataset(tmp_path: Path):
     assert image.shape == (3, 224, 224)
 
 
-def test_image_transform():
-    transform = image_transform()
+def test_test_transform():
+    transform = _test_transform()
     
     rgb_img = Image.new("RGB", (300, 300), color="red")
     tensor = transform(rgb_img)

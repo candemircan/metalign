@@ -2,47 +2,18 @@
 common datasets and processing utils  used throughout the project
 """
 
-__all__ = ["ImageDataset", "Things", "Coco", "h5_to_numpy", "image_transform", "FunctionDataset", "prepare_things_spose", "load_backbone_representations", "Levels"]
+__all__ = ["ImageDataset", "Things", "Coco", "h5_to_numpy", "FunctionDataset", "prepare_things_spose", "load_backbone_representations", "Levels"]
 
 import pickle
 from pathlib import Path
-from typing import Sequence
 
 import h5py
 import numpy as np
 import torch
 from PIL import Image
 from torch.utils.data import Dataset
-from torchvision import transforms
 
-from .constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD, NUM_COCO_TRAIN_IMAGES, NUM_THINGS_CATEGORIES, NUM_THINGS_IMAGES
-
-
-def _convert_to_rgb(img):
-    if img.mode != 'RGB': return img.convert('RGB')
-    return img
-
-def image_transform(
-    *,
-    resize_size: int = 256,
-    interpolation=transforms.InterpolationMode.BICUBIC,
-    crop_size: int = 224,
-    mean: Sequence[float] = IMAGENET_DEFAULT_MEAN,
-    std: Sequence[float] = IMAGENET_DEFAULT_STD,
-) -> transforms.Compose:
-    """
-    transform pipeline for images, including resizing, cropping, normalization, and conversion to tensor.
-    standard imagenet stuff, adapted from [here](https://github.com/facebookresearch/dinov2/blob/592541c8d842042bb5ab29a49433f73b544522d5/dinov2/data/transforms.py)
-    """
-    transforms_list = [
-        transforms.Resize(resize_size, interpolation=interpolation),
-        transforms.CenterCrop(crop_size),
-        _convert_to_rgb,
-        transforms.ToTensor(),
-        transforms.Normalize(mean=mean, std=std),
-    ]
-    return transforms.Compose(transforms_list)
-
+from .constants import NUM_COCO_TRAIN_IMAGES, NUM_THINGS_CATEGORIES, NUM_THINGS_IMAGES
 
 
 def h5_to_numpy(features_path: Path, # path to the h5 file with the features
@@ -125,14 +96,17 @@ class ImageDataset(Dataset):
     A generic image dataset that can handle different directory structures.
     Images are sorted by name.
 
-    By default, ImageNet style transformations are applied to the images, including resizing, cropping, normalization, and conversion to tensor.
-    If a processor is provided, it will be used instead of transforms. If a custom transform is provided, it will override the default.
+    You must provide either a processor (AutoImageProcessor from transformers) or a transform (torchvision transforms).
+    If processor is provided, it will be used to process PIL images and return tensors.
+    If transform is provided, it will be applied to PIL images.
     """
 
     def __init__(self, root: Path, glob_pattern: str = "*.jpg", total_images: int | None = None, processor=None, transform=None):
+        assert (processor is None) != (transform is None), "Must provide exactly one of processor or transform"
+        
         self.images = sorted(root.glob(glob_pattern))
         self.processor = processor
-        self.transform = transform if transform is not None else image_transform()
+        self.transform = transform
 
         if total_images is not None:
             assert len(self.images) == total_images, f"Expected {total_images} images, found {len(self.images)} in {root} with pattern {glob_pattern}"
@@ -143,13 +117,13 @@ class ImageDataset(Dataset):
     def __getitem__(self, idx):
         img_path = self.images[idx]
         with Image.open(img_path) as image:
+            image = image.convert('RGB')
             if self.processor is not None:
-                # Return PIL image for processor to handle
-                return image.convert('RGB')
+                # Use processor (returns dict with tensors)
+                return self.processor(images=image, return_tensors="pt")
             else:
                 # Apply transforms and return tensor
-                image = self.transform(image)
-        return image
+                return self.transform(image)
 
 
 class Things(ImageDataset):
@@ -174,11 +148,12 @@ class Coco(ImageDataset):
             super().__init__(root=root / "train2017", glob_pattern="*.jpg", total_images=NUM_COCO_TRAIN_IMAGES, processor=processor, transform=transform)
         else:
             # For eval, manually set images from val and test directories
+            assert (processor is None) != (transform is None), "Must provide exactly one of processor or transform"
             val_images = sorted((root / "val2017").glob("*.jpg"))
             test_images = sorted((root / "test2017").glob("*.jpg"))
             self.images = val_images + test_images
             self.processor = processor
-            self.transform = transform if transform is not None else image_transform()
+            self.transform = transform
 
         
 class Levels(ImageDataset):
@@ -226,18 +201,21 @@ class Levels(ImageDataset):
         self.image_keys, self.images = [list(t) for t in zip(*sorted_pairs)]
         
         self.processor = processor
-        self.transform = transform if transform is not None else image_transform()
+        self.transform = transform
+        assert (processor is None) != (transform is None), "Must provide exactly one of processor or transform"
 
     def __len__(self): return len(self.images)
 
     def __getitem__(self, idx):
         img_path = self.images[idx]
         with Image.open(img_path) as image:
+            image = image.convert('RGB')
             if self.processor is not None:
-                return image.convert('RGB')
+                # Use processor (returns dict with tensors)
+                return self.processor(images=image, return_tensors="pt")
             else:
-                image = self.transform(image)
-        return image
+                # Apply transforms and return tensor
+                return self.transform(image)
 
 
 
