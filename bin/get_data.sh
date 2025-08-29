@@ -70,7 +70,7 @@ if [ ! -f "data/external/levels.pkl" ]; then
     wget -O data/external/levels.pkl https://gin.g-node.org/fborn/Dataset_Levels/raw/master/processed_data/pruned_dataset.pkl
 fi
 ## ImageNet ##
-if [! -d data/external/imagenet]; then
+if [ ! -d "data/external/imagenet" ]; then
     wget -O data/external/ILSVRC2012_img_train.tar https://image-net.org/data/ILSVRC/2012/ILSVRC2012_img_train.tar --no-check-certificate
     wget -O data/external/ILSVRC2012_img_val.tar https://image-net.org/data/ILSVRC/2012/ILSVRC2012_img_val.tar --no-check-certificate
     cd data/external
