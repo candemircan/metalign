@@ -27,7 +27,7 @@ if [ ! -d "data/external/THINGS" ]; then
 fi
 
 # things odd-one-out
-if [ ! -d "data/external/THINGS_odd_one_out" ]; then
+if [ ! -f "data/external/THINGS_triplets.csv" ]; then
     wget -O data/external/THINGS_odd_one_out.zip https://osf.io/n9u4a/download
     unzip data/external/THINGS_odd_one_out.zip -d data/external/
     mv data/external/triplet_dataset data/external/THINGS_odd_one_out

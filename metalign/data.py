@@ -4,7 +4,6 @@ common datasets and processing utils  used throughout the project
 
 __all__ = ["ImageDataset", "Things", "Coco", "h5_to_numpy", "image_transform", "FunctionDataset", "prepare_things_spose", "load_backbone_representations", "Levels"]
 
-import io
 import pickle
 from pathlib import Path
 from typing import Sequence
@@ -12,7 +11,6 @@ from typing import Sequence
 import h5py
 import numpy as np
 import torch
-from datasets import load_dataset
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
@@ -183,10 +181,10 @@ class Coco(ImageDataset):
             self.transform = transform if transform is not None else image_transform()
 
         
-class Levels(Dataset):
+class Levels(ImageDataset):
     """
     This is an odd-one-out similarity dataset that uses a subset of the ImageNet dataset.
-    The class will identify the relevant images from data/external/levels.pkl and load them from the hf dataset timm/imagenet-1k-wds.
+    The class will identify the relevant images from data/external/levels.pkl and load them from the local imagenet directory.
     """
 
     def __init__(self, root: Path = Path("data/external"), processor=None, transform=None):
@@ -202,31 +200,44 @@ class Levels(Dataset):
 
         unique_image_names = {img.split(".")[0] for img in image_names}
         
-        ds = load_dataset("timm/imagenet-1k-wds", split="train", streaming=True)
-        filtered_ds = ds.filter(lambda x: x['__key__'] in unique_image_names)
-
-        self.processor = processor
-        self.transform = transform if transform is not None else image_transform()
+        # find matching images in local imagenet directory
+        imagenet_root = root / "imagenet"
+        train_root = imagenet_root / "train"
+        val_root = imagenet_root / "val"
         
+        # collect all imagenet images from train and val directories
+        all_image_paths = []
+        if train_root.exists():
+            all_image_paths.extend(train_root.glob("*/*.JPEG"))
+        if val_root.exists():
+            all_image_paths.extend(val_root.glob("*.JPEG"))
+        
+        # filter to only include images that match our required image names
         self.images = []
         self.image_keys = []
-        for item in filtered_ds:
-            self.image_keys.append(item['__key__'])
-            image_data = item['jpg']
-            image = Image.open(io.BytesIO(image_data['bytes'])) if isinstance(image_data, dict) else image_data
-            
-            if self.processor:
-                self.images.append(image.convert('RGB'))
-            else:
-                self.images.append(self.transform(image))
+        for img_path in all_image_paths:
+            img_key = img_path.stem.split("_")[0]  # extract the key part (e.g., "n01440764" from "n01440764_18.JPEG")
+            if img_key in unique_image_names:
+                self.images.append(img_path)
+                self.image_keys.append(img_key)
         
         # sort images and keys together based on keys to ensure consistent ordering
         sorted_pairs = sorted(zip(self.image_keys, self.images))
         self.image_keys, self.images = [list(t) for t in zip(*sorted_pairs)]
+        
+        self.processor = processor
+        self.transform = transform if transform is not None else image_transform()
 
     def __len__(self): return len(self.images)
 
-    def __getitem__(self, idx): return self.images[idx]
+    def __getitem__(self, idx):
+        img_path = self.images[idx]
+        with Image.open(img_path) as image:
+            if self.processor is not None:
+                return image.convert('RGB')
+            else:
+                image = self.transform(image)
+        return image
 
 
 
