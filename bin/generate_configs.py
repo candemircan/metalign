@@ -15,7 +15,7 @@ def main(output_dir: Path = Path("data/configs"), base_config_path: Path = Path(
 
     param_grid = {
         "lr": [2.5e-4, 5e-4, 1e-3],
-        "model_name": ["dinov3-vitb16-pretrain-lvd1689m", "CLIP-ViT-B-32-DataComp.XL-s13B-b90K_sae-top_k-64-cls_only-layer_11-hook_resid_post_raw",  "siglip2-base-patch16-224", "vit-base-patch16-224"]
+        "model_name": ["vit_base_patch16_rope_reg1_gap_256.sbb_in1k", "CLIP-ViT-B-32-DataComp.XL-s13B-b90K_sae-top_k-64-cls_only-layer_11-hook_resid_post_raw",  "vit_base_patch14_reg4_dinov2.lvd142m", "ViT-B-16-SigLIP2-512"]
     }
 
     keys, values = zip(*param_grid.items())
@@ -50,7 +50,12 @@ def main(output_dir: Path = Path("data/configs"), base_config_path: Path = Path(
         for i, params in enumerate(permutations):
             config = base_config.copy()
             config.update(params) 
-            short_model_name = config["model_name"].split("-")[0]               
+            if "siglip" in config["model_name"].lower():
+                short_model_name = "siglip2"
+            elif "dino" in config["model_name"].lower():
+                short_model_name = "dinov2"
+            elif "sbb" in config["model_name"].lower():
+                short_model_name = "vit"         
             lr_str = f"{config['lr']:.0e}".replace("-0", "-")
             config["name"] = f"[{setup_name}]_{short_model_name}_lr{lr_str}"
             config["train_backbone"] = f"coco_train_{config['model_name']}"

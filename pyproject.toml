@@ -13,7 +13,6 @@ dependencies = [
     "h5py", 
     "wandb", 
     "tomli-w",
-    "nnsight",
     "timm",
     "open_clip_torch",
     "flash-attn ; sys_platform == 'linux'",

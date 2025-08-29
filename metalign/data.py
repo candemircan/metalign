@@ -138,13 +138,10 @@ class Coco(ImageDataset):
         if train:
             super().__init__(root=root / "train2017", glob_pattern="*.jpg", total_images=NUM_COCO_TRAIN_IMAGES, transform=transform)
         else:
-            # For eval, manually set images from val and test directories
+            # for eval, manually set images from val and test directories
             val_images = sorted((root / "val2017").glob("*.jpg"))
             test_images = sorted((root / "test2017").glob("*.jpg"))
             self.images = val_images + test_images
-            # Manually call parent init after setting self.images
-            super(ImageDataset, self).__init__(root=root, glob_pattern="", total_images=None, transform=transform)
-            self.images = val_images + test_images 
         
 class Levels(ImageDataset):
     """

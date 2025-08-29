@@ -1,4 +1,7 @@
 import os
+
+os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"  # needed for aten::_upsample_bicubic2d_aa.out with the mps backend
+
 from pathlib import Path
 
 import h5py
@@ -9,8 +12,6 @@ from fastcore.script import call_parse
 from tqdm import tqdm
 
 from metalign.data import Coco, Things
-
-os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"  # needed for aten::_upsample_bicubic2d_aa.out with the mps backend
 
 _ = torch.set_grad_enabled(False)
 
