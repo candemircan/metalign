@@ -67,4 +67,5 @@ fi
 ## Levels ##
 wget -O data/external/levels.pkl https://gin.g-node.org/fborn/Dataset_Levels/raw/master/processed_data/pruned_dataset.pkl
 ## ImageNet ##
-uv run huggingface-cli download --repo-type dataset timm/imagenet-1k-wds
+mkdir -p data/external/imagenet
+uv run kaggle  competitions download -c imagenet-object-localization-challenge -p data/external/imagenet

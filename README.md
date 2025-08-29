@@ -20,7 +20,6 @@ For setup, you need to do the following things:
 
 3. The project currently uses the following gated repositories:
 
-    - [imagenet-1k-wds](https://huggingface.co/datasets/timm/imagenet-1k-wds)
     - [dinov3](https://huggingface.co/facebook/dinov3-vitb16-pretrain-lvd1689m/tree/main)
 
     You need to log in to Hugging Face website, and accept the terms and conditions. Then you need to verify yourself via the CLI (`uv run hf auth login`).

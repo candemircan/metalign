@@ -284,33 +284,22 @@ class FunctionDataset(Dataset):
         pos_indices = torch.where(pos_mask)[0]
         neg_indices = torch.where(neg_mask)[0]
 
-        # ensure we have enough indices to sample from
-        if len(pos_indices) == 0:
-            # fallback: use all indices and random labels
-            all_indices = torch.randperm(len(y_dim))[:self.seq_len]
-            X_episode = self.X[all_indices]
-            Y_episode = torch.randint(0, 2, (len(all_indices),), dtype=torch.float32)
-        elif len(neg_indices) == 0:
-            # fallback: use all indices and random labels  
-            all_indices = torch.randperm(len(y_dim))[:self.seq_len]
-            X_episode = self.X[all_indices]
-            Y_episode = torch.randint(0, 2, (len(all_indices),), dtype=torch.float32)
+
+        # normal sampling
+        n_pos = min(n_pos, len(pos_indices))
+        n_neg = min(n_neg, len(neg_indices))
+        
+        pos_sample_indices = pos_indices[torch.randperm(len(pos_indices))[:n_pos]]
+        neg_sample_indices = neg_indices[torch.randperm(len(neg_indices))[:n_neg]]
+
+        indices = torch.cat([pos_sample_indices, neg_sample_indices])
+        indices = indices[torch.randperm(len(indices)).long()]
+
+        X_episode = self.X[indices]
+        if self.is_sparse:
+            Y_episode = (self.Y[indices, dim] != 0).float()
         else:
-            # normal sampling
-            n_pos = min(n_pos, len(pos_indices))
-            n_neg = min(n_neg, len(neg_indices))
-            
-            pos_sample_indices = pos_indices[torch.randperm(len(pos_indices))[:n_pos]]
-            neg_sample_indices = neg_indices[torch.randperm(len(neg_indices))[:n_neg]]
-
-            indices = torch.cat([pos_sample_indices, neg_sample_indices])
-            indices = indices[torch.randperm(len(indices)).long()]
-
-            X_episode = self.X[indices]
-            if self.is_sparse:
-                Y_episode = (self.Y[indices, dim] != 0).float()
-            else:
-                Y_episode = (self.Y[indices, dim] > median_val).float()
+            Y_episode = (self.Y[indices, dim] > median_val).float()
 
         if torch.rand(1).item() < 0.5: Y_episode = 1 - Y_episode
         return X_episode, Y_episode
