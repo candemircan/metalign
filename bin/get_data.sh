@@ -65,7 +65,9 @@ if [ ! -d "data/external/coco/test2017" ]; then
 fi
 
 ## Levels ##
-wget -O data/external/levels.pkl https://gin.g-node.org/fborn/Dataset_Levels/raw/master/processed_data/pruned_dataset.pkl
+if [ ! -f "data/external/levels.pkl" ]; then
+    wget -O data/external/levels.pkl https://gin.g-node.org/fborn/Dataset_Levels/raw/master/processed_data/pruned_dataset.pkl
+fi
 ## ImageNet ##
 mkdir -p data/external/imagenet
 uv run kaggle  competitions download -c imagenet-object-localization-challenge -p data/external/imagenet

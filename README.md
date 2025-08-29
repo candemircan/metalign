@@ -21,8 +21,11 @@ For setup, you need to do the following things:
 3. The project currently uses the following gated repositories:
 
     - [dinov3](https://huggingface.co/facebook/dinov3-vitb16-pretrain-lvd1689m/tree/main)
+    - [ImageNet](https://www.kaggle.com/c/imagenet-object-localization-challenge/data)
 
-    You need to log in to Hugging Face website, and accept the terms and conditions. Then you need to verify yourself via the CLI (`uv run hf auth login`).
+    You need to log in to Hugging Face website, and accept the terms and conditions. Then you need to verify yourself via the CLI (`uv run hf auth login`) for dinov3.
+
+    For ImageNet, you need to create a Kaggle account, and accept the terms and conditions. Then you need to download your API key from your account settings and follow [these instructions](https://github.com/Kaggle/kaggle-api/blob/main/docs/README.md).
 
 3. The project uses a lot of external data, which is not committed to the repository. You can download the data by running the following script, which requires `wget`.
     ```bash
