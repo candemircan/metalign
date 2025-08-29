@@ -51,7 +51,7 @@ def main(
     model_name = checkpoint_name.split("_")[1]
     things_reps = glob(f"data/backbone_reps/things_{model_name}*.h5")[0]
 
-    df = pd.read_table("data/external/THINGS_odd_one_out/triplets_large_final_correctednc_correctedorder.csv")
+    df = pd.read_table("data/external/THINGS_triplets.csv")
     backbone_reps, _ = prepare_things_spose(load_backbone_representations(things_reps))
 
     ckpt = torch.load(checkpoint_path / "best.pt", weights_only=False)

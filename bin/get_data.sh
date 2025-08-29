@@ -32,7 +32,8 @@ if [ ! -d "data/external/THINGS_odd_one_out" ]; then
     unzip data/external/THINGS_odd_one_out.zip -d data/external/
     mv data/external/triplet_dataset data/external/THINGS_odd_one_out
     rm data/external/THINGS_odd_one_out.zip
-    rm data/external/THINGS_odd_one_out/*txt # we need just the csv
+    mv data/external/THINGS_odd_one_out/triplets_large_final_correctednc_correctedorder.csv data/external/THINGS_triplets.csv
+    rm -r data/external/THINGS_odd_one_out/
 fi
 
 # things category learning
@@ -69,5 +70,8 @@ if [ ! -f "data/external/levels.pkl" ]; then
     wget -O data/external/levels.pkl https://gin.g-node.org/fborn/Dataset_Levels/raw/master/processed_data/pruned_dataset.pkl
 fi
 ## ImageNet ##
-mkdir -p data/external/imagenet
-uv run kaggle  competitions download -c imagenet-object-localization-challenge -p data/external/imagenet
+if [! -d data/external/imagenet]; then
+    wget -O data/external/ILSVRC2012_img_train.tar https://image-net.org/data/ILSVRC/2012/ILSVRC2012_img_train.tar --no-check-certificate
+    wget -O data/external/ILSVRC2012_img_val.tar https://image-net.org/data/ILSVRC/2012/ILSVRC2012_img_val.tar --no-check-certificate
+    cd data/external
+    curl -sSL https://raw.githubusercontent.com/pytorch/examples/main/imagenet/extract_ILSVRC.sh | bash
