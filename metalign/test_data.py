@@ -51,22 +51,6 @@ def test_things_dataset(things_root: Path):
     assert image_2.shape == (3, 224, 224)
 
 
-def test_things_dataset_with_processor(things_root: Path):
-    # Mock processor that just returns PIL images
-    class MockProcessor:
-        def __call__(self, images, return_tensors=None):
-            return {"pixel_values": torch.stack([torch.randn(3, 224, 224)])}
-    
-    mock_processor = MockProcessor()
-    dataset = Things(root=things_root, total_images=3, processor=mock_processor)
-    
-    assert len(dataset) == 3
-    
-    result = dataset[0]  # Should return PIL image when processor is provided
-    assert isinstance(result, Image.Image)
-    assert result.size == (100, 100)  # Original image size
-
-
 def test_things_dataset_with_custom_transform(things_root: Path):
     from torchvision import transforms
     
@@ -83,6 +67,17 @@ def test_things_dataset_with_custom_transform(things_root: Path):
     image = dataset[0]
     assert isinstance(image, torch.Tensor)
     assert image.shape == (3, 128, 128)  # Should be the custom size
+
+
+def test_things_dataset_no_transform(things_root: Path):
+    """Test Things dataset with no transform - should return PIL images."""
+    dataset = Things(root=things_root, total_images=3, transform=None)
+    
+    assert len(dataset) == 3
+    
+    result = dataset[0]  # Should return PIL image when no transform is provided
+    assert isinstance(result, Image.Image)
+    assert result.size == (100, 100)  # Original image size
 
 
 def test_coco_dataset(tmp_path: Path, monkeypatch):

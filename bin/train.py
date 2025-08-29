@@ -165,7 +165,7 @@ def main(
 
     best_eval_accuracy = -1.0
     early_stopping_counter = 0
-    if ddp_rank == 0: best_checkpoint_path = f"{full_checkpoint_dir}/best.pt"
+    if ddp_rank == 0: best_checkpoint_path = f"{full_checkpoint_dir}/model.pt"
 
     if args["wandb_log"] and ddp_rank == 0:
         # hacky way to see if i'm training on juwels, which does not have internet in compute nodes

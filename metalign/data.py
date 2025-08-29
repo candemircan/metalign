@@ -96,16 +96,11 @@ class ImageDataset(Dataset):
     A generic image dataset that can handle different directory structures.
     Images are sorted by name.
 
-    You must provide either a processor (AutoImageProcessor from transformers) or a transform (torchvision transforms).
-    If processor is provided, it will be used to process PIL images and return tensors.
-    If transform is provided, it will be applied to PIL images.
+    Uses torchvision transforms to process PIL images.
     """
 
-    def __init__(self, root: Path, glob_pattern: str = "*.jpg", total_images: int | None = None, processor=None, transform=None):
-        assert (processor is None) != (transform is None), "Must provide exactly one of processor or transform"
-        
+    def __init__(self, root: Path, glob_pattern: str = "*.jpg", total_images: int | None = None, transform=None):
         self.images = sorted(root.glob(glob_pattern))
-        self.processor = processor
         self.transform = transform
 
         if total_images is not None:
@@ -118,12 +113,8 @@ class ImageDataset(Dataset):
         img_path = self.images[idx]
         with Image.open(img_path) as image:
             image = image.convert('RGB')
-            if self.processor is not None:
-                # return PIL image for external processing
-                return image
-            else:
-                # Apply transforms and return tensor
-                return self.transform(image)
+            if self.transform is not None: return self.transform(image)
+            return image
 
 
 class Things(ImageDataset):
@@ -133,8 +124,8 @@ class Things(ImageDataset):
     The images are expected to be in the format `data/external/THINGS/{category}/{image}.jpg`, which matches the original structure of the THINGS dataset.
     """
 
-    def __init__(self, root: Path = Path("data/external/THINGS"), total_images: int = NUM_THINGS_IMAGES, processor=None, transform=None):
-        super().__init__(root=root, glob_pattern="*/*.jpg", total_images=total_images, processor=processor, transform=transform)
+    def __init__(self, root: Path = Path("data/external/THINGS"), total_images: int = NUM_THINGS_IMAGES, transform=None):
+        super().__init__(root=root, glob_pattern="*/*.jpg", total_images=total_images, transform=transform)
 
 class Coco(ImageDataset):
     """
@@ -143,16 +134,16 @@ class Coco(ImageDataset):
     The images are expected to be in the format `data/external/coco/{split}/{image}.jpg`, which matches the original structure of the COCO dataset.
     """
 
-    def __init__(self, root: Path = Path("data/external/coco"), train: bool = True, processor=None, transform=None):
+    def __init__(self, root: Path = Path("data/external/coco"), train: bool = True, transform=None):
         if train:
-            super().__init__(root=root / "train2017", glob_pattern="*.jpg", total_images=NUM_COCO_TRAIN_IMAGES, processor=processor, transform=transform)
+            super().__init__(root=root / "train2017", glob_pattern="*.jpg", total_images=NUM_COCO_TRAIN_IMAGES, transform=transform)
         else:
             # For eval, manually set images from val and test directories
             val_images = sorted((root / "val2017").glob("*.jpg"))
             test_images = sorted((root / "test2017").glob("*.jpg"))
             self.images = val_images + test_images
             # Manually call parent init after setting self.images
-            super(ImageDataset, self).__init__(root=root, glob_pattern="", total_images=None, processor=processor, transform=transform)
+            super(ImageDataset, self).__init__(root=root, glob_pattern="", total_images=None, transform=transform)
             self.images = val_images + test_images 
         
 class Levels(ImageDataset):
@@ -161,7 +152,7 @@ class Levels(ImageDataset):
     The class will identify the relevant images from data/external/levels.pkl and load them from the local imagenet directory.
     """
 
-    def __init__(self, root: Path = Path("data/external"), processor=None, transform=None):
+    def __init__(self, root: Path = Path("data/external"), transform=None):
         with open(root / "levels.pkl", "rb") as f:
             levels = pickle.load(f)
         
@@ -192,9 +183,7 @@ class Levels(ImageDataset):
         sorted_pairs = sorted(zip(self.image_keys, self.images))
         self.image_keys, self.images = [list(t) for t in zip(*sorted_pairs)]
         
-        self.processor = processor
         self.transform = transform
-        assert (processor is None) != (transform is None), "Must provide exactly one of processor or transform"
 
     def __len__(self): return len(self.images)
 
@@ -202,12 +191,8 @@ class Levels(ImageDataset):
         img_path = self.images[idx]
         with Image.open(img_path) as image:
             image = image.convert('RGB')
-            if self.processor is not None:
-                # Use processor (returns dict with tensors)
-                return self.processor(images=image, return_tensors="pt")
-            else:
-                # Apply transforms and return tensor
-                return self.transform(image)
+            if self.transform is not None: return self.transform(image)
+            return image
 
 
 

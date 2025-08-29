@@ -25,7 +25,7 @@ def main(
     model_name = checkpoint_name.split("_")[1]
     things_reps = glob(f"data/backbone_reps/things_{model_name}*.h5")[0]
 
-    ckpt = torch.load(checkpoint_path / "best.pt", weights_only=False)
+    ckpt = torch.load(checkpoint_path / "model.pt", weights_only=False)
     config, state_dict = ckpt['config'], ckpt['state_dict']
     model = Transformer(config=config)
     model.load_state_dict(state_dict)

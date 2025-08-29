@@ -54,7 +54,7 @@ def main(
     df = pd.read_table("data/external/THINGS_triplets.csv")
     backbone_reps, _ = prepare_things_spose(load_backbone_representations(things_reps))
 
-    ckpt = torch.load(checkpoint_path / "best.pt", weights_only=False)
+    ckpt = torch.load(checkpoint_path / "model.pt", weights_only=False)
     config, state_dict = ckpt['config'], ckpt['state_dict']
     model = Transformer(config=config)
     model.load_state_dict(state_dict)

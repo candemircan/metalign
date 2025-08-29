@@ -8,9 +8,10 @@
 
 module load CUDA/12
 
-for model in facebook/dinov3-vitb16-pretrain-lvd1689m google/vit-base-patch16-224 openai/clip-vit-base-patch16 google/siglip2-base-patch16-224; do
-    srun --exclusive -n 1 --gres=gpu:1  --cpus-per-task=4 uv run bin/extract_backbone.py coco $model &
-    srun --exclusive -n 1 --gres=gpu:1  --cpus-per-task=4 uv run bin/extract_backbone.py things  $model &
+for dataset in things coco; do
+    for model in timm/vit_base_patch14_reg4_dinov2.lvd142m timm/ViT-B-16-SigLIP2-512 timm/vit_base_patch16_rope_reg1_gap_256.sbb_in1k; do
+        srun --exclusive -n 1 --gres=gpu:1  --cpus-per-task=4 uv run bin/extract_backbone.py $dataset $model &
+    done
 done
 
 for layer in 6 11; do

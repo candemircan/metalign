@@ -945,13 +945,14 @@ dependencies = [
     { name = "flash-attn", marker = "sys_platform == 'linux'" },
     { name = "h5py" },
     { name = "nnsight" },
+    { name = "open-clip-torch" },
     { name = "schedulefree" },
     { name = "scikit-learn" },
     { name = "seaborn" },
+    { name = "timm" },
     { name = "tomli-w" },
     { name = "torch" },
     { name = "torchvision" },
-    { name = "transformers" },
     { name = "vit-prisma" },
     { name = "wandb" },
 ]
@@ -973,6 +974,7 @@ requires-dist = [
     { name = "h5py" },
     { name = "ipykernel", marker = "extra == 'dev'" },
     { name = "nnsight" },
+    { name = "open-clip-torch" },
     { name = "pre-commit", marker = "extra == 'dev'" },
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "ruff", marker = "extra == 'dev'" },
@@ -980,10 +982,10 @@ requires-dist = [
     { name = "scikit-learn" },
     { name = "seaborn" },
     { name = "shiny", marker = "extra == 'dev'" },
+    { name = "timm" },
     { name = "tomli-w" },
     { name = "torch" },
     { name = "torchvision" },
-    { name = "transformers", git = "https://github.com/huggingface/transformers.git?rev=4912d5b490a39d621b9d6f1b80df446d99e6239a" },
     { name = "vit-prisma", git = "https://github.com/Prisma-Multimodal/ViT-Prisma.git?rev=97dd26fc01dfd856060c4a234b882c6f16836c15" },
     { name = "wandb" },
 ]
@@ -2222,8 +2224,8 @@ wheels = [
 
 [[package]]
 name = "transformers"
-version = "4.56.0.dev0"
-source = { git = "https://github.com/huggingface/transformers.git?rev=4912d5b490a39d621b9d6f1b80df446d99e6239a#4912d5b490a39d621b9d6f1b80df446d99e6239a" }
+version = "4.55.4"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "filelock" },
     { name = "huggingface-hub" },
@@ -2235,6 +2237,10 @@ dependencies = [
     { name = "safetensors" },
     { name = "tokenizers" },
     { name = "tqdm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/2b/43/3cb831d5f28cc723516e5bb43a8c6042aca3038bb36b6bd6016b40dfd1e8/transformers-4.55.4.tar.gz", hash = "sha256:574a30559bc273c7a4585599ff28ab6b676e96dc56ffd2025ecfce2fd0ab915d", size = 9573015, upload-time = "2025-08-22T15:18:43.192Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fa/0a/8791a6ee0529c45f669566969e99b75e2ab20eb0bfee8794ce295c18bdad/transformers-4.55.4-py3-none-any.whl", hash = "sha256:df28f3849665faba4af5106f0db4510323277c4bb595055340544f7e59d06458", size = 11269659, upload-time = "2025-08-22T15:18:40.025Z" },
 ]
 
 [[package]]
