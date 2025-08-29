@@ -2,8 +2,9 @@
 common datasets and processing utils  used throughout the project
 """
 
-__all__ = ["ImageDataset", "Things", "Coco", "h5_to_numpy", "image_transform", "FunctionDataset", "prepare_things_spose", "load_backbone_representations"]
+__all__ = ["ImageDataset", "Things", "Coco", "h5_to_numpy", "image_transform", "FunctionDataset", "prepare_things_spose", "load_backbone_representations", "Levels"]
 
+import io
 import pickle
 from pathlib import Path
 from typing import Sequence
@@ -182,7 +183,6 @@ class Coco(ImageDataset):
             self.transform = transform if transform is not None else image_transform()
 
         
-
 class Levels(Dataset):
     """
     This is an odd-one-out similarity dataset that uses a subset of the ImageNet dataset.
@@ -212,7 +212,9 @@ class Levels(Dataset):
         self.image_keys = []
         for item in filtered_ds:
             self.image_keys.append(item['__key__'])
-            image = item['jpg']
+            image_data = item['jpg']
+            image = Image.open(io.BytesIO(image_data['bytes'])) if isinstance(image_data, dict) else image_data
+            
             if self.processor:
                 self.images.append(image.convert('RGB'))
             else:
