@@ -119,8 +119,8 @@ class ImageDataset(Dataset):
         with Image.open(img_path) as image:
             image = image.convert('RGB')
             if self.processor is not None:
-                # Use processor (returns dict with tensors)
-                return self.processor(images=image, return_tensors="pt")
+                # return PIL image for external processing
+                return image
             else:
                 # Apply transforms and return tensor
                 return self.transform(image)
@@ -148,13 +148,12 @@ class Coco(ImageDataset):
             super().__init__(root=root / "train2017", glob_pattern="*.jpg", total_images=NUM_COCO_TRAIN_IMAGES, processor=processor, transform=transform)
         else:
             # For eval, manually set images from val and test directories
-            assert (processor is None) != (transform is None), "Must provide exactly one of processor or transform"
             val_images = sorted((root / "val2017").glob("*.jpg"))
             test_images = sorted((root / "test2017").glob("*.jpg"))
             self.images = val_images + test_images
-            self.processor = processor
-            self.transform = transform
-
+            # Manually call parent init after setting self.images
+            super(ImageDataset, self).__init__(root=root, glob_pattern="", total_images=None, processor=processor, transform=transform)
+            self.images = val_images + test_images 
         
 class Levels(ImageDataset):
     """
@@ -177,15 +176,8 @@ class Levels(ImageDataset):
         
         # find matching images in local imagenet directory
         imagenet_root = root / "imagenet"
-        train_root = imagenet_root / "train"
-        val_root = imagenet_root / "val"
-        
-        # collect all imagenet images from train and val directories
-        all_image_paths = []
-        if train_root.exists():
-            all_image_paths.extend(train_root.glob("*/*.JPEG"))
-        if val_root.exists():
-            all_image_paths.extend(val_root.glob("*.JPEG"))
+        train_root = imagenet_root / "train"    
+        all_image_paths = train_root.glob("*/*.JPEG")
         
         # filter to only include images that match our required image names
         self.images = []

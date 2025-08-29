@@ -62,9 +62,9 @@ def test_things_dataset_with_processor(things_root: Path):
     
     assert len(dataset) == 3
     
-    result = dataset[0]  # Should return dict from processor
-    assert isinstance(result, dict)
-    assert "pixel_values" in result
+    result = dataset[0]  # Should return PIL image when processor is provided
+    assert isinstance(result, Image.Image)
+    assert result.size == (100, 100)  # Original image size
 
 
 def test_things_dataset_with_custom_transform(things_root: Path):

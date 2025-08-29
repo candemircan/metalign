@@ -67,7 +67,7 @@ def _extract_and_save(
 @call_parse
 def main(
     dataset: str, # dataset to use, either "things" or "coco"
-    repo_id: str = "Prisma-Multimodal/sae-top_k-64-cls_only-layer_11-hook_resid_post", # the repo ID of the SAE model on Hugging Face Hub
+    repo_id: str, # the repo ID of the SAE model on Hugging Face Hub
     batch_size: int = 256, # the batch size to use for processing images
     force: bool = False, # if True, remove the existing h5 file and remake one
 ):

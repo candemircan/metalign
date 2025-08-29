@@ -8,7 +8,7 @@ import h5py
 import torch
 from fastcore.script import call_parse
 from tqdm import tqdm
-from transformers import AutoImageProcessor, AutoModel
+from transformers import AutoModel, AutoProcessor
 
 from metalign.data import Coco, Things
 
@@ -30,15 +30,14 @@ def _extract_and_save(model, processor, dataset, save_path, device, batch_size):
             batch_images.append(dataset[i])
         
         # Process the batch
-        inputs = processor(images=batch_images, return_tensors="pt")
-        inputs = {k: v.to(device) for k, v in inputs.items()}
+        inputs = processor(images=batch_images, return_tensors="pt").to(device)
         
-        with torch.no_grad():
-            outputs = model(**inputs)
-            if model.config.model_type == "siglip":
-                cls_tokens = outputs.pooler_output # last hidden state from siglip worked very poorly for the baseline so getting the output
-            else:
-                cls_tokens = outputs.last_hidden_state[:, 0]  # CLS token is first token
+        if model.config.model_type == "siglip":
+            cls_tokens = model.get_image_features(**inputs)
+        elif model.config.model_type == "dinov3_vit":
+            cls_tokens = model(**inputs).pooler_output
+        else:
+            cls_tokens = model(**inputs).last_hidden_state[:, 0]  # CLS token is first token, this is done for imagenet ViT at the moment
         all_cls_tokens.append(cls_tokens.cpu())
     
     cls_reps = torch.cat(all_cls_tokens, dim=0).numpy()
@@ -49,8 +48,8 @@ def _extract_and_save(model, processor, dataset, save_path, device, batch_size):
 @call_parse
 def main(
     dataset: str, # one of things or coco
-    repo_id: str = "facebook/dinov3-vitb16-pretrain-lvd1689m", # HuggingFace repo for the backbone model
-    batch_size: int = 64, # batch size for the backbone model, for feature extraction
+    repo_id: str,
+    batch_size: int = 512, # batch size for the backbone model, for feature extraction
     force: bool = False # if True, will extract features even if the file already exists. Otherwise, will skip if the file  exists.
 ):
     """
@@ -60,11 +59,8 @@ def main(
     The representations are saved as a numpy array in an h5 file with compression.
     """
     
-    device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
-
-    model = AutoModel.from_pretrained(repo_id).to(device)
-    processor = AutoImageProcessor.from_pretrained(repo_id)
-    if model.config.model_type == "siglip": model = model.vision_model
+    model = AutoModel.from_pretrained(repo_id, attn_implementation="sdpa", device_map="auto").eval()
+    processor = AutoProcessor.from_pretrained(repo_id)
     model.eval()
     
     # Extract model name from repo for file naming
@@ -78,7 +74,7 @@ def main(
             return
         
         ds = Things(processor=processor)
-        _extract_and_save(model, processor, ds, save_path, device, batch_size)
+        _extract_and_save(model, processor, ds, save_path, model.device, batch_size)
 
     elif dataset == "coco":
         # Handle train set
@@ -86,7 +82,7 @@ def main(
         save_path_train.parent.mkdir(parents=True, exist_ok=True)
         if not save_path_train.exists() or force:
             ds_train = Coco(train=True, processor=processor)
-            _extract_and_save(model, processor, ds_train, save_path_train, device, batch_size)
+            _extract_and_save(model, processor, ds_train, save_path_train, model.device, batch_size)
         else:
             print(f"File {save_path_train} already exists. Use --force to overwrite.")
 
@@ -95,7 +91,7 @@ def main(
         save_path_eval.parent.mkdir(parents=True, exist_ok=True)
         if not save_path_eval.exists() or force:
             ds_eval = Coco(train=False, processor=processor)
-            _extract_and_save(model, processor, ds_eval, save_path_eval, device, batch_size)
+            _extract_and_save(model, processor, ds_eval, save_path_eval, model.device, batch_size)
         else:
             print(f"File {save_path_eval} already exists. Use --force to overwrite.")
     else:
