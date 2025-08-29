@@ -59,6 +59,8 @@ def main(
 ):
     """
     train a meta-learning transformer model over function learning tasks.
+
+    the defaults here are not what's used for training. see data/base_config.toml along with bin/generate_configs.py for that.
     """
 
     args = locals()

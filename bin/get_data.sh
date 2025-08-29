@@ -32,6 +32,7 @@ if [ ! -d "data/external/THINGS_odd_one_out" ]; then
     unzip data/external/THINGS_odd_one_out.zip -d data/external/
     mv data/external/triplet_dataset data/external/THINGS_odd_one_out
     rm data/external/THINGS_odd_one_out.zip
+    rm data/external/THINGS_odd_one_out/*txt # we need just the csv
 fi
 
 # things category learning

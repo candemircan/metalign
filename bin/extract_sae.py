@@ -2,7 +2,6 @@ import os
 
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"  # needed for aten::_upsample_bicubic2d_aa.out with the mps backend
 
-import warnings
 from pathlib import Path
 
 import h5py
@@ -17,7 +16,6 @@ from vit_prisma.transforms import get_clip_val_transforms
 
 from metalign.data import Coco, Things
 
-warnings.filterwarnings("ignore", module="kaleido") # idk what this is, but it is annoying
 _ = torch.set_grad_enabled(False) 
 
 def _extract_and_save(

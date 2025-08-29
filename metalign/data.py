@@ -4,12 +4,14 @@ common datasets and processing utils  used throughout the project
 
 __all__ = ["ImageDataset", "Things", "Coco", "h5_to_numpy", "image_transform", "FunctionDataset", "prepare_things_spose", "load_backbone_representations"]
 
+import pickle
 from pathlib import Path
 from typing import Sequence
 
 import h5py
 import numpy as np
 import torch
+from datasets import load_dataset
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
@@ -178,6 +180,52 @@ class Coco(ImageDataset):
             self.images = val_images + test_images
             self.processor = processor
             self.transform = transform if transform is not None else image_transform()
+
+        
+
+class Levels(Dataset):
+    """
+    This is an odd-one-out similarity dataset that uses a subset of the ImageNet dataset.
+    The class will identify the relevant images from data/external/levels.pkl and load them from the hf dataset timm/imagenet-1k-wds.
+    """
+
+    def __init__(self, root: Path = Path("data/external"), processor=None, transform=None):
+        with open(root / "levels.pkl", "rb") as f:
+            levels = pickle.load(f)
+        
+        image_names = []
+        for values in levels.values():
+            for trial in values:
+                image_names.append(trial["image1Path"])
+                image_names.append(trial["image2Path"])
+                image_names.append(trial["image3Path"])
+
+        unique_image_names = {img.split(".")[0] for img in image_names}
+        
+        ds = load_dataset("timm/imagenet-1k-wds", split="train", streaming=True)
+        filtered_ds = ds.filter(lambda x: x['__key__'] in unique_image_names)
+
+        self.processor = processor
+        self.transform = transform if transform is not None else image_transform()
+        
+        self.images = []
+        self.image_keys = []
+        for item in filtered_ds:
+            self.image_keys.append(item['__key__'])
+            image = item['jpg']
+            if self.processor:
+                self.images.append(image.convert('RGB'))
+            else:
+                self.images.append(self.transform(image))
+        
+        # sort images and keys together based on keys to ensure consistent ordering
+        sorted_pairs = sorted(zip(self.image_keys, self.images))
+        self.image_keys, self.images = [list(t) for t in zip(*sorted_pairs)]
+
+    def __len__(self): return len(self.images)
+
+    def __getitem__(self, idx): return self.images[idx]
+
 
 
 class FunctionDataset(Dataset):
