@@ -139,6 +139,7 @@ class Coco(ImageDataset):
             super().__init__(root=root / "train2017", glob_pattern="*.jpg", total_images=NUM_COCO_TRAIN_IMAGES, transform=transform)
         else:
             # for eval, manually set images from val and test directories
+            self.transform = transform
             val_images = sorted((root / "val2017").glob("*.jpg"))
             test_images = sorted((root / "test2017").glob("*.jpg"))
             self.images = val_images + test_images
