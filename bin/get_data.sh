@@ -42,6 +42,11 @@ if [ ! -f "data/external/category_learning.csv" ]; then
     wget -O data/external/category_learning.csv https://osf.io/rsd46/download
 fi
 
+# things reward learning
+if [ ! -f "data/external/reward_learning.csv" ]; then
+    wget -O data/external/reward_learning.csv https://osf.io/6exjm/download
+fi
+
 ## COCO ##
 
 # coco images

@@ -5,7 +5,7 @@ axes.spines.top: False
 
 # Color palette configuration
 image.lut: 256
-axes.prop_cycle: cycler("color", ["#AF3029", "#BC5215", "#AD8301" , "#66800B", "#24837B", "#205EA6", "#5E409D", "#A02F6F"])
+axes.prop_cycle: cycler("color", ["#AF3029",  "#5E409D", "#BC5215", "#AD8301" , "#66800B", "#24837B", "#205EA6", "#A02F6F"])
 
 # Retina figures configuration
 figure.dpi: 300

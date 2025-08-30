@@ -54,7 +54,7 @@ def main(
     
 
     df = pd.read_table("data/external/THINGS_triplets.csv")
-    backbone_reps, _ = prepare_things_spose(load_backbone_representations(things_reps))
+    backbone_reps, ceiling_model = prepare_things_spose(load_backbone_representations(things_reps))
 
     ckpt = torch.load(ckpt, weights_only=False)
     config, state_dict = ckpt['config'], ckpt['state_dict']
@@ -69,6 +69,7 @@ def main(
     
     og_acc = _calculate_accuracy(backbone_reps, X, y, batch_size=batch_size)
     metalign_acc = _calculate_accuracy(metaligned_reps, X, y, batch_size=batch_size)
+    ceiling_acc = _calculate_accuracy(ceiling_model, X, y, batch_size=batch_size)
 
     eval_path = Path("data/evals/thingso1o")
     eval_path.mkdir(parents=True, exist_ok=True)
@@ -78,7 +79,8 @@ def main(
         "model_name": backbone_name,
         "checkpoint_name": file_name,
         "base_model_accuracy": og_acc,
-        "metalign_accuracy": metalign_acc
+        "metalign_accuracy": metalign_acc,
+        "ceiling_accuracy": ceiling_acc
     }
     with open(eval_file, "w") as f: json.dump(eval_data, f, indent=4)
     print(f"Base model accuracy: {og_acc:.4f}")

@@ -45,6 +45,7 @@ For setup, you need to do the following things:
 #### Learning
 
 - [x] our category learning task
+- [x] our reward learning task
 
 #### fMRI
 

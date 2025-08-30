@@ -1,0 +1,85 @@
+import json
+from glob import glob
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import torch
+from fastcore.script import call_parse
+from tqdm import tqdm
+
+from metalign.cognitive_model import RewardLearner
+from metalign.data import load_backbone_representations
+from metalign.model import Transformer
+
+_ = torch.set_grad_enabled(False)
+
+@call_parse
+def main(
+    experiment_name: str, # has to be one of main, raw, midsae
+    backbone_name: str, # has to be one of vit, clip, siglip2, dinov2
+):
+    """
+    Compare metalign to baselines with linear probes in how aligned they are with human reward learning
+    """
+    
+    best_models = json.load(open(Path("data/checkpoints") / "best_models.json"))
+    backbone_dict = json.load(open(Path("data/backbone_reps") / "backbones.json"))
+    ckpt = best_models[f"[{experiment_name.upper()}]"][backbone_name]
+    things_reps = f"data/backbone_reps/things_{backbone_dict[backbone_name]}.h5"
+
+    ckpt = torch.load(ckpt,  weights_only=False)
+    config, state_dict = ckpt['config'], ckpt['state_dict']
+    model = Transformer(config=config)
+    model.load_state_dict(state_dict)
+    model.eval()
+
+    human_data = pd.read_csv("data/external/reward_learning.csv")
+    backbone_reps = load_backbone_representations(things_reps)
+    metalign_reps = (torch.cat([torch.zeros(backbone_reps.shape[0], 2), torch.from_numpy(backbone_reps)], dim=1) @ model.embedding.weight.T + model.embedding.bias).numpy()
+
+    imgs = sorted(glob("data/external/THINGS/*/*jpg"))
+    metalign_accuracies, base_accuracies = [], []
+
+
+
+    for participant in tqdm(human_data.participant.unique()):
+        participant_data = human_data[human_data.participant == participant]
+        left_images = participant_data["left_image"].tolist()
+        left_images = [f"data/external/THINGS/{image.split("stimuli/")[-1]}" for image in left_images]  # Extract the file names
+        right_images = participant_data["right_image"].tolist()
+        right_images = [f"data/external/THINGS/{image.split("stimuli/")[-1]}" for image in right_images]  # Extract the file names
+        left_img_locs = [imgs.index(image) for image in left_images]
+        right_img_locs = [imgs.index(image) for image in right_images]
+
+        # X should be observations x (left, right) x features
+        X = np.array([[backbone_reps[left], backbone_reps[right]] for left, right in zip(left_img_locs, right_img_locs)])
+        # y should be observations by (left, right) where entries are rewards (continuous)
+        y = participant_data[["left_reward", "right_reward"]].values
+        participant_choices = participant_data["choice"].values
+
+        # base   
+        learner = RewardLearner()
+        learner.fit(X, y)
+        model_preds = np.argmax(learner.values, axis=1)
+        acc = np.mean(participant_choices == model_preds)
+        print(f"Participant {participant} base accuracy: {acc}")
+        base_accuracies.append(acc)
+
+        X = np.array([[metalign_reps[left], metalign_reps[right]] for left, right in zip(left_img_locs, right_img_locs)])
+        learner = RewardLearner()
+        learner.fit(X, y)
+        model_preds = np.argmax(learner.values, axis=1)
+        acc = np.mean(participant_choices == model_preds)
+        print(f"Participant {participant} metalign accuracy: {acc}")
+        metalign_accuracies.append(acc)
+
+
+    result_df = pd.DataFrame({"participant": human_data.participant.unique(),"metalign_accuracy": metalign_accuracies,  "base_accuracy": base_accuracies})
+    eval_path = Path("data/evals/rewardlearning")
+    eval_path.mkdir(parents=True, exist_ok=True)
+    file_name = f"{experiment_name}_{backbone_name}"
+    eval_file = eval_path / f"{file_name}.csv"
+    result_df.to_csv(eval_file, index=False)
+    print(f"Average metalign accuracy: {np.mean(metalign_accuracies)}")
+    print(f"Average base accuracy: {np.mean(base_accuracies)}")
