@@ -71,6 +71,13 @@ if [ ! -d "data/external/coco/test2017" ]; then
     rm data/external/coco_test.zip
 fi
 
+## Nights ##
+if [ ! -d "data/external/nights" ]; then
+    wget -O data/external/nights.zip https://data.csail.mit.edu/nights/nights.zip
+    unzip data/external/nights.zip -d data/external/
+    rm data/external/nights.zip
+fi
+
 ## Levels ##
 if [ ! -f "data/external/levels.pkl" ]; then
     wget -O data/external/levels.pkl https://gin.g-node.org/fborn/Dataset_Levels/raw/master/processed_data/pruned_dataset.pkl
@@ -82,9 +89,3 @@ if [ ! -d "data/external/imagenet" ]; then
     cd data/external
     wget -qO- https://raw.githubusercontent.com/pytorch/examples/main/imagenet/extract_ILSVRC.sh | bash
 fi
-
-## Nights ##
-wget -O nights.zip https://data.csail.mit.edu/nights/nights.zip
-
-unzip nights.zip
-rm nights.zip

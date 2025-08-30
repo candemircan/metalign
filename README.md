@@ -40,7 +40,8 @@ For setup, you need to do the following things:
 #### Similarity
 
 - [x] odd-one-out judgements on THINGS 
-- [ ] odd-one-out judgements on Levels (Imagenet)
+- [x] odd-one-out judgements on Levels (Imagenet)
+- [ ] 2 AFC on NIGHTS 
 
 #### Learning
 
