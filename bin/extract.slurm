@@ -14,8 +14,10 @@ for data in levels coco things; do
     done
 done
 
-for layer in 6 11; do
-    srun --exclusive -n 1 --gres=gpu:1  --cpus-per-task=4 uv run bin/extract_sae.py coco Prisma-Multimodal/sae-top_k-64-cls_only-layer_${layer}-hook_resid_post &
+for data in levels coco things; do
+    for layer in 6 11; do
+        srun --exclusive -n 1 --gres=gpu:1  --cpus-per-task=4 uv run bin/extract_sae.py $data Prisma-Multimodal/sae-top_k-64-cls_only-layer_${layer}-hook_resid_post &
+    done
 done
 
 wait
