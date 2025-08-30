@@ -75,7 +75,7 @@ def main(output_dir: Path = Path("data/configs"), base_config_path: Path = Path(
             config["tags"] = setup_params["tags"]
             
 
-            file_path = output_dir / f"{setup_params['prefix']}{i}.toml"
+            file_path = output_dir / f"{setup_params['prefix']}_{short_model_name}_{i}.toml"
             with open(file_path, "wb") as f:
                 tomli_w.dump(config, f)
 
