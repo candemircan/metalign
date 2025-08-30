@@ -72,8 +72,8 @@ def main(
     force: bool = False, # if True, remove the existing h5 file and remake one
 ):
     
-    if dataset not in ["things", "coco"]:
-        raise ValueError("Dataset must be either 'things' or 'coco'.")
+    if dataset not in ["things", "coco", "levels"]:
+        raise ValueError("Dataset must be either 'things', 'coco', or 'levels'.")
     
     sae_dir_path = Path("data/sae")
     sae_dir_path.mkdir(parents=True, exist_ok=True)
@@ -124,6 +124,3 @@ def main(
         sae_file_path_eval = sae_dir_path / f"coco_eval_{repo_id_suffix}.h5"
         raw_file_path_eval = raw_dir_path / f"coco_eval_{save_model_name}_raw.h5"
         _extract_and_save(model, sae, dataloader_eval, sae_file_path_eval, raw_file_path_eval, device, force)
-
-    else:
-        raise ValueError("Dataset must be either 'things', 'coco', or 'levels'.")
