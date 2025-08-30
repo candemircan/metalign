@@ -9,7 +9,7 @@
 module load CUDA/12
 
 for data in coco things; do
-    for model in timm/vit_base_patch14_reg4_dinov2.lvd142m timm/ViT-B-16-SigLIP2-512 timm/vit_base_patch16_224; do
+    for model in timm/vit_base_patch14_reg4_dinov2.lvd142m timm/ViT-B-16-SigLIP2-512 timm/vit_base_patch16_224.augreg_in21k; do
         srun --exclusive -n 1 --gres=gpu:1  --cpus-per-task=4 uv run bin/extract_backbone.py $data $model &
     done
 done
