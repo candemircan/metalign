@@ -16,7 +16,7 @@ def main(output_dir: Path = Path("data/configs"), base_config_path: Path = Path(
 
     param_grid = {
         "lr": [2.5e-4, 5e-4, 1e-3],
-        "model_name": ["vit-base-patch16-224", "CLIP-ViT-B-32-DataComp.XL-s13B-b90K_sae-top_k-64-cls_only-layer_11-hook_resid_post_raw",  "vit_base_patch14_reg4_dinov2.lvd142m", "ViT-B-16-SigLIP2-512"]
+        "model_name": ["webssl-mae300m-full2b-224", "vit-base-patch16-224", "CLIP-ViT-B-32-DataComp.XL-s13B-b90K_sae-top_k-64-cls_only-layer_11-hook_resid_post_raw",  "vit_base_patch14_reg4_dinov2.lvd142m", "ViT-B-16-SigLIP2-512"]
     }
 
     keys, values = zip(*param_grid.items())
@@ -60,6 +60,8 @@ def main(output_dir: Path = Path("data/configs"), base_config_path: Path = Path(
                 short_model_name = "dinov2"
             elif "clip" in config["model_name"].lower():
                 short_model_name = "clip"
+            elif "mae" in config["model_name"].lower():
+                short_model_name = "mae"
             elif "vit" in config["model_name"].lower(): # this is hacky, but vit has to come first. bc other models have vit in their names too
                 short_model_name = "vit"
             else:
