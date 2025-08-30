@@ -73,6 +73,7 @@ def main(output_dir: Path = Path("data/configs"), base_config_path: Path = Path(
             config["train_features"] = setup_params["train_features"]
             config["eval_features"] = setup_params["eval_features"]
             config["tags"] = setup_params["tags"]
+            config["hidden_size"] = config["hidden_size"] if short_model_name != "mae" else 1024
 
             file_path = output_dir / f"{setup_params['prefix']}{i}.toml"
             with open(file_path, "wb") as f:
