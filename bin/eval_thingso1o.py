@@ -1,5 +1,4 @@
 import json
-from glob import glob
 from pathlib import Path
 
 import pandas as pd
@@ -40,21 +39,24 @@ def _calculate_accuracy(reps, X, y, batch_size=2048):
 
 @call_parse
 def main(
-    checkpoint_name: str, # path to model checkpoint file
+    experiment_name: str, # has to be one of main, raw, midsae
+    backbone_name: str, # has to be one of vit, clip, siglip2, dinov2
     batch_size: int = 2048 # batch size for evaluation
 ):
     """
     Evaluate 0-shot accuracy on THINGS odd-one-out task of the base model and the given checkpoint
     """
     
-    checkpoint_path = Path("data/checkpoints") / checkpoint_name
-    model_name = checkpoint_name.split("_")[1]
-    things_reps = glob(f"data/backbone_reps/things_{model_name}*.h5")[0]
+    best_models = json.load(open(Path("data/checkpoints") / "best_models.json"))
+    backbone_dict = json.load(open(Path("data/backbone_reps") / "backbones.json"))
+    ckpt = best_models[f"[{experiment_name.upper()}]"][backbone_name]
+    things_reps = f"data/backbone_reps/things_{backbone_dict[backbone_name]}.h5"
+    
 
     df = pd.read_table("data/external/THINGS_triplets.csv")
     backbone_reps, _ = prepare_things_spose(load_backbone_representations(things_reps))
 
-    ckpt = torch.load(checkpoint_path / "model.pt", weights_only=False)
+    ckpt = torch.load(ckpt, weights_only=False)
     config, state_dict = ckpt['config'], ckpt['state_dict']
     model = Transformer(config=config)
     model.load_state_dict(state_dict)
@@ -70,10 +72,11 @@ def main(
 
     eval_path = Path("data/evals/things010")
     eval_path.mkdir(parents=True, exist_ok=True)
-    eval_file = eval_path / f"{checkpoint_name}.json"
+    file_name = f"{experiment_name}_{backbone_name}"
+    eval_file = eval_path / f"{file_name}.json"
     eval_data = {
-        "model_name": model_name,
-        "checkpoint_name": checkpoint_name,
+        "model_name": backbone_name,
+        "checkpoint_name": file_name,
         "base_model_accuracy": og_acc,
         "metalign_accuracy": metalign_acc
     }

@@ -1,4 +1,5 @@
 import itertools
+import json
 import tomllib
 from pathlib import Path
 
@@ -22,6 +23,9 @@ def main(output_dir: Path = Path("data/configs"), base_config_path: Path = Path(
     permutations = [dict(zip(keys, v)) for v in itertools.product(*values)]
 
     output_dir.mkdir(parents=True, exist_ok=True)
+    backbone_json = {}
+    backbone_dir = Path("data/backbone_reps")
+    backbone_dir.mkdir(parents=True, exist_ok=True)
 
     experiment_setups = {
         "MAIN" : {
@@ -50,14 +54,14 @@ def main(output_dir: Path = Path("data/configs"), base_config_path: Path = Path(
         for i, params in enumerate(permutations):
             config = base_config.copy()
             config.update(params) 
-            if "siglip" in config["model_name"].lower():
+            if "siglip2" in config["model_name"].lower():
                 short_model_name = "siglip2"
-            elif "dino" in config["model_name"].lower():
+            elif "dinov2" in config["model_name"].lower():
                 short_model_name = "dinov2"
-            elif "sbb" in config["model_name"].lower():
-                short_model_name = "vit"
             elif "clip" in config["model_name"].lower():
                 short_model_name = "clip"
+            elif "vit" in config["model_name"].lower(): # this is hacky, but vit has to come first. bc other models have vit in their names too
+                short_model_name = "vit"
             else:
                 raise ValueError(f"Unknown model name {config['model_name']}")         
             lr_str = f"{config['lr']:.0e}".replace("-0", "-")
@@ -71,3 +75,8 @@ def main(output_dir: Path = Path("data/configs"), base_config_path: Path = Path(
             file_path = output_dir / f"{setup_params['prefix']}{i}.toml"
             with open(file_path, "wb") as f:
                 tomli_w.dump(config, f)
+
+            backbone_json[short_model_name] = config["model_name"]
+
+    with open(backbone_dir / "backbones.json", "w") as f:
+        json.dump(backbone_json, f, indent=4)
