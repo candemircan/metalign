@@ -63,15 +63,14 @@ def main(
         learner.fit(X, y)
         model_preds = np.argmax(learner.values, axis=1)
         acc = np.mean(participant_choices == model_preds)
-        print(f"Participant {participant} base accuracy: {acc}")
         base_accuracies.append(acc)
 
+        # metalign
         X = np.array([[metalign_reps[left], metalign_reps[right]] for left, right in zip(left_img_locs, right_img_locs)])
         learner = RewardLearner()
         learner.fit(X, y)
         model_preds = np.argmax(learner.values, axis=1)
         acc = np.mean(participant_choices == model_preds)
-        print(f"Participant {participant} metalign accuracy: {acc}")
         metalign_accuracies.append(acc)
 
 

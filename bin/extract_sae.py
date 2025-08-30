@@ -14,7 +14,7 @@ from vit_prisma.models.model_loader import load_hooked_model
 from vit_prisma.sae import SparseAutoencoder
 from vit_prisma.transforms import get_clip_val_transforms
 
-from metalign.data import Coco, Things
+from metalign.data import Coco, Levels, Things
 
 _ = torch.set_grad_enabled(False) 
 
@@ -66,7 +66,7 @@ def _extract_and_save(
 
 @call_parse
 def main(
-    dataset: str, # dataset to use, either "things" or "coco"
+    dataset: str, # dataset to use, "things", "coco", or "levels"
     repo_id: str, # the repo ID of the SAE model on Hugging Face Hub
     batch_size: int = 256, # the batch size to use for processing images
     force: bool = False, # if True, remove the existing h5 file and remake one
@@ -99,6 +99,15 @@ def main(
         sae_file_path = sae_dir_path / f"things_{repo_id_suffix}.h5"
         raw_file_path = raw_dir_path / f"things_{save_model_name}_raw.h5"
         _extract_and_save(model, sae, dataloader, sae_file_path, raw_file_path, device, force)
+
+    elif dataset == "levels":
+        clip_transforms = get_clip_val_transforms()
+        ds = Levels(transform=clip_transforms)
+        dataloader = DataLoader(ds, batch_size=batch_size, shuffle=False, num_workers=4)
+        sae_file_path = sae_dir_path / f"levels_{repo_id_suffix}.h5"
+        raw_file_path = raw_dir_path / f"levels_{save_model_name}_raw.h5"
+        _extract_and_save(model, sae, dataloader, sae_file_path, raw_file_path, device, force)
+
     
     elif dataset == "coco":
         clip_transforms = get_clip_val_transforms()
@@ -115,3 +124,6 @@ def main(
         sae_file_path_eval = sae_dir_path / f"coco_eval_{repo_id_suffix}.h5"
         raw_file_path_eval = raw_dir_path / f"coco_eval_{save_model_name}_raw.h5"
         _extract_and_save(model, sae, dataloader_eval, sae_file_path_eval, raw_file_path_eval, device, force)
+
+    else:
+        raise ValueError("Dataset must be either 'things', 'coco', or 'levels'.")
