@@ -2,14 +2,13 @@
 common datasets and processing utils  used throughout the project
 """
 
-__all__ = ["ImageDataset", "Things", "Coco", "h5_to_numpy", "FunctionDataset", "prepare_things_spose", "load_backbone_representations", "Levels", "prepare_levels_data", "Nights"]
+__all__ = ["ImageDataset", "Things", "Coco", "h5_to_numpy", "FunctionDataset", "prepare_things_spose", "load_backbone_representations", "Levels", "prepare_levels_data"]
 
 import pickle
 from pathlib import Path
 
 import h5py
 import numpy as np
-import pandas as pd
 import torch
 from PIL import Image
 from torch.utils.data import Dataset
@@ -143,26 +142,6 @@ class Coco(ImageDataset):
             val_images = sorted((root / "val2017").glob("*.jpg"))
             test_images = sorted((root / "test2017").glob("*.jpg"))
             self.images = val_images + test_images
-
-class Nights(ImageDataset):
-    """
-    The NIGHTS dataset, which contains a 2 AFC task of perceptual similarity.
-    """
-
-    def __init__(self, root: Path = Path("data/external/nights"), transform=None):
-        df = pd.read_csv(root / "data.csv")
-        self.images = sorted(list(set(df['ref_path'].tolist() + df['left_path'].tolist() + df['right_path'].tolist())))
-        self.images = [root / Path(img_path) for img_path in self.images]
-        self.transform = transform
-
-    def __len__(self): return len(self.images)
-
-    def __getitem__(self, idx):
-        img_path = self.images[idx]
-        with Image.open(img_path) as image:
-            image = image.convert('RGB')
-            if self.transform is not None: return self.transform(image)
-            return image
 
 class Levels(ImageDataset):
     """

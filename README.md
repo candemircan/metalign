@@ -41,7 +41,6 @@ For setup, you need to do the following things:
 
 - [x] odd-one-out judgements on THINGS 
 - [x] odd-one-out judgements on Levels (Imagenet)
-- [ ] 2 AFC on NIGHTS 
 
 #### Learning
 

@@ -12,7 +12,7 @@ from fastcore.script import call_parse
 from tqdm import tqdm
 from transformers import AutoModel, AutoProcessor
 
-from metalign.data import Coco, Levels, Nights, Things
+from metalign.data import Coco, Levels, Things
 
 _ = torch.set_grad_enabled(False)
 
@@ -106,7 +106,7 @@ def _extract_and_save(model, dataset, save_path, device, batch_size, model_type,
 
 @call_parse
 def main(
-    dataset: str, # one of things, coco, levels, or nights
+    dataset: str, # one of things, coco, levels
     repo_id: str,
     batch_size: int = 512, # batch size for the backbone model, for feature extraction
     force: bool = False # if True, will extract features even if the file already exists. Otherwise, will skip if the file  exists.
@@ -177,20 +177,6 @@ def main(
         else:
             ds = Levels(transform=transform_or_processor)
             _extract_and_save(model, ds, save_path, device, batch_size, model_type)
-    
-    elif dataset == "nights":
-        save_path = Path("data/backbone_reps") / f"nights_{model_name}.h5"
-        save_path.parent.mkdir(parents=True, exist_ok=True)
-        if save_path.exists() and not force:
-            print(f"File {save_path} already exists. Use --force to overwrite.")
-            return
-        
-        if model_type == "transformers":
-            ds = Nights(transform=None)  # No preprocessing for transformers
-            _extract_and_save(model, ds, save_path, device, batch_size, model_type, processor=transform_or_processor)
-        else:
-            ds = Nights(transform=transform_or_processor)
-            _extract_and_save(model, ds, save_path, device, batch_size, model_type)
 
     else:
-        raise ValueError(f"Unknown dataset: {dataset}. Must be 'things', 'coco', 'levels', or 'nights'.")
+        raise ValueError(f"Unknown dataset: {dataset}. Must be 'things', 'coco', or 'levels'.")

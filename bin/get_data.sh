@@ -71,13 +71,6 @@ if [ ! -d "data/external/coco/test2017" ]; then
     rm data/external/coco_test.zip
 fi
 
-## Nights ##
-if [ ! -d "data/external/nights" ]; then
-    wget -O data/external/nights.zip https://data.csail.mit.edu/nights/nights.zip
-    unzip data/external/nights.zip -d data/external/
-    rm data/external/nights.zip
-fi
-
 ## Levels ##
 if [ ! -f "data/external/levels.pkl" ]; then
     wget -O data/external/levels.pkl https://gin.g-node.org/fborn/Dataset_Levels/raw/master/processed_data/pruned_dataset.pkl
