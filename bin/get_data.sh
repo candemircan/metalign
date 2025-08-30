@@ -82,3 +82,9 @@ if [ ! -d "data/external/imagenet" ]; then
     cd data/external
     wget -qO- https://raw.githubusercontent.com/pytorch/examples/main/imagenet/extract_ILSVRC.sh | bash
 fi
+
+## Nights ##
+wget -O nights.zip https://data.csail.mit.edu/nights/nights.zip
+
+unzip nights.zip
+rm nights.zip
