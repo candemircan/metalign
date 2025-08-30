@@ -70,7 +70,7 @@ def main(
     og_acc = _calculate_accuracy(backbone_reps, X, y, batch_size=batch_size)
     metalign_acc = _calculate_accuracy(metaligned_reps, X, y, batch_size=batch_size)
 
-    eval_path = Path("data/evals/things010")
+    eval_path = Path("data/evals/thingso1o")
     eval_path.mkdir(parents=True, exist_ok=True)
     file_name = f"{experiment_name}_{backbone_name}"
     eval_file = eval_path / f"{file_name}.json"

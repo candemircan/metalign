@@ -171,15 +171,13 @@ class Levels(ImageDataset):
         self.images = []
         self.image_keys = []
         for img_path in all_image_paths:
-            img_key = img_path.stem.split("_")[0]  # extract the key part (e.g., "n01440764" from "n01440764_18.JPEG")
-            if img_key in unique_image_names:
+            if img_path.stem in unique_image_names:
                 self.images.append(img_path)
-                self.image_keys.append(img_key)
+                self.image_keys.append(str(img_path).split("/")[-1])
         
         # sort images and keys together based on keys to ensure consistent ordering
         sorted_pairs = sorted(zip(self.image_keys, self.images))
         self.image_keys, self.images = [list(t) for t in zip(*sorted_pairs)]
-        
         self.transform = transform
 
     def __len__(self): return len(self.images)

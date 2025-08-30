@@ -24,10 +24,8 @@ def _calculate_accuracy(reps, trials, batch_size=2048):
             selected_idx = trial['selected']
             trial_type = trial['triplet_type']
             
-            # get representations for the three images
             trial_reps = reps[img_indices]
             
-            # calculate pairwise similarities (same logic as THINGS)
             i_reps, j_reps, k_reps = trial_reps[0:1], trial_reps[1:2], trial_reps[2:3]
             
             sim_ij = F.cosine_similarity(i_reps, j_reps)
@@ -41,7 +39,6 @@ def _calculate_accuracy(reps, trials, batch_size=2048):
             
             is_correct = predicted_odd == selected_idx
             
-            # update overall counts
             if is_correct: num_correct += 1
             num_total += 1
             
@@ -102,4 +99,3 @@ def main(
     print(f"Metalign accuracy: {metalign_acc:.4f}")
     print(f"Base model by type: {og_type_accs}")
     print(f"Metalign by type: {metalign_type_accs}")
-    print(f"Number of trials: {len(trials)}")
