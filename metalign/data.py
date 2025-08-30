@@ -116,7 +116,6 @@ class ImageDataset(Dataset):
             if self.transform is not None: return self.transform(image)
             return image
 
-
 class Things(ImageDataset):
     """
     A dataset for the THINGS dataset, which contains images of objects.

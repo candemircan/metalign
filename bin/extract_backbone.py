@@ -10,6 +10,7 @@ import timm
 import torch
 from fastcore.script import call_parse
 from tqdm import tqdm
+from transformers import AutoModel, AutoProcessor
 
 from metalign.data import Coco, Things
 
@@ -19,7 +20,7 @@ _ = torch.set_grad_enabled(False)
 def _get_model_and_transform(repo_id: str, device: str):
     """Load model and get appropriate transform based on repo_id format."""
     
-    if "siglip" in repo_id.lower() and repo_id.startswith("timm/"):
+    if repo_id.startswith("timm/") and "siglip" in repo_id.lower():
         # SigLIP models via open_clip (even though they have timm/ prefix)
         model_name = f"hf-hub:{repo_id}"
         model, preprocess = open_clip.create_model_from_pretrained(model_name)
@@ -34,6 +35,11 @@ def _get_model_and_transform(repo_id: str, device: str):
         transform = timm.data.create_transform(**data_config, is_training=False)
         return model, transform, "timm"
     
+    elif "/" in repo_id:
+        model = AutoModel.from_pretrained(repo_id).to(device).eval()
+        processor = AutoProcessor.from_pretrained(repo_id)
+        return model, processor, "transformers"
+    
     else:
         # Assume open_clip format for non-timm models
         model, preprocess = open_clip.create_model_from_pretrained(repo_id)
@@ -46,10 +52,13 @@ def _extract_features(model, inputs, model_type: str):
     
     if model_type == "timm": return model(inputs)  # CLS token features
     elif model_type == "open_clip": return model.encode_image(inputs)
+    elif model_type == "transformers": 
+        outputs = model(pixel_values=inputs)
+        return outputs.last_hidden_state[:, 0]  # CLS token from last hidden state
     else: raise ValueError(f"Unknown model type: {model_type}")
 
 
-def _extract_and_save(model, dataset, save_path, device, batch_size, model_type):
+def _extract_and_save(model, dataset, save_path, device, batch_size, model_type, processor=None):
     """Helper function to extract features and save them."""
     all_features = []
     num_batches = (len(dataset) + batch_size - 1) // batch_size
@@ -57,12 +66,16 @@ def _extract_and_save(model, dataset, save_path, device, batch_size, model_type)
     for batch_idx in tqdm(range(num_batches), desc=f"Extracting to {save_path}"):
         start_idx = batch_idx * batch_size
         end_idx = min(start_idx + batch_size, len(dataset))
-        
-        # Collect batch of tensors - dataset returns tensors
-        batch_tensors = []
+        # For transformers models, we need to process PIL images with the processor
+        batch_images = []
         for i in range(start_idx, end_idx):
-            batch_tensors.append(dataset[i])
-        inputs = torch.stack(batch_tensors).to(device)
+            batch_images.append(dataset[i])
+        
+        if model_type == "transformers" and processor is not None:
+            processed = processor(images=batch_images, return_tensors="pt")
+            inputs = processed["pixel_values"].to(device)
+        else:
+            inputs = torch.stack(batch_images).to(device)
         
         features = _extract_features(model, inputs, model_type)
         all_features.append(features.cpu())
@@ -80,14 +93,14 @@ def main(
     force: bool = False # if True, will extract features even if the file already exists. Otherwise, will skip if the file  exists.
 ):
     """
-    extract features from a model (timm or open_clip).
+    extract features from a model (timm, open_clip, or transformers).
     The representations are saved in `data/backbone_reps/{dataset}_{model_name}.h5` file.
     For the COCO dataset, it creates separate files for train and evaluation sets.
     The representations are saved as a numpy array in an h5 file with compression.
     """
     
     device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
-    model, transform, model_type = _get_model_and_transform(repo_id, device)
+    model, transform_or_processor, model_type = _get_model_and_transform(repo_id, device)
     
     # Extract model name from repo for file naming
     model_name = repo_id.split('/')[-1]
@@ -99,16 +112,24 @@ def main(
             print(f"File {save_path} already exists. Use --force to overwrite.")
             return
         
-        ds = Things(transform=transform)
-        _extract_and_save(model, ds, save_path, device, batch_size, model_type)
+        if model_type == "transformers":
+            ds = Things(transform=None)  # No preprocessing for transformers
+            _extract_and_save(model, ds, save_path, device, batch_size, model_type, processor=transform_or_processor)
+        else:
+            ds = Things(transform=transform_or_processor)
+            _extract_and_save(model, ds, save_path, device, batch_size, model_type)
 
     elif dataset == "coco":
         # Handle train set
         save_path_train = Path("data/backbone_reps") / f"coco_train_{model_name}.h5"
         save_path_train.parent.mkdir(parents=True, exist_ok=True)
         if not save_path_train.exists() or force:
-            ds_train = Coco(train=True, transform=transform)
-            _extract_and_save(model, ds_train, save_path_train, device, batch_size, model_type)
+            if model_type == "transformers":
+                ds_train = Coco(train=True, transform=None)
+                _extract_and_save(model, ds_train, save_path_train, device, batch_size, model_type, processor=transform_or_processor)
+            else:
+                ds_train = Coco(train=True, transform=transform_or_processor)
+                _extract_and_save(model, ds_train, save_path_train, device, batch_size, model_type)
         else:
             print(f"File {save_path_train} already exists. Use --force to overwrite.")
 
@@ -116,8 +137,12 @@ def main(
         save_path_eval = Path("data/backbone_reps") / f"coco_eval_{model_name}.h5"
         save_path_eval.parent.mkdir(parents=True, exist_ok=True)
         if not save_path_eval.exists() or force:
-            ds_eval = Coco(train=False, transform=transform)
-            _extract_and_save(model, ds_eval, save_path_eval, device, batch_size, model_type)
+            if model_type == "transformers":
+                ds_eval = Coco(train=False, transform=None)
+                _extract_and_save(model, ds_eval, save_path_eval, device, batch_size, model_type, processor=transform_or_processor)
+            else:
+                ds_eval = Coco(train=False, transform=transform_or_processor)
+                _extract_and_save(model, ds_eval, save_path_eval, device, batch_size, model_type)
         else:
             print(f"File {save_path_eval} already exists. Use --force to overwrite.")
     else:

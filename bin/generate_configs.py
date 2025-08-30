@@ -15,7 +15,7 @@ def main(output_dir: Path = Path("data/configs"), base_config_path: Path = Path(
 
     param_grid = {
         "lr": [2.5e-4, 5e-4, 1e-3],
-        "model_name": ["vit_base_patch16_224.augreg_in21k", "CLIP-ViT-B-32-DataComp.XL-s13B-b90K_sae-top_k-64-cls_only-layer_11-hook_resid_post_raw",  "vit_base_patch14_reg4_dinov2.lvd142m", "ViT-B-16-SigLIP2-512"]
+        "model_name": ["vit-base-patch16-224", "CLIP-ViT-B-32-DataComp.XL-s13B-b90K_sae-top_k-64-cls_only-layer_11-hook_resid_post_raw",  "vit_base_patch14_reg4_dinov2.lvd142m", "ViT-B-16-SigLIP2-512"]
     }
 
     keys, values = zip(*param_grid.items())
