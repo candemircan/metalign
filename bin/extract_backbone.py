@@ -58,31 +58,50 @@ def _extract_features(model, inputs, model_type: str):
     else: raise ValueError(f"Unknown model type: {model_type}")
 
 
+def _identity_collate(batch):
+    """Custom collate function that returns batch as-is (for PIL images)."""
+    return batch
+
+
 def _extract_and_save(model, dataset, save_path, device, batch_size, model_type, processor=None):
     """Helper function to extract features and save them."""
-    all_features = []
-    num_batches = (len(dataset) + batch_size - 1) // batch_size
+    from torch.utils.data import DataLoader
     
-    for batch_idx in tqdm(range(num_batches), desc=f"Extracting to {save_path}"):
-        start_idx = batch_idx * batch_size
-        end_idx = min(start_idx + batch_size, len(dataset))
-        # For transformers models, we need to process PIL images with the processor
-        batch_images = []
-        for i in range(start_idx, end_idx):
-            batch_images.append(dataset[i])
-        
-        if model_type == "transformers" and processor is not None:
-            processed = processor(images=batch_images, return_tensors="pt")
-            inputs = processed["pixel_values"].to(device)
-        else:
-            inputs = torch.stack(batch_images).to(device)
-        
-        features = _extract_features(model, inputs, model_type)
-        all_features.append(features.cpu())
+    if model_type == "transformers":
+        dataset.transform = None
+        collate_fn = _identity_collate
+    else:
+        collate_fn = None
     
-    feature_reps = torch.cat(all_features, dim=0).numpy()
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, 
+                          num_workers=4, pin_memory=True, collate_fn=collate_fn)
+    
     with h5py.File(save_path, 'w') as f:
-        f.create_dataset('representations', data=feature_reps, compression='gzip')
+        total_samples = len(dataset)
+        feature_dim = None
+        h5_dataset = None
+        current_idx = 0
+        
+        for batch in tqdm(dataloader, desc=f"Extracting to {save_path}"):
+            if model_type == "transformers" and processor is not None:
+                processed = processor(images=batch, return_tensors="pt")
+                inputs = processed["pixel_values"].to(device, non_blocking=True)
+            else:
+                inputs = batch.to(device, non_blocking=True)
+            
+            features = _extract_features(model, inputs, model_type)
+            features = features.cpu().numpy()
+            
+            if h5_dataset is None:
+                feature_dim = features.shape[1]
+                h5_dataset = f.create_dataset('representations', 
+                                            shape=(total_samples, feature_dim), 
+                                            dtype=features.dtype, 
+                                            compression='gzip')
+            
+            batch_size_actual = features.shape[0]
+            h5_dataset[current_idx:current_idx + batch_size_actual] = features
+            current_idx += batch_size_actual
 
 
 @call_parse
