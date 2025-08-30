@@ -49,7 +49,7 @@ def _extract_features(model, inputs, model_type: str):
     else: raise ValueError(f"Unknown model type: {model_type}")
 
 
-def _extract_and_save(model, transform, dataset, save_path, device, batch_size, model_type):
+def _extract_and_save(model, dataset, save_path, device, batch_size, model_type):
     """Helper function to extract features and save them."""
     all_features = []
     num_batches = (len(dataset) + batch_size - 1) // batch_size
@@ -100,7 +100,7 @@ def main(
             return
         
         ds = Things(transform=transform)
-        _extract_and_save(model, transform, ds, save_path, device, batch_size, model_type)
+        _extract_and_save(model, ds, save_path, device, batch_size, model_type)
 
     elif dataset == "coco":
         # Handle train set
@@ -108,7 +108,7 @@ def main(
         save_path_train.parent.mkdir(parents=True, exist_ok=True)
         if not save_path_train.exists() or force:
             ds_train = Coco(train=True, transform=transform)
-            _extract_and_save(model, transform, ds_train, save_path_train, device, batch_size, model_type)
+            _extract_and_save(model, ds_train, save_path_train, device, batch_size, model_type)
         else:
             print(f"File {save_path_train} already exists. Use --force to overwrite.")
 
@@ -117,7 +117,7 @@ def main(
         save_path_eval.parent.mkdir(parents=True, exist_ok=True)
         if not save_path_eval.exists() or force:
             ds_eval = Coco(train=False, transform=transform)
-            _extract_and_save(model, transform, ds_eval, save_path_eval, device, batch_size, model_type)
+            _extract_and_save(model, ds_eval, save_path_eval, device, batch_size, model_type)
         else:
             print(f"File {save_path_eval} already exists. Use --force to overwrite.")
     else:
