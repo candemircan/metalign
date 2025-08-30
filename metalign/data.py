@@ -152,6 +152,7 @@ class Nights(ImageDataset):
     def __init__(self, root: Path = Path("data/external/nights"), transform=None):
         df = pd.read_csv(root / "data.csv")
         self.images = sorted(list(set(df['ref_path'].tolist() + df['left_path'].tolist() + df['right_path'].tolist())))
+        self.images = [root / Path(img_path) for img_path in self.images]
         self.transform = transform
 
     def __len__(self): return len(self.images)
