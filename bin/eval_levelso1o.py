@@ -57,12 +57,20 @@ def _calculate_accuracy(reps, trials, batch_size=2048):
 def main(
     experiment_name: str, # has to be one of main, raw, midsae
     backbone_name: str, # has to be one of vit, clip, siglip2, dinov2
-    batch_size: int = 2048 # batch size for evaluation
+    batch_size: int = 2048, # batch size for evaluation
+    force: bool = False # if True, will overwrite existing eval file
 ):
     """
     Evaluate 0-shot accuracy on LEVELS odd-one-out task of the base model and the given checkpoint
     """
-    
+    eval_path = Path("data/evals/levelso1o")
+    eval_path.mkdir(parents=True, exist_ok=True)
+    file_name = f"{experiment_name}_{backbone_name}"
+    eval_file = eval_path / f"{file_name}.json"
+    if eval_file.exists() and not force:
+        print(f"Eval file {eval_file} already exists. Use --force to overwrite.")
+        return
+
     best_models = json.load(open(Path("data/checkpoints") / "best_models.json"))
     backbone_dict = json.load(open(Path("data/backbone_reps") / "backbones.json"))
     ckpt = best_models[f"[{experiment_name.upper()}]"][backbone_name]
@@ -81,10 +89,7 @@ def main(
     og_acc, og_type_accs = _calculate_accuracy(backbone_reps, trials, batch_size=batch_size)
     metalign_acc, metalign_type_accs = _calculate_accuracy(metaligned_reps, trials, batch_size=batch_size)
 
-    eval_path = Path("data/evals/levelso1o")
-    eval_path.mkdir(parents=True, exist_ok=True)
-    file_name = f"{experiment_name}_{backbone_name}"
-    eval_file = eval_path / f"{file_name}.json"
+
     eval_data = {
         "model_name": backbone_name,
         "checkpoint_name": file_name,
