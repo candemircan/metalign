@@ -2,7 +2,7 @@
 common datasets and processing utils  used throughout the project
 """
 
-__all__ = ["ImageDataset", "Things", "Coco", "h5_to_numpy", "FunctionDataset", "prepare_things_spose", "load_backbone_representations", "Levels"]
+__all__ = ["ImageDataset", "Things", "Coco", "h5_to_numpy", "FunctionDataset", "prepare_things_spose", "load_backbone_representations", "Levels", "prepare_levels_data"]
 
 import pickle
 from pathlib import Path
@@ -316,3 +316,72 @@ def load_backbone_representations(file_path: str) -> np.ndarray:
             for key in keys:
                 reps.append(f[str(key)][:])
             return np.array(reps)
+
+
+def prepare_levels_data(
+    representations: np.ndarray, # directly loaded backbone representations
+    data_root: Path = Path("data/external"), # the root directory containing levels.pkl
+    return_tensors: str = "pt", # the type of tensors to return, can be "pt" for PyTorch tensors or "np" for NumPy arrays
+) -> tuple[torch.Tensor, list] | tuple[np.ndarray, list]:
+    """
+    Prepare the levels odd-one-out dataset by matching backbone representations to trials.
+    
+    Assumes representations are extracted in the same order as the Levels dataset class would provide them.
+    The Levels class sorts images by their keys, so we need to map trial images to the correct indices.
+    
+    Returns:
+        representations: The backbone representations for all unique images  
+        trials: List of trial dictionaries with image indices and ground truth
+    """
+    with open(data_root / "levels.pkl", "rb") as f:
+        levels = pickle.load(f)
+    
+    # collect all unique image names and create the same ordering as Levels class
+    image_names = []
+    for participant_data in levels.values():
+        for trial in participant_data:
+            image_names.extend([trial["image1Path"], trial["image2Path"], trial["image3Path"]])
+    
+    # get unique image keys (without .JPEG extension) and sort them
+    unique_image_keys = sorted(set(img.split(".")[0] for img in image_names))
+    
+    # create mapping from image key to representation index
+    image_key_to_idx = {key: idx for idx, key in enumerate(unique_image_keys)}
+    
+    # the representations should be in the same order as unique_image_keys
+    X = representations[:len(unique_image_keys)]
+    
+    # prepare trials with indices and ground truth
+    trials = []
+    for participant_data in levels.values():
+        for trial in participant_data:
+            if trial.get('exp_trial_type') == 'exp_trial':  # only experimental trials
+                img1_key = trial["image1Path"].split(".")[0]
+                img2_key = trial["image2Path"].split(".")[0]
+                img3_key = trial["image3Path"].split(".")[0]
+                selected_key = trial["selected_image"].split(".")[0]
+                
+                if all(key in image_key_to_idx for key in [img1_key, img2_key, img3_key]):
+                    img_indices = [
+                        image_key_to_idx[img1_key],
+                        image_key_to_idx[img2_key], 
+                        image_key_to_idx[img3_key]
+                    ]
+                    
+                    # find which position the selected image is in
+                    if selected_key == img1_key: selected_idx = 0
+                    elif selected_key == img2_key: selected_idx = 1
+                    elif selected_key == img3_key: selected_idx = 2
+                    else: continue  # skip if selected image not in triplet
+                    
+                    trials.append({
+                        'images': img_indices,
+                        'selected': selected_idx,
+                        'triplet_type': trial.get('triplet_type')
+                    })
+    
+    if return_tensors == "pt": X = torch.from_numpy(X)
+    elif return_tensors == "np": pass
+    else: raise ValueError(f"Unknown return_tensors type: {return_tensors}. Must be 'pt' or 'np'.")
+    
+    return X, trials
