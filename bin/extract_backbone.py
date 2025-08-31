@@ -34,10 +34,7 @@ def _extract_and_save(model, dataset, save_path, device, batch_size):
             
             if h5_dataset is None:
                 feature_dim = features.shape[1]
-                h5_dataset = f.create_dataset('representations', 
-                                            shape=(total_samples, feature_dim), 
-                                            dtype=features.dtype, 
-                                            compression='gzip')
+                h5_dataset = f.create_dataset('representations', shape=(total_samples, feature_dim), dtype=features.dtype, compression='gzip')
             
             batch_size_actual = features.shape[0]
             h5_dataset[current_idx:current_idx + batch_size_actual] = features
