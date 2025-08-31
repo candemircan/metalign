@@ -102,6 +102,9 @@ class Transformer(nn.Module):
 
         if not config.embedding and actual_input_size != config.hidden_size: raise ValueError(f"Input size {actual_input_size} must match hidden size {config.hidden_size} when embedding is False.")
 
+        if config.normalize: self.norm = nn.LayerNorm(actual_input_size)
+        else: self.norm = nn.Identity()
+
         if config.embedding: self.embedding = nn.Linear(actual_input_size, config.hidden_size, bias=config.bias)
         else: self.embedding = nn.Identity()
 
@@ -147,14 +150,13 @@ class Transformer(nn.Module):
                 y: torch.Tensor | None = None, # (batch_size, seq_len) - binary targets for each position - or None, used to just get the representations
                 ) -> torch.Tensor:
         
-        # scale to unit norm if specified
-        x =  F.normalize(x, dim=-1) if self.config.normalize else x
 
         # prepend BOS tokens to all tokens if y is None, else use y as is
         y = y if y is not None else torch.zeros(x.shape[0], x.shape[1], device=x.device)
         x = self._prep_inputs(x, y)  # (batch_size, seq_len, input_size)
 
-        x = self.embedding(x)
+        x = self.norm(x)
+        x = self.embedding(x) 
 
         for layer in self.layers:
             x = layer(x)
