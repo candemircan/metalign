@@ -54,7 +54,7 @@ def main(
     min_nonzero: int = 120,  # minimum number of non-zero activations per column to keep it in the final array
     tags: Param(help="tags to use for the wandb run. If empty, no tags are used.", type=str, nargs="*") = [],  # type: ignore
     early_stopping_patience: int = 20, # number of evaluation intervals to wait for improvement before stopping
-    early_stopping_min_delta: float = 0.01, # minimum change in evaluation accuracy to be considered an improvement
+    early_stopping_min_delta: float = 0.005, # minimum change in evaluation accuracy to be considered an improvement
     early_stopping_min_threshold: float = 0.75, # minimum evaluation accuracy to start considering early stopping
     early_stopping_max_steps: int = 3000, # after this, early stopping will be considered even if the min_threshold is not reached
 ):
