@@ -51,7 +51,7 @@ def main(output_dir: Path = Path("data/configs"), base_config_path: Path = Path(
 
     for setup_name, setup_params in experiment_setups.items():
 
-        for params in permutations:
+        for i, params in enumerate(permutations):
             config = base_config.copy()
             config.update(params) 
             if "siglip2" in config["model_name"].lower():
@@ -75,7 +75,7 @@ def main(output_dir: Path = Path("data/configs"), base_config_path: Path = Path(
             config["tags"] = setup_params["tags"]
             
 
-            file_path = output_dir / f"{setup_params['prefix']}{short_model_name}.toml"
+            file_path = output_dir / f"{setup_params['prefix']}{short_model_name}_{i}.toml"
             with open(file_path, "wb") as f:
                 tomli_w.dump(config, f)
 
