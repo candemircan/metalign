@@ -30,6 +30,7 @@ class TransformerConfig:
     logit_bias: bool = True
     attention_dropout: float = 0.1
     sequence_length: int = 120
+    normalize: bool = True
 
     def __post_init__(self):
         if self.hidden_size % self.num_attention_heads != 0:
@@ -145,6 +146,9 @@ class Transformer(nn.Module):
                 x: torch.Tensor, # (batch_size, seq_len, feature_dim) - input features
                 y: torch.Tensor | None = None, # (batch_size, seq_len) - binary targets for each position - or None, used to just get the representations
                 ) -> torch.Tensor:
+        
+        # scale to unit norm if specified
+        x =  F.normalize(x, dim=-1) if self.config.normalize else x
 
         # prepend BOS tokens to all tokens if y is None, else use y as is
         y = y if y is not None else torch.zeros(x.shape[0], x.shape[1], device=x.device)
