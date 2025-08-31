@@ -33,7 +33,7 @@ def main(
     logit_bias: bool_arg = True,  # whether to use bias in the final linear layer of the transformer model. If False, the final layer will not have a bias term.
     attention_dropout: float = 0.0,  # dropout rate for the attention layers in the transformer model
     sequence_length: int = 120,  # maximum number of position embeddings in the transformer model, also the sequence length of the input data
-    normalize: bool_arg = True,  # whether to apply layer norm to input features
+    normalize: bool_arg = False,  # whether to apply layer norm to input features
     batch_size: int = 256,  # batch size for training the model
     training_steps: int = 1000000,  # number of training steps per epoch
     seed: int = 1234, # random seed for reproducibility
@@ -54,7 +54,7 @@ def main(
     min_nonzero: int = 120,  # minimum number of non-zero activations per column to keep it in the final array
     tags: Param(help="tags to use for the wandb run. If empty, no tags are used.", type=str, nargs="*") = [],  # type: ignore
     early_stopping_patience: int = 20, # number of evaluation intervals to wait for improvement before stopping
-    early_stopping_min_delta: float = 0.005, # minimum change in evaluation accuracy to be considered an improvement
+    early_stopping_min_delta: float = 0.01, # minimum change in evaluation accuracy to be considered an improvement
     early_stopping_min_threshold: float = 0.75, # minimum evaluation accuracy to start considering early stopping
     early_stopping_max_steps: int = 3000, # after this, early stopping will be considered even if the min_threshold is not reached
 ):
