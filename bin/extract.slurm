@@ -9,7 +9,7 @@
 module load CUDA/12
 
 for data in levels coco things; do
-    for model in facebook/webssl-mae300m-full2b-224 timm/vit_base_patch14_reg4_dinov2.lvd142m timm/ViT-B-16-SigLIP2-512 google/vit-base-patch16-224; do
+    for model in facebook/webssl-mae300m-full2b-224 timm/vit_base_patch14_reg4_dinov2.lvd142m timm/ViT-B-16-SigLIP2-512 timm/vit_base_patch16_224.augreg2_in21k_ft_in1k; do
         srun --exclusive -n 1 --gres=gpu:1  --cpus-per-task=4 uv run bin/extract_backbone.py $data $model &
     done
 done
