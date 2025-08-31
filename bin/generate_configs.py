@@ -54,7 +54,7 @@ def main(output_dir: Path = Path("data/configs"), base_config_path: Path = Path(
         for i, params in enumerate(permutations):
             config = base_config.copy()
             config.update(params) 
-            if "siglip2" in config["model_name"].lower():
+            if "siglip" in config["model_name"].lower():
                 short_model_name = "siglip2"
             elif "dinov2" in config["model_name"].lower():
                 short_model_name = "dinov2"
