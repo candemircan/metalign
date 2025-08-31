@@ -5,76 +5,21 @@ os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"  # needed for aten::_upsample_bi
 from pathlib import Path
 
 import h5py
-import open_clip
 import timm
 import torch
 from fastcore.script import call_parse
+from torch.utils.data import DataLoader
 from tqdm import tqdm
-from transformers import AutoModel, AutoProcessor
 
 from metalign.data import Coco, Levels, Things
 
 _ = torch.set_grad_enabled(False)
 
 
-def _get_model_and_transform(repo_id: str, device: str):
-    """Load model and get appropriate transform based on repo_id format."""
-    
-    if repo_id.startswith("timm/") and "siglip" in repo_id.lower():
-        # SigLIP models via open_clip (even though they have timm/ prefix)
-        model_name = f"hf-hub:{repo_id}"
-        model, preprocess = open_clip.create_model_from_pretrained(model_name)
-        model = model.to(device).eval()
-        return model, preprocess, "open_clip"
-        
-    elif repo_id.startswith("timm/"):
-        # Regular timm model
-        model_name = f"hf_hub:{repo_id}"
-        model = timm.create_model(model_name, pretrained=True, num_classes=0).to(device).eval()
-        data_config = timm.data.resolve_model_data_config(model)
-        transform = timm.data.create_transform(**data_config, is_training=False)
-        return model, transform, "timm"
-    
-    elif "/" in repo_id:
-        model = AutoModel.from_pretrained(repo_id).to(device).eval()
-        processor = AutoProcessor.from_pretrained(repo_id)
-        return model, processor, "transformers"
-    
-    else:
-        # Assume open_clip format for non-timm models
-        model, preprocess = open_clip.create_model_from_pretrained(repo_id)
-        model = model.to(device).eval()
-        return model, preprocess, "open_clip"
-
-
-def _extract_features(model, inputs, model_type: str):
-    """Extract features based on model type."""
-    
-    if model_type == "timm": return model(inputs)  # CLS token features
-    elif model_type == "open_clip": return model.encode_image(inputs)
-    elif model_type == "transformers": 
-        outputs = model(pixel_values=inputs)
-        return outputs.last_hidden_state[:, 0]  # CLS token from last hidden state
-    else: raise ValueError(f"Unknown model type: {model_type}")
-
-
-def _identity_collate(batch):
-    """Custom collate function that returns batch as-is (for PIL images)."""
-    return batch
-
-
-def _extract_and_save(model, dataset, save_path, device, batch_size, model_type, processor=None):
+def _extract_and_save(model, dataset, save_path, device, batch_size):
     """Helper function to extract features and save them."""
-    from torch.utils.data import DataLoader
     
-    if model_type == "transformers":
-        dataset.transform = None
-        collate_fn = _identity_collate
-    else:
-        collate_fn = None
-    
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, 
-                          num_workers=4, pin_memory=True, collate_fn=collate_fn)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4, pin_memory=True)
     
     with h5py.File(save_path, 'w') as f:
         total_samples = len(dataset)
@@ -83,13 +28,8 @@ def _extract_and_save(model, dataset, save_path, device, batch_size, model_type,
         current_idx = 0
         
         for batch in tqdm(dataloader, desc=f"Extracting to {save_path}"):
-            if model_type == "transformers" and processor is not None:
-                processed = processor(images=batch, return_tensors="pt")
-                inputs = processed["pixel_values"].to(device, non_blocking=True)
-            else:
-                inputs = batch.to(device, non_blocking=True)
-            
-            features = _extract_features(model, inputs, model_type)
+            inputs = batch.to(device, non_blocking=True)
+            features = model(inputs)
             features = features.cpu().numpy()
             
             if h5_dataset is None:
@@ -112,14 +52,17 @@ def main(
     force: bool = False # if True, will extract features even if the file already exists. Otherwise, will skip if the file  exists.
 ):
     """
-    extract features from a model (timm, open_clip, or transformers).
+    extract features from a timm model.
     The representations are saved in `data/backbone_reps/{dataset}_{model_name}.h5` file.
     For the COCO dataset, it creates separate files for train and evaluation sets.
     The representations are saved as a numpy array in an h5 file with compression.
     """
     
     device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
-    model, transform_or_processor, model_type = _get_model_and_transform(repo_id, device)
+    model_name = f"hf_hub:{repo_id}" if repo_id.startswith("timm/") else repo_id
+    model = timm.create_model(model_name, pretrained=True, num_classes=0).to(device).eval()
+    data_config = timm.data.resolve_model_data_config(model)
+    transform = timm.data.create_transform(**data_config, is_training=False)
     
     # Extract model name from repo for file naming
     model_name = repo_id.split('/')[-1]
@@ -131,24 +74,16 @@ def main(
             print(f"File {save_path} already exists. Use --force to overwrite.")
             return
         
-        if model_type == "transformers":
-            ds = Things(transform=None)  # No preprocessing for transformers
-            _extract_and_save(model, ds, save_path, device, batch_size, model_type, processor=transform_or_processor)
-        else:
-            ds = Things(transform=transform_or_processor)
-            _extract_and_save(model, ds, save_path, device, batch_size, model_type)
+        ds = Things(transform=transform)
+        _extract_and_save(model, ds, save_path, device, batch_size)
 
     elif dataset == "coco":
         # Handle train set
         save_path_train = Path("data/backbone_reps") / f"coco_train_{model_name}.h5"
         save_path_train.parent.mkdir(parents=True, exist_ok=True)
         if not save_path_train.exists() or force:
-            if model_type == "transformers":
-                ds_train = Coco(train=True, transform=None)
-                _extract_and_save(model, ds_train, save_path_train, device, batch_size, model_type, processor=transform_or_processor)
-            else:
-                ds_train = Coco(train=True, transform=transform_or_processor)
-                _extract_and_save(model, ds_train, save_path_train, device, batch_size, model_type)
+            ds_train = Coco(train=True, transform=transform)
+            _extract_and_save(model, ds_train, save_path_train, device, batch_size)
         else:
             print(f"File {save_path_train} already exists. Use --force to overwrite.")
 
@@ -156,12 +91,8 @@ def main(
         save_path_eval = Path("data/backbone_reps") / f"coco_eval_{model_name}.h5"
         save_path_eval.parent.mkdir(parents=True, exist_ok=True)
         if not save_path_eval.exists() or force:
-            if model_type == "transformers":
-                ds_eval = Coco(train=False, transform=None)
-                _extract_and_save(model, ds_eval, save_path_eval, device, batch_size, model_type, processor=transform_or_processor)
-            else:
-                ds_eval = Coco(train=False, transform=transform_or_processor)
-                _extract_and_save(model, ds_eval, save_path_eval, device, batch_size, model_type)
+            ds_eval = Coco(train=False, transform=transform)
+            _extract_and_save(model, ds_eval, save_path_eval, device, batch_size)
         else:
             print(f"File {save_path_eval} already exists. Use --force to overwrite.")
     elif dataset == "levels":
@@ -171,12 +102,8 @@ def main(
             print(f"File {save_path} already exists. Use --force to overwrite.")
             return
         
-        if model_type == "transformers":
-            ds = Levels(transform=None)  # No preprocessing for transformers
-            _extract_and_save(model, ds, save_path, device, batch_size, model_type, processor=transform_or_processor)
-        else:
-            ds = Levels(transform=transform_or_processor)
-            _extract_and_save(model, ds, save_path, device, batch_size, model_type)
+        ds = Levels(transform=transform)
+        _extract_and_save(model, ds, save_path, device, batch_size)
 
     else:
         raise ValueError(f"Unknown dataset: {dataset}. Must be 'things', 'coco', or 'levels'.")
