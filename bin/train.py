@@ -61,7 +61,7 @@ def main(
     """
     train a meta-learning transformer model over function learning tasks.
 
-    the defaults here are not what's used for training. see data/base_config.toml along with bin/generate_configs.py for that.
+    some of the defaults are always overriden by the config file. If the config doesn't have some of the fields, the defaults here are used. see data/base_config.toml for the defaults and bin/generate_configs.py for how the config files are generated.
     """
 
     args = locals()
