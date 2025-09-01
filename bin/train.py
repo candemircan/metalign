@@ -34,7 +34,7 @@ def main(
     reg_lambda: float = 0.1,  # regularization strength for embedding weights
     reg_alpha: float = 1.0,  # scaling factor for identity matrix in regularization
     batch_size: int = 256,  # batch size for training the model
-    training_steps: int = 10000,  # number of training steps per epoch
+    training_steps: int = 50000,  # number of training steps per epoch
     seed: int = 1234, # random seed for reproducibility
     lr: float = 0.0025,  # learning rate for the optimizer
     weight_decay: float = 0.,  # weight decay for the optimizer
