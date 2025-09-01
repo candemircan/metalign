@@ -9,6 +9,7 @@ import timm
 import torch
 from fastcore.script import call_parse
 from torch.utils.data import DataLoader
+from torchvision.datasets import CIFAR100
 from tqdm import tqdm
 
 from metalign.data import Coco, Levels, Things
@@ -43,7 +44,7 @@ def _extract_and_save(model, dataset, save_path, device, batch_size):
 
 @call_parse
 def main(
-    dataset: str, # one of things, coco, levels
+    dataset: str, # one of things, coco, levels, cifar100
     repo_id: str,
     batch_size: int = 512, # batch size for the backbone model, for feature extraction
     force: bool = False # if True, will extract features even if the file already exists. Otherwise, will skip if the file  exists.
@@ -51,7 +52,7 @@ def main(
     """
     extract features from a timm model.
     The representations are saved in `data/backbone_reps/{dataset}_{model_name}.h5` file.
-    For the COCO dataset, it creates separate files for train and evaluation sets.
+    For the COCO and CIFAR-100 datasets, it creates separate files for train and evaluation sets.
     The representations are saved as a numpy array in an h5 file with compression.
     """
     
@@ -102,5 +103,24 @@ def main(
         ds = Levels(transform=transform)
         _extract_and_save(model, ds, save_path, device, batch_size)
 
+    elif dataset == "cifar100":
+        # Handle train set
+        save_path_train = Path("data/backbone_reps") / f"cifar100_train_{model_name}.h5"
+        save_path_train.parent.mkdir(parents=True, exist_ok=True)
+        if not save_path_train.exists() or force:
+            ds_train = CIFAR100(root="data/external", train=True, download=True, transform=transform)
+            _extract_and_save(model, ds_train, save_path_train, device, batch_size)
+        else:
+            print(f"File {save_path_train} already exists. Use --force to overwrite.")
+
+        # Handle test set
+        save_path_test = Path("data/backbone_reps") / f"cifar100_test_{model_name}.h5"
+        save_path_test.parent.mkdir(parents=True, exist_ok=True)
+        if not save_path_test.exists() or force:
+            ds_test = CIFAR100(root="data/external", train=False, download=True, transform=transform)
+            _extract_and_save(model, ds_test, save_path_test, device, batch_size)
+        else:
+            print(f"File {save_path_test} already exists. Use --force to overwrite.")
+
     else:
-        raise ValueError(f"Unknown dataset: {dataset}. Must be 'things', 'coco', or 'levels'.")
+        raise ValueError(f"Unknown dataset: {dataset}. Must be 'things', 'coco', 'levels', or 'cifar100'.")

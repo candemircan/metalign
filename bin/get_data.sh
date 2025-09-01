@@ -7,6 +7,9 @@ for model in timm/vit_base_patch16_224.mae timm/vit_base_patch14_reg4_dinov2.lvd
     uv run huggingface-cli download $model
 done
 
+## CIFAR-100 ##
+uv run python -c "import torchvision; torchvision.datasets.CIFAR100('data/external', train=True, download=True); torchvision.datasets.CIFAR100('data/external', train=False, download=True)"
+
 ## THINGS ##
 # spose
 if [ ! -f "data/external/spose_embedding_66d_sorted.txt" ]; then

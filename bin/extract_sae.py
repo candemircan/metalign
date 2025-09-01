@@ -66,14 +66,14 @@ def _extract_and_save(
 
 @call_parse
 def main(
-    dataset: str, # dataset to use, "things", "coco", "levels"
+    dataset: str, # dataset to use, "things", "coco", "levels", "cifar100"
     repo_id: str, # the repo ID of the SAE model on Hugging Face Hub
     batch_size: int = 256, # the batch size to use for processing images
     force: bool = False, # if True, remove the existing h5 file and remake one
 ):
     
-    if dataset not in ["things", "coco", "levels"]:
-        raise ValueError("Dataset must be either 'things', 'coco', or 'levels'.")
+    if dataset not in ["things", "coco", "levels", "cifar100"]:
+        raise ValueError("Dataset must be either 'things', 'coco', 'levels', or 'cifar100'.")
     
     sae_dir_path = Path("data/sae")
     sae_dir_path.mkdir(parents=True, exist_ok=True)
@@ -124,3 +124,20 @@ def main(
         sae_file_path_eval = sae_dir_path / f"coco_eval_{repo_id_suffix}.h5"
         raw_file_path_eval = raw_dir_path / f"coco_eval_{save_model_name}_raw.h5"
         _extract_and_save(model, sae, dataloader_eval, sae_file_path_eval, raw_file_path_eval, device, force)
+    
+    elif dataset == "cifar100":
+        from torchvision.datasets import CIFAR100
+        clip_transforms = get_clip_val_transforms()
+        # Process training data
+        ds_train = CIFAR100(root="data/external", train=True, download=True, transform=clip_transforms)
+        dataloader_train = DataLoader(ds_train, batch_size=batch_size, shuffle=False, num_workers=4)
+        sae_file_path_train = sae_dir_path / f"cifar100_train_{repo_id_suffix}.h5"
+        raw_file_path_train = raw_dir_path / f"cifar100_train_{save_model_name}_raw.h5"
+        _extract_and_save(model, sae, dataloader_train, sae_file_path_train, raw_file_path_train, device, force)
+
+        # Process test data
+        ds_test = CIFAR100(root="data/external", train=False, download=True, transform=clip_transforms)
+        dataloader_test = DataLoader(ds_test, batch_size=batch_size, shuffle=False, num_workers=4)
+        sae_file_path_test = sae_dir_path / f"cifar100_test_{repo_id_suffix}.h5"
+        raw_file_path_test = raw_dir_path / f"cifar100_test_{save_model_name}_raw.h5"
+        _extract_and_save(model, sae, dataloader_test, sae_file_path_test, raw_file_path_test, device, force)
