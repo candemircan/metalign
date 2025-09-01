@@ -20,11 +20,11 @@ def main(
     best_models = {exp: {bb: None for bb in backbone_patterns} for exp in experiment_patterns}
     for exp in tqdm(experiment_patterns):
         for bb in tqdm(backbone_patterns, leave=False):
-            best_eval = float("inf")
+            best_eval = -float("inf")
             all_cpts = glob(str(checkpoints_dir / f"{escape(exp)}_{bb}_*" / "model.pt"))
             for checkpoint in all_cpts:
-                cur_eval = torch.load(checkpoint, weights_only=False)["eval_loss"]
-                if cur_eval < best_eval:
+                cur_eval = torch.load(checkpoint, weights_only=False)["eval_accuracy"]
+                if cur_eval > best_eval:
                     best_eval = cur_eval
                     best_models[exp][bb] = checkpoint
 
