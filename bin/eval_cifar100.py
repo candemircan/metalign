@@ -107,7 +107,7 @@ def main(
     n_runs: int = 20 # number of runs for few-shot evaluation
 ):
     """
-    Evaluate 1-shot and 10-shot accuracy on CIFAR-100 classification task
+    Evaluate 5-shot accuracy on CIFAR-100 classification task
     """
     
     best_models = json.load(open(Path("data/checkpoints") / "best_models.json"))
@@ -147,15 +147,10 @@ def main(
     # set random seed for reproducibility
     np.random.seed(1234)
     
-    # evaluate 1-shot and 10-shot
-    results_1_shot = _evaluate_few_shot(
+    # evaluate 5-shot
+    results_5_shot = _evaluate_few_shot(
         train_backbone_reps, train_metalign_reps, train_targets, 
-        test_backbone_reps, test_metalign_reps, test_targets, 1, n_runs
-    )
-    
-    results_10_shot = _evaluate_few_shot(
-        train_backbone_reps, train_metalign_reps, train_targets,
-        test_backbone_reps, test_metalign_reps, test_targets, 10, n_runs
+        test_backbone_reps, test_metalign_reps, test_targets, 5, n_runs
     )
     
     # save results
@@ -168,17 +163,12 @@ def main(
         "model_name": backbone_name,
         "checkpoint_name": file_name,
         "n_runs": n_runs,
-        "1_shot": results_1_shot,
-        "10_shot": results_10_shot
+        "5_shot": results_5_shot
     }
     
     with open(eval_file, "w") as f: 
         json.dump(eval_data, f, indent=4)
     
-    print("1-shot results:")
-    print(f"  Backbone: {results_1_shot['backbone_mean']:.4f} ± {results_1_shot['backbone_std']:.4f}")
-    print(f"  Metalign: {results_1_shot['metalign_mean']:.4f} ± {results_1_shot['metalign_std']:.4f}")
-    
-    print("10-shot results:")
-    print(f"  Backbone: {results_10_shot['backbone_mean']:.4f} ± {results_10_shot['backbone_std']:.4f}")
-    print(f"  Metalign: {results_10_shot['metalign_mean']:.4f} ± {results_10_shot['metalign_std']:.4f}")
+    print("5-shot results:")
+    print(f"  Backbone: {results_5_shot['backbone_mean']:.4f} ± {results_5_shot['backbone_std']:.4f}")
+    print(f"  Metalign: {results_5_shot['metalign_mean']:.4f} ± {results_5_shot['metalign_std']:.4f}")
