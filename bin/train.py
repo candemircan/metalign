@@ -52,9 +52,8 @@ def main(
     min_nonzero: int = 120,  # minimum number of non-zero activations per column to keep it in the final array
     tags: Param(help="tags to use for the wandb run. If empty, no tags are used.", type=str, nargs="*") = [],  # type: ignore
     early_stopping_patience: int = 20, # number of evaluation intervals to wait for improvement before stopping
-    early_stopping_min_delta: float = 0.01, # minimum change in evaluation accuracy to be considered an improvement
-    early_stopping_min_threshold: float = 0.75, # minimum evaluation accuracy to start considering early stopping
-    early_stopping_max_steps: int = 3000, # after this, early stopping will be considered even if the min_threshold is not reached
+    early_stopping_min_delta: float = 0.001, # minimum change in evaluation loss to be considered an improvement
+    early_stopping_max_steps: int = 3000, # after this, early stopping will be considered even if improvement is still happening
 ):
     """
     train a meta-learning transformer model over function learning tasks.
@@ -160,7 +159,7 @@ def main(
 
     optimizer = AdamWScheduleFree(model.parameters(),lr=args["lr"],weight_decay=args["weight_decay"], warmup_steps=args["warmup_steps"])
 
-    best_eval_accuracy = -1.0
+    best_eval_loss = float('inf')
     early_stopping_counter = 0
     if ddp_rank == 0: best_checkpoint_path = f"{full_checkpoint_dir}/model.pt"
 
@@ -293,29 +292,32 @@ def main(
                             "accuracy_eval": eval_accuracy
                         }, step=training_step)
 
-                    if best_eval_accuracy > args["early_stopping_min_threshold"] or training_step >= args["early_stopping_max_steps"]:
-                        if eval_accuracy - best_eval_accuracy > args["early_stopping_min_delta"]:
-                            best_eval_accuracy = eval_accuracy
+                    # Early stopping based on total evaluation loss (lower is better)
+                    if training_step >= args["early_stopping_max_steps"]:
+                        if best_eval_loss - avg_eval_loss > args["early_stopping_min_delta"]:
+                            best_eval_loss = avg_eval_loss
                             early_stopping_counter = 0
                             torch.save({
                                 'state_dict': {k: v.cpu() for k, v in model.module.state_dict().items()},
+                                'eval_loss': avg_eval_loss,
                                 'eval_accuracy': eval_accuracy,
                                 'step': training_step,
                                 'config': config,
                             }, best_checkpoint_path)
                         else:
                             early_stopping_counter += 1
-                    elif eval_accuracy > best_eval_accuracy:
-                        best_eval_accuracy = eval_accuracy
+                    elif avg_eval_loss < best_eval_loss:
+                        best_eval_loss = avg_eval_loss
                         torch.save({
                             'state_dict': {k: v.cpu() for k, v in model.module.state_dict().items()},
+                            'eval_loss': avg_eval_loss,
                             'eval_accuracy': eval_accuracy,
                             'step': training_step,
                             'config': config,
                         }, best_checkpoint_path)
                     
                     if early_stopping_counter >= args["early_stopping_patience"]:
-                        print(f"early stopping at step {training_step} due to no improvement in eval accuracy for {args['early_stopping_patience']} evaluation intervals.")
+                        print(f"early stopping at step {training_step} due to no improvement in eval loss for {args['early_stopping_patience']} evaluation intervals.")
                         stop_training.fill_(1)
 
             torch.distributed.broadcast(stop_training, src=0)
