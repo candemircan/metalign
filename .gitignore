@@ -162,3 +162,5 @@ wandb
 /.quarto/
 .jupyter_cache
 example*
+bin/*ipynb
+bin/matplotlibrc

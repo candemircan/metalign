@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import torch
 from fastcore.script import call_parse
+from nnsight import NNsight
 from tqdm import tqdm
 
 from metalign.cognitive_model import CategoryLearner
@@ -33,10 +34,11 @@ def main(
     model = Transformer(config=config)
     model.load_state_dict(state_dict)
     model.eval()
+    model = NNsight(model)
 
     human_data = pd.read_csv("data/external/category_learning.csv")
     backbone_reps = load_backbone_representations(things_reps)
-    metalign_reps = torch.cat([torch.zeros(backbone_reps.shape[0], 2), torch.from_numpy(backbone_reps)], dim=1) @ model.embedding.weight.T + model.embedding.bias
+    with model.trace(backbone_reps): metalign_reps = model.embedding.output.save()
 
     imgs = sorted(glob("data/external/THINGS/*/*jpg"))
     metalign_accuracies, base_accuracies, metalign_linear_accuracies = [], [], []

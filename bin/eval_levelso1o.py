@@ -3,6 +3,7 @@ from pathlib import Path
 
 import torch
 from fastcore.script import call_parse
+from nnsight import NNsight
 from torch.nn import functional as F
 from tqdm import tqdm
 
@@ -83,11 +84,13 @@ def main(
     model = Transformer(config=config)
     model.load_state_dict(state_dict)
     model.eval()
+    model = NNsight(model)
 
-    metaligned_reps = torch.cat([torch.zeros(backbone_reps.shape[0], 2), backbone_reps], dim=1) @ model.embedding.weight.T + model.embedding.bias
+    with model.trace(backbone_reps): metalign_reps = model.embedding.output.save()
+
     
     og_acc, og_type_accs = _calculate_accuracy(backbone_reps, trials, batch_size=batch_size)
-    metalign_acc, metalign_type_accs = _calculate_accuracy(metaligned_reps, trials, batch_size=batch_size)
+    metalign_acc, metalign_type_accs = _calculate_accuracy(metalign_reps, trials, batch_size=batch_size)
 
 
     eval_data = {

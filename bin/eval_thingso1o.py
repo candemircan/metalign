@@ -4,6 +4,7 @@ from pathlib import Path
 import pandas as pd
 import torch
 from fastcore.script import call_parse
+from nnsight import NNsight
 from torch.nn import functional as F
 from tqdm import tqdm
 
@@ -61,14 +62,15 @@ def main(
     model = Transformer(config=config)
     model.load_state_dict(state_dict)
     model.eval()
+    model = NNsight(model)
 
-    metaligned_reps = torch.cat([torch.zeros(backbone_reps.shape[0], 2), backbone_reps], dim=1) @ model.embedding.weight.T + model.embedding.bias
+    with model.trace(backbone_reps): metalign_reps = model.embedding.output.save()
 
     X = df[["image1", "image2", "image3"]].values - 1 # 0 index
     y = df["choice"].values -1 # 0 index
     
     og_acc = _calculate_accuracy(backbone_reps, X, y, batch_size=batch_size)
-    metalign_acc = _calculate_accuracy(metaligned_reps, X, y, batch_size=batch_size)
+    metalign_acc = _calculate_accuracy(metalign_reps, X, y, batch_size=batch_size)
     ceiling_acc = _calculate_accuracy(ceiling_model, X, y, batch_size=batch_size)
 
     eval_path = Path("data/evals/thingso1o")
