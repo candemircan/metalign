@@ -194,7 +194,7 @@ class Levels(ImageDataset):
 class FunctionDataset(Dataset):
     "Episode-based dataset for given features, optimized for DataLoader usage."
     def __init__(self, inputs: np.ndarray, features_path: Path,
-                 seq_len: int = 120, scale: bool = False, min_nonzero: int = 120, train_dims: list = None, 
+                 seq_len: int = 120, min_nonzero: int = 120, train_dims: list = None, 
                  epoch_size: int = 100000):
         X = torch.tensor(inputs, dtype=torch.float32)
         
@@ -210,12 +210,6 @@ class FunctionDataset(Dataset):
         # for sparse features, most values are 0; for dense features, all values are non-zero
         sparsity = (self.Y == 0).float().mean()
         self.is_sparse = sparsity > 0.5  # if more than 50% are zeros, treat as sparse
-        
-        if scale:
-            self.mean = self.X.mean(dim=0, keepdim=True)
-            self.std = self.X.std(dim=0, keepdim=True)
-            self.X = (self.X - self.mean) / (self.std + 1e-8)
-        else: self.mean, self.std = None, None
             
         self.train_dims = train_dims if train_dims is not None else list(range(self.num_functions))
         

@@ -1,16 +1,14 @@
-embedding = true
 hidden_act = "gelu"
 bias = true
 sequence_length = 120
 logit_bias = true
-scale = false
 compile = true
 warmup_steps = 1000
 training_steps = 1000000
 attention_dropout = 0.1
-hidden_size = 768
 num_attention_heads = 12
 intermediate_size = 3072
 weight_decay = 0.0001
 num_layers = 3
 batch_size = 4096
+lr = 0.00025

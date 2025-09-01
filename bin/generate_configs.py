@@ -15,7 +15,8 @@ def main(output_dir: Path = Path("data/configs"), base_config_path: Path = Path(
         base_config = tomllib.load(f)
 
     param_grid = {
-        "lr": [2.5e-4, 5e-4, 1e-3],
+        "reg_alpha": [0.05,0.1,0.25,0.5],
+        "reg_lambda": [0.001, 0.01, 0.1, 1.],
         "model_name": ["vit_base_patch16_224.mae", "vit_base_patch16_224.augreg2_in21k_ft_in1k", "CLIP-ViT-B-32-DataComp.XL-s13B-b90K_sae-top_k-64-cls_only-layer_11-hook_resid_post_raw",  "vit_base_patch14_reg4_dinov2.lvd142m", "vit_base_patch16_siglip_512.v2_webli"]
     }
 
@@ -66,8 +67,7 @@ def main(output_dir: Path = Path("data/configs"), base_config_path: Path = Path(
                 short_model_name = "vit"
             else:
                 raise ValueError(f"Unknown model name {config['model_name']}")         
-            lr_str = f"{config['lr']:.0e}".replace("-0", "-")
-            config["name"] = f"[{setup_name}]_{short_model_name}_lr{lr_str}"
+            config["name"] = f"[{setup_name}]_{short_model_name}_l{config['reg_lambda']}_a{config['reg_alpha']}"
             config["train_backbone"] = f"coco_train_{config['model_name']}"
             config["eval_backbone"] = f"coco_eval_{config['model_name']}"
             config["train_features"] = setup_params["train_features"]

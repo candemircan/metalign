@@ -23,8 +23,6 @@ def main(
     config_file: str = None,  # path to a config file. If provided, any parameters in the file will override the corresponding command line arguments.
     wandb_log: bool_arg = True,  # whether to log the model to wandb. If False, no logging is done.
     wandb_name: str = "metalign",  # name of the wandb project. Used to log the model.
-    embedding: bool_arg = True,  # whether to use an embedding layer at the beginning of the model
-    hidden_size: int = 768,  # hidden size of the transformer model. if this is different from the input size, an embedding layer must be used
     num_attention_heads: int = 12,  # number of attention heads in the transformer model
     intermediate_size: int = 3072,  # size of the intermediate layer in the MLP of the transformer model
     num_layers: int = 6,  # number of transformer layers
@@ -33,9 +31,10 @@ def main(
     logit_bias: bool_arg = True,  # whether to use bias in the final linear layer of the transformer model. If False, the final layer will not have a bias term.
     attention_dropout: float = 0.0,  # dropout rate for the attention layers in the transformer model
     sequence_length: int = 120,  # maximum number of position embeddings in the transformer model, also the sequence length of the input data
-    normalize: bool_arg = False,  # whether to apply layer norm to input features
+    reg_lambda: float = 0.1,  # regularization strength for embedding weights
+    reg_alpha: float = 1.0,  # scaling factor for identity matrix in regularization
     batch_size: int = 256,  # batch size for training the model
-    training_steps: int = 1000000,  # number of training steps per epoch
+    training_steps: int = 10000,  # number of training steps per epoch
     seed: int = 1234, # random seed for reproducibility
     lr: float = 0.0025,  # learning rate for the optimizer
     weight_decay: float = 0.,  # weight decay for the optimizer
@@ -45,7 +44,6 @@ def main(
     eval_interval_steps: int = 100,  # evaluate the model every eval_interval_steps steps
     num_eval_episodes: int = 128,  # number of episodes to sample for evaluation
     checkpoint_dir: str = "checkpoints", # directory to save checkpoints. this will be placed under data/checkpoints/{name} if name is provided. If name is None, it will be saved under data/checkpoints
-    scale: bool = False,  # whether to scale the input data to have zero mean and unit variance
     compile: bool_arg = True,  # whether to compile the model with torch.compile
     train_backbone: str = "coco_train_dinov3-vitb16-pretrain-lvd1689m",  # backbone for train data. the name must match data/backbone_reps/{train_backbone}.h5
     eval_backbone: str = "coco_eval_dinov3-vitb16-pretrain-lvd1689m",  # backbone for eval data. the name must match data/backbone_reps/{eval_backbone}.h5
@@ -103,7 +101,6 @@ def main(
         inputs=train_inputs,
         features_path=train_features_path,
         seq_len=args["sequence_length"],
-        scale=args["scale"],
         min_nonzero=args["min_nonzero"],
         epoch_size=args["training_steps"]
     )
@@ -112,7 +109,6 @@ def main(
         inputs=eval_inputs,
         features_path=eval_features_path,
         seq_len=args["sequence_length"],
-        scale=args["scale"],
         min_nonzero=args["min_nonzero"],
         epoch_size=args["num_eval_episodes"]
     )
@@ -144,8 +140,6 @@ def main(
 
     config = TransformerConfig(
         input_size=feature_dim,
-        embedding=args["embedding"],
-        hidden_size=args["hidden_size"],
         num_attention_heads=args["num_attention_heads"],
         intermediate_size=args["intermediate_size"],
         num_layers=args["num_layers"],
@@ -154,7 +148,8 @@ def main(
         logit_bias=args["logit_bias"],
         attention_dropout=args["attention_dropout"],
         sequence_length=args["sequence_length"],
-        normalize=args["normalize"],
+        reg_lambda=args["reg_lambda"],
+        reg_alpha=args["reg_alpha"],
     )
 
     model = Transformer(config)
@@ -178,6 +173,8 @@ def main(
 
     
     accumulated_train_loss = 0.0
+    accumulated_train_bce_loss = 0.0
+    accumulated_train_reg_loss = 0.0
     accumulated_train_correct = 0
     accumulated_train_total = 0
 
@@ -201,7 +198,9 @@ def main(
 
         with autocast(dtype=torch.bfloat16, device_type="cuda"):
             logits = model(X_batch, Y_batch).squeeze(-1)
-            loss = F.binary_cross_entropy_with_logits(logits, Y_batch)
+            bce_loss = F.binary_cross_entropy_with_logits(logits, Y_batch)
+            reg_loss = model.module.compute_embedding_regularization()
+            loss = bce_loss + reg_loss
 
         optimizer.zero_grad()
         loss.backward()
@@ -209,12 +208,14 @@ def main(
         optimizer.step()
 
         accumulated_train_loss += loss.item()
+        accumulated_train_bce_loss += bce_loss.item()
+        accumulated_train_reg_loss += reg_loss.item()
         predictions = (torch.sigmoid(logits) > 0.5).float()
         accumulated_train_correct += (predictions == Y_batch).sum().item()
         accumulated_train_total += Y_batch.numel()
 
         if (training_step + 1) % args["log_interval_steps"] == 0:
-            metrics = torch.tensor([accumulated_train_loss, accumulated_train_correct, accumulated_train_total], device=device)
+            metrics = torch.tensor([accumulated_train_loss, accumulated_train_bce_loss, accumulated_train_reg_loss, accumulated_train_correct, accumulated_train_total], device=device)
             
             # sum this tensor across all processes in the DDP group
             torch.distributed.all_reduce(metrics, op=torch.distributed.ReduceOp.SUM)
@@ -223,12 +224,21 @@ def main(
             if args["wandb_log"] and ddp_rank == 0:
                 # log_interval_steps is multiplied by ddp_world_size because each process ran that many steps
                 global_loss = metrics[0].item() / (args["log_interval_steps"] * ddp_world_size)
-                global_accuracy = metrics[1].item() / metrics[2].item()
+                global_bce_loss = metrics[1].item() / (args["log_interval_steps"] * ddp_world_size)
+                global_reg_loss = metrics[2].item() / (args["log_interval_steps"] * ddp_world_size)
+                global_accuracy = metrics[3].item() / metrics[4].item()
                 
-                wandb.log({"loss_train": global_loss, "accuracy_train": global_accuracy}, step=training_step)
+                wandb.log({
+                    "loss_train": global_loss,
+                    "bce_loss_train": global_bce_loss, 
+                    "reg_loss_train": global_reg_loss,
+                    "accuracy_train": global_accuracy
+                }, step=training_step)
 
             # reset local accumulators on all processes
             accumulated_train_loss = 0.0
+            accumulated_train_bce_loss = 0.0
+            accumulated_train_reg_loss = 0.0
             accumulated_train_correct = 0
             accumulated_train_total = 0
 
@@ -238,6 +248,8 @@ def main(
                 optimizer.eval() # schedule free optimizers need this
                 
                 local_sum_eval_loss = 0.0
+                local_sum_eval_bce_loss = 0.0
+                local_sum_eval_reg_loss = 0.0
                 local_correct_predictions = 0
                 local_total_predictions = 0
 
@@ -247,26 +259,39 @@ def main(
 
                     with autocast(dtype=torch.bfloat16, device_type="cuda"):
                         logits_eval = model(batch_X, batch_Y).squeeze(-1)
-                        loss_eval =  F.binary_cross_entropy_with_logits(logits_eval, batch_Y)
+                        bce_loss_eval = F.binary_cross_entropy_with_logits(logits_eval, batch_Y)
+                        reg_loss_eval = model.module.compute_embedding_regularization()
+                        loss_eval = bce_loss_eval + reg_loss_eval
                     
                     local_sum_eval_loss += loss_eval.item() * batch_Y.numel()
+                    local_sum_eval_bce_loss += bce_loss_eval.item() * batch_Y.numel()
+                    local_sum_eval_reg_loss += reg_loss_eval.item() * batch_Y.numel()
                     predictions = (torch.sigmoid(logits_eval) > 0.5).float()
                     local_correct_predictions += (predictions == batch_Y).sum().item()
                     local_total_predictions += batch_Y.numel()
 
-                metrics = torch.tensor([local_sum_eval_loss, local_correct_predictions, local_total_predictions], device=device)
+                metrics = torch.tensor([local_sum_eval_loss, local_sum_eval_bce_loss, local_sum_eval_reg_loss, local_correct_predictions, local_total_predictions], device=device)
                 torch.distributed.all_reduce(metrics, op=torch.distributed.ReduceOp.SUM)
 
                 stop_training = torch.tensor(0, device=device)
                 if ddp_rank == 0:
                     global_sum_loss = metrics[0].item()
-                    global_correct = metrics[1].item()
-                    global_total = metrics[2].item()
+                    global_sum_bce_loss = metrics[1].item()
+                    global_sum_reg_loss = metrics[2].item()
+                    global_correct = metrics[3].item()
+                    global_total = metrics[4].item()
                     eval_accuracy = global_correct / global_total
 
                     if args["wandb_log"]:
                         avg_eval_loss = global_sum_loss / global_total
-                        wandb.log({"loss_eval": avg_eval_loss, "accuracy_eval": eval_accuracy}, step=training_step)
+                        avg_eval_bce_loss = global_sum_bce_loss / global_total
+                        avg_eval_reg_loss = global_sum_reg_loss / global_total
+                        wandb.log({
+                            "loss_eval": avg_eval_loss,
+                            "bce_loss_eval": avg_eval_bce_loss,
+                            "reg_loss_eval": avg_eval_reg_loss,
+                            "accuracy_eval": eval_accuracy
+                        }, step=training_step)
 
                     if best_eval_accuracy > args["early_stopping_min_threshold"] or training_step >= args["early_stopping_max_steps"]:
                         if eval_accuracy - best_eval_accuracy > args["early_stopping_min_delta"]:

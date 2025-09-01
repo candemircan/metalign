@@ -9,12 +9,10 @@ def config():
     """Default TransformerConfig for testing."""
     return TransformerConfig(
         input_size=512,
-        hidden_size=128,
         num_attention_heads=4,
         intermediate_size=256,
         num_layers=2,
         sequence_length=64,
-        embedding=True,
         bias=True,
         attention_dropout=0.1,
     )
@@ -66,18 +64,11 @@ def test_transformer(config: TransformerConfig):
     output = model(x, y)
     assert output.shape == (2, 10, 1)
 
-def test_transformer_no_embedding(config: TransformerConfig):
-    config.embedding = False
-    config.input_size = config.hidden_size - 2  # Account for the +2 that happens internally
+def test_transformer_regularization(config: TransformerConfig):
     model = Transformer(config)
-    x = torch.randn(2, 10, config.input_size)
-    y = torch.randint(0, 2, (2, 10))
-    output = model(x, y)
-    assert output.shape == (2, 10, 1)
-
-def test_transformer_raises_on_size_mismatch():
-    with pytest.raises(ValueError):
-        Transformer(TransformerConfig(embedding=False, input_size=128, hidden_size=256, sequence_length=64))
+    reg_loss = model.compute_embedding_regularization()
+    assert isinstance(reg_loss, torch.Tensor)
+    assert reg_loss.ndim == 0  # scalar tensor
 
 def test_transformer_prep_inputs(config: TransformerConfig):
     model = Transformer(config)

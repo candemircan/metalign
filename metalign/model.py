@@ -20,8 +20,6 @@ class TransformerConfig:
     The defaults here are kinda random. They exist just to make testing easy. 
     """
     input_size: int = 512
-    embedding: bool = True
-    hidden_size: int = 128
     num_attention_heads: int = 4
     intermediate_size: int = 512
     num_layers: int = 2
@@ -30,11 +28,16 @@ class TransformerConfig:
     logit_bias: bool = True
     attention_dropout: float = 0.1
     sequence_length: int = 120
-    normalize: bool = True
+    reg_lambda: float = 0.1
+    reg_alpha: float = 1.0
+
+    @property
+    def hidden_size(self) -> int:
+        return self.input_size
 
     def __post_init__(self):
-        if self.hidden_size % self.num_attention_heads != 0:
-            raise ValueError(f"hidden_size ({self.hidden_size}) must be divisible by num_attention_heads ({self.num_attention_heads})")
+        if self.input_size % self.num_attention_heads != 0:
+            raise ValueError(f"input_size ({self.input_size}) must be divisible by num_attention_heads ({self.num_attention_heads})")
 
 class MLP(nn.Module):
     def __init__(self, hidden_size:int, intermediate_size:int, hidden_act: str, bias: bool):
@@ -100,10 +103,7 @@ class Transformer(nn.Module):
         # actual input size includes features + 2 for target encoding
         actual_input_size = config.input_size + 2
 
-        if not config.embedding and actual_input_size != config.hidden_size: raise ValueError(f"Input size {actual_input_size} must match hidden size {config.hidden_size} when embedding is False.")
-
-        self.norm = nn.LayerNorm(config.input_size) if config.normalize else nn.Identity()
-        self.embedding = nn.Linear(actual_input_size, config.hidden_size, bias=config.bias) if config.embedding else nn.Identity()
+        self.embedding = nn.Linear(actual_input_size, config.hidden_size, bias=config.bias)
         self.rope = RotaryPositionalEmbeddings(dim=config.hidden_size // config.num_attention_heads, max_seq_len=config.sequence_length)
 
 
@@ -120,6 +120,28 @@ class Transformer(nn.Module):
         ])
         self.final_ln = nn.LayerNorm(config.hidden_size)
         self.linear_head = nn.Linear(config.hidden_size,1, bias=config.logit_bias)
+
+    def compute_embedding_regularization(self) -> torch.Tensor:
+        """
+        Compute regularization term: lambda * ||W_embedding[:, 2:] - alpha * I||_F^2
+        Only considers the weights that correspond to the feature dimensions, not the one-hot part.
+        """
+        embedding_weights = self.embedding.weight[:, 2:]  # exclude one-hot columns
+        feature_dim = embedding_weights.shape[1]
+        hidden_dim = embedding_weights.shape[0]
+        
+        # create identity matrix with appropriate dimensions
+        if feature_dim <= hidden_dim:
+            identity = torch.eye(feature_dim, device=embedding_weights.device, dtype=embedding_weights.dtype)
+            # pad with zeros if needed
+            if feature_dim < hidden_dim:
+                identity = torch.cat([identity, torch.zeros(hidden_dim - feature_dim, feature_dim, device=embedding_weights.device, dtype=embedding_weights.dtype)], dim=0)
+        else:
+            # truncate identity if feature_dim > hidden_dim
+            identity = torch.eye(hidden_dim, feature_dim, device=embedding_weights.device, dtype=embedding_weights.dtype)
+        
+        regularization = torch.norm(embedding_weights - self.config.reg_alpha * identity, p='fro') ** 2
+        return self.config.reg_lambda * regularization
 
 
     def _prep_inputs(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
@@ -147,7 +169,6 @@ class Transformer(nn.Module):
                 ) -> torch.Tensor:
         
 
-        x = self.norm(x)
         # prepend BOS tokens to all tokens if y is None, else use y as is
         y = y if y is not None else torch.zeros(x.shape[0], x.shape[1], device=x.device)
         x = self._prep_inputs(x, y)  # (batch_size, seq_len, input_size)
