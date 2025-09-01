@@ -102,12 +102,8 @@ class Transformer(nn.Module):
 
         if not config.embedding and actual_input_size != config.hidden_size: raise ValueError(f"Input size {actual_input_size} must match hidden size {config.hidden_size} when embedding is False.")
 
-        if config.normalize: self.norm = nn.LayerNorm(config.input_size) # we want to apply this before the one-hot concatenation
-        else: self.norm = nn.Identity()
-
-        if config.embedding: self.embedding = nn.Linear(actual_input_size, config.hidden_size, bias=config.bias)
-        else: self.embedding = nn.Identity()
-
+        self.norm = nn.LayerNorm(config.input_size) if config.normalize else nn.Identity()
+        self.embedding = nn.Linear(actual_input_size, config.hidden_size, bias=config.bias) if config.embedding else nn.Identity()
         self.rope = RotaryPositionalEmbeddings(dim=config.hidden_size // config.num_attention_heads, max_seq_len=config.sequence_length)
 
 

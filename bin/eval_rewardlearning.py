@@ -48,7 +48,7 @@ def main(
 
     human_data = pd.read_csv("data/external/reward_learning.csv")
     backbone_reps = load_backbone_representations(things_reps)
-    with model.trace(torch.from_numpy(backbone_reps).unsqueeze(0)): metalign_reps = model.embedding.output.save()
+    with model.trace(torch.from_numpy(backbone_reps).unsqueeze(1)): metalign_reps = model.embedding.output.squeeze().save()
 
     imgs = sorted(glob("data/external/THINGS/*/*jpg"))
     metalign_accuracies, base_accuracies = [], []
