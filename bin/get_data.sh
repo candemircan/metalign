@@ -2,6 +2,11 @@ if [ ! -d "data/external" ]; then
     mkdir -p data/external
 fi
 
+## Models ##
+for model in timm/vit_base_patch16_224.mae timm/vit_base_patch14_reg4_dinov2.lvd142m timm/vit_base_patch16_siglip_512.v2_webli timm/vit_base_patch16_224.augreg2_in21k_ft_in1k Prisma-Multimodal/sae-top_k-64-cls_only-layer_6-hook_resid_post Prisma-Multimodal/sae-top_k-64-cls_only-layer_11-hook_resid_post; do
+    uv run huggingface-cli download $model
+done
+
 ## THINGS ##
 # spose
 if [ ! -f "data/external/spose_embedding_66d_sorted.txt" ]; then

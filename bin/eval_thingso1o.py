@@ -64,7 +64,7 @@ def main(
     model.eval()
     model = NNsight(model)
 
-    with model.trace(backbone_reps): metalign_reps = model.embedding.output.save()
+    with model.trace(backbone_reps.unsqueeze(0)): metalign_reps = model.embedding.output.save()
 
     X = df[["image1", "image2", "image3"]].values - 1 # 0 index
     y = df["choice"].values -1 # 0 index

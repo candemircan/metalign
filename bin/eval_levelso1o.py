@@ -86,7 +86,7 @@ def main(
     model.eval()
     model = NNsight(model)
 
-    with model.trace(backbone_reps): metalign_reps = model.embedding.output.save()
+    with model.trace(backbone_reps.unsqueeze(0)): metalign_reps = model.embedding.output.save()
 
     
     og_acc, og_type_accs = _calculate_accuracy(backbone_reps, trials, batch_size=batch_size)
