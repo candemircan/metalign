@@ -1,4 +1,5 @@
 import json
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -6,7 +7,6 @@ import torch
 from fastcore.script import call_parse
 from nnsight import NNsight
 from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import StandardScaler
 from torchvision.datasets import CIFAR100
 from tqdm import tqdm
 
@@ -14,6 +14,9 @@ from metalign.data import load_backbone_representations
 from metalign.model import Transformer
 
 _ = torch.set_grad_enabled(False)
+# few shot always raises warnings about two little samples per class
+warnings.filterwarnings("ignore", category=UserWarning, module="sklearn") 
+
 
 def _evaluate_few_shot(train_backbone_reps, train_metalign_reps, train_targets, 
                       test_backbone_reps, test_metalign_reps, test_targets, n_shot, n_runs=20):
@@ -27,7 +30,7 @@ def _evaluate_few_shot(train_backbone_reps, train_metalign_reps, train_targets,
         train_indices = []
         val_indices = []
         
-        for class_id in range(100):  # CIFAR-100 has 100 classes
+        for class_id in range(len(np.unique(train_targets))):
             class_indices = np.where(train_targets == class_id)[0]
             np.random.shuffle(class_indices)
             
@@ -47,79 +50,42 @@ def _evaluate_few_shot(train_backbone_reps, train_metalign_reps, train_targets,
         y_val = train_targets[val_indices]
         
         # hyperparameter search space
-        param_grid = {
-            'C': [0.001, 0.01, 0.1, 1.0, 10.0, 100.0],
-            'use_scaler': [True, False]
-        }
+        param_grid = {'C': [0.001, 0.01, 0.1, 1.0, 10.0, 100.0]}
         
         # evaluate backbone representations
         best_backbone_acc = 0
-        best_backbone_params = None
+        best_backbone_C = None
         for C in param_grid['C']:
-            for use_scaler in param_grid['use_scaler']:
-                if use_scaler:
-                    scaler = StandardScaler()
-                    X_train_scaled = scaler.fit_transform(X_train_backbone)
-                    X_val_scaled = scaler.transform(X_val_backbone)
-                else:
-                    X_train_scaled = X_train_backbone
-                    X_val_scaled = X_val_backbone
-                    scaler = None
-                
-                clf = LogisticRegression(C=C, max_iter=1000, random_state=42)
-                clf.fit(X_train_scaled, y_train)
-                val_acc = clf.score(X_val_scaled, y_val)
-                
-                if val_acc > best_backbone_acc:
-                    best_backbone_acc = val_acc
-                    best_backbone_params = {'C': C, 'scaler': scaler}
+            clf = LogisticRegression(C=C, max_iter=1000, random_state=1234)
+            clf.fit(X_train_backbone, y_train)
+            val_acc = clf.score(X_val_backbone, y_val)
+            
+            if val_acc > best_backbone_acc:
+                best_backbone_acc = val_acc
+                best_backbone_C = C
         
         # evaluate metalign representations  
         best_metalign_acc = 0
-        best_metalign_params = None
+        best_metalign_C = None
         for C in param_grid['C']:
-            for use_scaler in param_grid['use_scaler']:
-                if use_scaler:
-                    scaler = StandardScaler()
-                    X_train_scaled = scaler.fit_transform(X_train_metalign)
-                    X_val_scaled = scaler.transform(X_val_metalign)
-                else:
-                    X_train_scaled = X_train_metalign
-                    X_val_scaled = X_val_metalign
-                    scaler = None
-                
-                clf = LogisticRegression(C=C, max_iter=1000, random_state=42)
-                clf.fit(X_train_scaled, y_train)
-                val_acc = clf.score(X_val_scaled, y_val)
-                
-                if val_acc > best_metalign_acc:
-                    best_metalign_acc = val_acc
-                    best_metalign_params = {'C': C, 'scaler': scaler}
+            clf = LogisticRegression(C=C, max_iter=1000, random_state=1234)
+            clf.fit(X_train_metalign, y_train)
+            val_acc = clf.score(X_val_metalign, y_val)
+            
+            if val_acc > best_metalign_acc:
+                best_metalign_acc = val_acc
+                best_metalign_C = C
         
         # test on test set with best hyperparameters
         # backbone test
-        if best_backbone_params['scaler'] is not None:
-            X_train_backbone_scaled = best_backbone_params['scaler'].fit_transform(X_train_backbone)
-            X_test_backbone_scaled = best_backbone_params['scaler'].transform(test_backbone_reps)
-        else:
-            X_train_backbone_scaled = X_train_backbone
-            X_test_backbone_scaled = test_backbone_reps
-            
-        backbone_clf = LogisticRegression(C=best_backbone_params['C'], max_iter=1000, random_state=42)
-        backbone_clf.fit(X_train_backbone_scaled, y_train)
-        backbone_test_acc = backbone_clf.score(X_test_backbone_scaled, test_targets)
+        backbone_clf = LogisticRegression(C=best_backbone_C, max_iter=1000, random_state=1234)
+        backbone_clf.fit(X_train_backbone, y_train)
+        backbone_test_acc = backbone_clf.score(test_backbone_reps, test_targets)
         
         # metalign test
-        if best_metalign_params['scaler'] is not None:
-            X_train_metalign_scaled = best_metalign_params['scaler'].fit_transform(X_train_metalign)
-            X_test_metalign_scaled = best_metalign_params['scaler'].transform(test_metalign_reps)
-        else:
-            X_train_metalign_scaled = X_train_metalign
-            X_test_metalign_scaled = test_metalign_reps
-            
-        metalign_clf = LogisticRegression(C=best_metalign_params['C'], max_iter=1000, random_state=42)
-        metalign_clf.fit(X_train_metalign_scaled, y_train)
-        metalign_test_acc = metalign_clf.score(X_test_metalign_scaled, test_targets)
+        metalign_clf = LogisticRegression(C=best_metalign_C, max_iter=1000, random_state=1234)
+        metalign_clf.fit(X_train_metalign, y_train)
+        metalign_test_acc = metalign_clf.score(test_metalign_reps, test_targets)
         
         print(f"Run {run}/{n_runs}: Backbone Test Acc: {backbone_test_acc:.4f}, Metalign Test Acc: {metalign_test_acc:.4f}")
         backbone_results.append(backbone_test_acc)
@@ -178,10 +144,10 @@ def main(
     train_metalign_reps = train_metalign_reps.cpu().numpy()
     test_metalign_reps = test_metalign_reps.cpu().numpy()
     
-    # Set random seed for reproducibility
-    np.random.seed(42)
+    # set random seed for reproducibility
+    np.random.seed(1234)
     
-    # Evaluate 1-shot and 10-shot
+    # evaluate 1-shot and 10-shot
     results_1_shot = _evaluate_few_shot(
         train_backbone_reps, train_metalign_reps, train_targets, 
         test_backbone_reps, test_metalign_reps, test_targets, 1, n_runs
@@ -192,7 +158,7 @@ def main(
         test_backbone_reps, test_metalign_reps, test_targets, 10, n_runs
     )
     
-    # Save results
+    # save results
     eval_path = Path("data/evals/cifar100")
     eval_path.mkdir(parents=True, exist_ok=True)
     file_name = f"{experiment_name}_{backbone_name}"
