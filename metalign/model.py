@@ -100,12 +100,13 @@ class Transformer(nn.Module):
         super().__init__()
         self.config = config
 
-        # actual input size includes features + 2 for target encoding
         actual_input_size = config.input_size + 2
 
         self.embedding = nn.Linear(actual_input_size, config.hidden_size, bias=config.bias)
+        
+        self.register_buffer('identity_matrix', torch.eye(config.input_size), persistent=False)
+        
         self.rope = RotaryPositionalEmbeddings(dim=config.hidden_size // config.num_attention_heads, max_seq_len=config.sequence_length)
-
 
         self.layers = nn.ModuleList([
             TransformerBlock(
@@ -122,26 +123,8 @@ class Transformer(nn.Module):
         self.linear_head = nn.Linear(config.hidden_size,1, bias=config.logit_bias)
 
     def compute_embedding_regularization(self) -> torch.Tensor:
-        """
-        Compute regularization term: lambda * ||W_embedding[:, 2:] - alpha * I||_F^2
-        Only considers the weights that correspond to the feature dimensions, not the one-hot part.
-        """
-        embedding_weights = self.embedding.weight[:, 2:]  # exclude one-hot columns
-        feature_dim = embedding_weights.shape[1]
-        hidden_dim = embedding_weights.shape[0]
-        
-        # create identity matrix with appropriate dimensions
-        if feature_dim <= hidden_dim:
-            identity = torch.eye(feature_dim, device=embedding_weights.device, dtype=embedding_weights.dtype)
-            # pad with zeros if needed
-            if feature_dim < hidden_dim:
-                identity = torch.cat([identity, torch.zeros(hidden_dim - feature_dim, feature_dim, device=embedding_weights.device, dtype=embedding_weights.dtype)], dim=0)
-        else:
-            # truncate identity if feature_dim > hidden_dim
-            identity = torch.eye(hidden_dim, feature_dim, device=embedding_weights.device, dtype=embedding_weights.dtype)
-        
-        regularization = torch.norm(embedding_weights - self.config.reg_alpha * identity, p='fro') ** 2
-        return self.config.reg_lambda * regularization
+        embedding_weights = self.embedding.weight[:, 2:]
+        return self.config.reg_lambda * torch.norm(embedding_weights - self.config.reg_alpha * self.identity_matrix, p='fro') ** 2
 
 
     def _prep_inputs(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
