@@ -85,8 +85,7 @@ def main(
     repo_id_suffix = repo_id.split('/')[-1]
 
     device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
-    sae_path = hf_hub_download(repo_id, "weights.pt")
-    hf_hub_download(repo_id, "config.json")
+    sae_path = hf_hub_download(repo_id, "weights.pt") # we already have it downloaded, but need the path for it
     sae = SparseAutoencoder.load_from_pretrained(sae_path).to(device)
     model_name = sae.cfg.model_name
     model = load_hooked_model(model_name, device=device).to(device)
@@ -131,14 +130,14 @@ def main(
         from torchvision.datasets import CIFAR100
         clip_transforms = get_clip_val_transforms()
         # Process training data
-        ds_train = CIFAR100(root="data/external", train=True, download=True, transform=clip_transforms)
+        ds_train = CIFAR100(root="data/external", train=True, download=False, transform=clip_transforms)
         dataloader_train = DataLoader(ds_train, batch_size=batch_size, shuffle=False, num_workers=4)
         sae_file_path_train = sae_dir_path / f"cifar100_train_{repo_id_suffix}.h5"
         raw_file_path_train = raw_dir_path / f"cifar100_train_{save_model_name}_raw.h5"
         _extract_and_save(model, sae, dataloader_train, sae_file_path_train, raw_file_path_train, device, force)
 
         # Process test data
-        ds_test = CIFAR100(root="data/external", train=False, download=True, transform=clip_transforms)
+        ds_test = CIFAR100(root="data/external", train=False, download=False, transform=clip_transforms)
         dataloader_test = DataLoader(ds_test, batch_size=batch_size, shuffle=False, num_workers=4)
         sae_file_path_test = sae_dir_path / f"cifar100_test_{repo_id_suffix}.h5"
         raw_file_path_test = raw_dir_path / f"cifar100_test_{save_model_name}_raw.h5"

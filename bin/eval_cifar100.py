@@ -23,7 +23,7 @@ def _evaluate_few_shot(train_backbone_reps, train_metalign_reps, train_targets,
     metalign_results = []
     
     for run in tqdm(range(n_runs), desc=f"{n_shot}-shot evaluation"):
-        # Sample n_shot instances per class from training data
+        # sample n_shot instances per class from training data
         train_indices = []
         val_indices = []
         
@@ -37,7 +37,7 @@ def _evaluate_few_shot(train_backbone_reps, train_metalign_reps, train_targets,
         train_indices = np.array(train_indices)
         val_indices = np.array(val_indices)
         
-        # Prepare training and validation data
+        # prepare training and validation data
         X_train_backbone = train_backbone_reps[train_indices]
         X_train_metalign = train_metalign_reps[train_indices]
         y_train = train_targets[train_indices]
@@ -46,13 +46,13 @@ def _evaluate_few_shot(train_backbone_reps, train_metalign_reps, train_targets,
         X_val_metalign = train_metalign_reps[val_indices]
         y_val = train_targets[val_indices]
         
-        # Hyperparameter search space
+        # hyperparameter search space
         param_grid = {
             'C': [0.001, 0.01, 0.1, 1.0, 10.0, 100.0],
             'use_scaler': [True, False]
         }
         
-        # Evaluate backbone representations
+        # evaluate backbone representations
         best_backbone_acc = 0
         best_backbone_params = None
         for C in param_grid['C']:
@@ -74,7 +74,7 @@ def _evaluate_few_shot(train_backbone_reps, train_metalign_reps, train_targets,
                     best_backbone_acc = val_acc
                     best_backbone_params = {'C': C, 'scaler': scaler}
         
-        # Evaluate metalign representations  
+        # evaluate metalign representations  
         best_metalign_acc = 0
         best_metalign_params = None
         for C in param_grid['C']:
@@ -96,8 +96,8 @@ def _evaluate_few_shot(train_backbone_reps, train_metalign_reps, train_targets,
                     best_metalign_acc = val_acc
                     best_metalign_params = {'C': C, 'scaler': scaler}
         
-        # Test on test set with best hyperparameters
-        # Backbone test
+        # test on test set with best hyperparameters
+        # backbone test
         if best_backbone_params['scaler'] is not None:
             X_train_backbone_scaled = best_backbone_params['scaler'].fit_transform(X_train_backbone)
             X_test_backbone_scaled = best_backbone_params['scaler'].transform(test_backbone_reps)
@@ -109,7 +109,7 @@ def _evaluate_few_shot(train_backbone_reps, train_metalign_reps, train_targets,
         backbone_clf.fit(X_train_backbone_scaled, y_train)
         backbone_test_acc = backbone_clf.score(X_test_backbone_scaled, test_targets)
         
-        # Metalign test
+        # metalign test
         if best_metalign_params['scaler'] is not None:
             X_train_metalign_scaled = best_metalign_params['scaler'].fit_transform(X_train_metalign)
             X_test_metalign_scaled = best_metalign_params['scaler'].transform(test_metalign_reps)
@@ -121,6 +121,7 @@ def _evaluate_few_shot(train_backbone_reps, train_metalign_reps, train_targets,
         metalign_clf.fit(X_train_metalign_scaled, y_train)
         metalign_test_acc = metalign_clf.score(X_test_metalign_scaled, test_targets)
         
+        print(f"Run {run}/{n_runs}: Backbone Test Acc: {backbone_test_acc:.4f}, Metalign Test Acc: {metalign_test_acc:.4f}")
         backbone_results.append(backbone_test_acc)
         metalign_results.append(metalign_test_acc)
     
@@ -147,14 +148,12 @@ def main(
     backbone_dict = json.load(open(Path("data/backbone_reps") / "backbones.json"))
     ckpt = best_models[f"[{experiment_name.upper()}]"][backbone_name]
     
-    # Load train and test representations
     train_reps_path = f"data/backbone_reps/cifar100_train_{backbone_dict[backbone_name]}.h5"
     test_reps_path = f"data/backbone_reps/cifar100_test_{backbone_dict[backbone_name]}.h5"
     
     train_backbone_reps = load_backbone_representations(train_reps_path)
     test_backbone_reps = load_backbone_representations(test_reps_path)
     
-    # Get CIFAR-100 labels (we need the actual labels, not just representations)
     train_dataset = CIFAR100(root="data/external", train=True, download=False)
     test_dataset = CIFAR100(root="data/external", train=False, download=False)
     

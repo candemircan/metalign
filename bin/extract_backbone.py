@@ -110,7 +110,7 @@ def main(
         save_path_train = Path("data/backbone_reps") / f"cifar100_train_{model_name}.h5"
         save_path_train.parent.mkdir(parents=True, exist_ok=True)
         if not save_path_train.exists() or force:
-            ds_train = CIFAR100(root="data/external", train=True, download=True, transform=transform)
+            ds_train = CIFAR100(root="data/external", train=True, download=False, transform=transform)
             _extract_and_save(model, ds_train, save_path_train, device, batch_size)
         else:
             print(f"File {save_path_train} already exists. Use --force to overwrite.")
@@ -119,7 +119,7 @@ def main(
         save_path_test = Path("data/backbone_reps") / f"cifar100_test_{model_name}.h5"
         save_path_test.parent.mkdir(parents=True, exist_ok=True)
         if not save_path_test.exists() or force:
-            ds_test = CIFAR100(root="data/external", train=False, download=True, transform=transform)
+            ds_test = CIFAR100(root="data/external", train=False, download=False, transform=transform)
             _extract_and_save(model, ds_test, save_path_test, device, batch_size)
         else:
             print(f"File {save_path_test} already exists. Use --force to overwrite.")
