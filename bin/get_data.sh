@@ -9,6 +9,9 @@ done
 
 ## CIFAR-100 ##
 uv run python -c "import torchvision; torchvision.datasets.CIFAR100('data/external', train=True, download=True); torchvision.datasets.CIFAR100('data/external', train=False, download=True)"
+if [ -f "data/external/cifar-100-python.tar.gz" ]; then
+   rm -rf data/external/cifar-100-python.tar.gz
+fi
 
 ## THINGS ##
 # spose

@@ -29,7 +29,9 @@ def _extract_and_save(model, dataset, save_path, device, batch_size):
         current_idx = 0
         
         for batch in tqdm(dataloader, desc=f"Extracting to {save_path}"):
-            inputs = batch.to(device, non_blocking=True)
+            # some return (image, labels) while others return images only
+            if isinstance(batch, (list, tuple)): inputs = batch[0].to(device, non_blocking=True)
+            else: inputs = batch.to(device, non_blocking=True)
             features = model(inputs)
             features = features.cpu().numpy()
             

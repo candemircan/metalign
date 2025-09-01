@@ -35,7 +35,9 @@ def _extract_and_save(
     image_offset = 0
     with h5py.File(sae_file_path, 'w') as sae_f, h5py.File(raw_file_path, 'w') as raw_f:
         for batch in tqdm(dataloader, desc=f"Processing images for {sae_file_path.stem}"):
-            images = batch.to(device)
+            # some return (image, labels) while others return images only
+            if isinstance(batch, (list, tuple)): images = batch[0].to(device)
+            else: images = batch.to(device)
             _, cache = model.run_with_cache(images, names_filter=sae.cfg.hook_point)
             hook_point_activation = cache[sae.cfg.hook_point].to(device)
 
