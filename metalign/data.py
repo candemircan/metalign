@@ -207,7 +207,8 @@ class FunctionDataset(Dataset):
         self.epoch_size = epoch_size
         
         # detect if this is dense (raw) or sparse (SAE) features
-        # for sparse features, most values are 0; for dense features, all values are non-zero
+        # for sparse features, most values are 0
+        #  for dense features, all values are non-zero
         sparsity = (self.Y == 0).float().mean()
         self.is_sparse = sparsity > 0.5  # if more than 50% are zeros, treat as sparse
             

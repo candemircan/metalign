@@ -19,112 +19,93 @@ class TransformerConfig:
 
     The defaults here are kinda random. They exist just to make testing easy. 
     """
-    input_size: int = 512
-    num_attention_heads: int = 4
-    intermediate_size: int = 512
-    num_layers: int = 2
-    hidden_act: str = "gelu"
+    x_sz: int = 512
+    n_heads: int = 4
+    int_sz: int = 512
+    n_layers: int = 2
+    act: str = "gelu"
     bias: bool = True
     logit_bias: bool = True
-    attention_dropout: float = 0.1
-    sequence_length: int = 120
-    reg_lambda: float = 0.1
-    reg_alpha: float = 1.0
-
-    @property
-    def hidden_size(self) -> int:
-        return self.input_size
+    attn_drop: float = 0.1
+    sl: int = 12
+    use_mlp: bool = True
 
     def __post_init__(self):
-        if self.input_size % self.num_attention_heads != 0:
-            raise ValueError(f"input_size ({self.input_size}) must be divisible by num_attention_heads ({self.num_attention_heads})")
+        if self.x_sz % self.n_heads != 0:
+            raise ValueError(f"input size ({self.x_sz}) must be divisible by the number of attention heads ({self.n_heads})")
 
 class MLP(nn.Module):
-    def __init__(self, hidden_size:int, intermediate_size:int, hidden_act: str, bias: bool):
+    def __init__(self, x_sz:int, int_sz:int, act: str, bias: bool):
         super().__init__()
-        self.act_fn = getattr(F, hidden_act, None)
-        if self.act_fn is None: raise ValueError(f"Activation function '{hidden_act}' is not supported.")
+        self.act_fn = getattr(F, act, None)
+        if self.act_fn is None: raise ValueError(f"Activation function '{act}' is not supported.")
 
-        self.fc1 = nn.Linear(hidden_size, intermediate_size, bias=bias)
-        self.fc2 = nn.Linear(intermediate_size, hidden_size, bias=bias)
+        self.fc1 = nn.Linear(x_sz, int_sz, bias=bias)
+        self.fc2 = nn.Linear(int_sz, x_sz, bias=bias)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.fc2(self.act_fn(self.fc1(x)))
+    def forward(self, x: torch.Tensor) -> torch.Tensor: return self.fc2(self.act_fn(self.fc1(x)))
 
 
 class SelfAttention(nn.Module):
-    def __init__(self, hidden_size: int, num_attention_heads: int, bias: bool, attention_dropout: float, rope: nn.Module):
+    def __init__(self, x_sz: int, n_heads: int, bias: bool, attn_drop: float, rope: nn.Module):
         super().__init__()
-        self.hidden_size = hidden_size
-        self.num_heads = num_attention_heads
-        self.head_dim = hidden_size // num_attention_heads
-        self.attention_dropout = attention_dropout
+        self.x_sz = x_sz
+        self.num_heads = n_heads
+        self.head_dim = x_sz // n_heads
+        self.attn_drop = attn_drop
         self.rope = rope
 
-        self.qkv = nn.Linear(hidden_size, hidden_size * 3, bias=bias)
-        self.o_proj = nn.Linear(hidden_size, hidden_size, bias=bias)
-        self.qkv_split = Rearrange('batch sequence (qkv head head_dim) -> qkv batch head sequence head_dim', qkv=3, head=num_attention_heads)
-        self.o_proj_transpose = Rearrange('batch head sequence head_dim -> batch sequence (head head_dim)')
+        self.qkv = nn.Linear(x_sz, x_sz * 3, bias=bias)
+        self.o_proj = nn.Linear(x_sz, x_sz, bias=bias)
+        self.qkv_split = Rearrange('b s (qkv h hd) -> qkv b h s hd', qkv=3, h=n_heads)
+        self.o_proj_t = Rearrange('b h s hd -> b s (h hd)')
 
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         qkv = self.qkv(x)
         q, k, v = self.qkv_split(qkv)
-        
+    
         q, k = self.rope(q, k)
 
-        attn_output = F.scaled_dot_product_attention(q, k, v, is_causal=True, dropout_p=self.attention_dropout if self.training else 0.0)
+        attn_output = F.scaled_dot_product_attention(q, k, v, is_causal=True, dropout_p=self.attn_drop if self.training else 0.0)
 
-        attn_output = self.o_proj_transpose(attn_output)
+        attn_output = self.o_proj_t(attn_output)
 
         return self.o_proj(attn_output)
 
 
 class TransformerBlock(nn.Module):
-    def __init__(self, hidden_size: int, num_attention_heads: int, intermediate_size: int, hidden_act: str, bias: bool, attention_dropout: float, rope: nn.Module):
+    def __init__(self, x_sz: int, n_heads: int, int_sz: int, act: str, bias: bool, attn_drop: float, rope: nn.Module, use_mlp: bool):
         super().__init__()
-        self.self_attn = SelfAttention(hidden_size, num_attention_heads, bias=bias, attention_dropout=attention_dropout, rope=rope)
-        self.mlp = MLP(hidden_size, intermediate_size, hidden_act, bias=bias)
-        self.ln1 = nn.LayerNorm(hidden_size)
-        self.ln2 = nn.LayerNorm(hidden_size)
+        self.self_attn = SelfAttention(x_sz, n_heads, bias=bias, attn_drop=attn_drop, rope=rope)
+        self.ln1 = nn.LayerNorm(x_sz)
+        if use_mlp:
+            self.mlp = MLP(x_sz, int_sz, act, bias=bias)
+            self.ln2 = nn.LayerNorm(x_sz)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        attn_output = self.self_attn(self.ln1(x))
-        x = x + attn_output
-        x = x + self.mlp(self.ln2(x))
+        x += self.self_attn(self.ln1(x))
+        if hasattr(self, 'mlp'): x += self.mlp(self.ln2(x))
         return x
 
 
 class Transformer(nn.Module):
-    def __init__(self, config: TransformerConfig):
+    def __init__(self, c: TransformerConfig):
         super().__init__()
-        self.config = config
+        self.c = c
 
-        actual_input_size = config.input_size + 2
+        onehot_x_sz = c.x_sz + 2 # binary one-hot encoded previous target
 
-        self.embedding = nn.Linear(actual_input_size, config.hidden_size, bias=config.bias)
-        
-        self.register_buffer('identity_matrix', torch.eye(config.input_size), persistent=False)
-        
-        self.rope = RotaryPositionalEmbeddings(dim=config.hidden_size // config.num_attention_heads, max_seq_len=config.sequence_length)
+        self.embedding = nn.Linear(onehot_x_sz, c.x_sz, bias=c.bias)
+                
+        self.rope = RotaryPositionalEmbeddings(dim=c.x_sz // c.n_heads, max_seq_len=c.sl)
 
         self.layers = nn.ModuleList([
-            TransformerBlock(
-                hidden_size=config.hidden_size,
-                num_attention_heads=config.num_attention_heads,
-                intermediate_size=config.intermediate_size,
-                hidden_act=config.hidden_act,
-                bias=config.bias,
-                attention_dropout=config.attention_dropout,
-                rope=self.rope
-            ) for _ in range(config.num_layers)
-        ])
-        self.final_ln = nn.LayerNorm(config.hidden_size)
-        self.linear_head = nn.Linear(config.hidden_size,1, bias=config.logit_bias)
-
-    def compute_embedding_regularization(self) -> torch.Tensor:
-        embedding_weights = self.embedding.weight[:, 2:]
-        return self.config.reg_lambda * torch.norm(embedding_weights - self.config.reg_alpha * self.identity_matrix, p='fro') ** 2
+            TransformerBlock(x_sz=c.x_sz, n_heads=c.n_heads, int_sz=c.int_sz, act=c.act,
+                             bias=c.bias, attn_drop=c.attn_drop, rope=self.rope, use_mlp=c.use_mlp) for _ in range(c.n_layers)
+                             ])
+        self.final_ln = nn.LayerNorm(c.x_sz)
+        self.linear_head = nn.Linear(c.x_sz,1, bias=c.logit_bias)
 
 
     def _prep_inputs(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
@@ -134,7 +115,7 @@ class Transformer(nn.Module):
         """
         batch_size = x.shape[0]
 
-        # create previous targets: shift targets right and prepend
+        # get the previous targets and prepend with zeros
         prev_targets = torch.cat([torch.zeros(batch_size, 1, device=x.device), y[:, :-1]], dim=1)
 
         # one-hot encode previous targets
@@ -143,7 +124,7 @@ class Transformer(nn.Module):
         # replace the first position with 0s, our BOS token is always [0., 0.]
         target_onehot[:, 0] = 0.
 
-        # concatenate target encoding with input features
+        # prepend the one-hot encoded previous targets to the input features
         return torch.cat([target_onehot, x], dim=-1)
 
     def forward(self,
@@ -154,7 +135,7 @@ class Transformer(nn.Module):
 
         # prepend BOS tokens to all tokens if y is None, else use y as is
         y = y if y is not None else torch.zeros(x.shape[0], x.shape[1], device=x.device)
-        x = self._prep_inputs(x, y)  # (batch_size, seq_len, input_size)
+        x = self._prep_inputs(x, y)  # (batch_size, seq_len, x_sz)
 
         x = self.embedding(x) 
 
@@ -272,3 +253,60 @@ class RotaryPositionalEmbeddings(nn.Module):
         q_out = self._apply_rope(q, rope_cache)
         k_out = self._apply_rope(k, rope_cache)
         return q_out, k_out
+    
+
+if __name__ == "__main__":
+
+    # config and mock input
+    bs = 2
+    c = TransformerConfig(sl=10)
+    x = torch.randn(bs, c.sl, c.x_sz)
+
+    # mlp shape
+    mlp = MLP(c.x_sz, c.int_sz, c.act, c.bias)
+    assert mlp(x).shape == (bs, c.sl, c.x_sz)
+
+    # attn shape
+    rope = RotaryPositionalEmbeddings(dim=c.x_sz // c.n_heads, max_seq_len=c.sl)
+    attn = SelfAttention(c.x_sz, c.n_heads, c.bias, c.attn_drop, rope)
+    assert attn(x).shape == (bs, c.sl, c.x_sz)
+
+    # block shape
+    block = TransformerBlock(c.x_sz, c.n_heads, c.int_sz, c.act, c.bias, c.attn_drop, rope, c.use_mlp)
+    assert block(x).shape == (bs, c.sl, c.x_sz)
+
+    # transformer shape
+    model = Transformer(c)
+    y = torch.randint(0, 2, (bs, c.sl)).float()
+    assert model(x, y).shape == (bs, c.sl, 1)
+
+    # prep input check
+    x = torch.tensor([
+        [10, 20, 30],
+        [40, 50, 60],
+        [70, 80, 90],
+        [100, 110, 120],
+    ], dtype=torch.float32).unsqueeze(0)  # (batch_size, seq_len, input_size)
+
+    y = torch.tensor([1, 0, 0, 1], dtype=torch.long).unsqueeze(0)  # (batch_size, seq_len)
+
+    x_oh_truth = torch.tensor([
+        [0., 0., 10, 20, 30],
+        [0., 1., 40, 50, 60],
+        [1., 0., 70, 80, 90],
+        [1., 0., 100, 110, 120],
+    ], dtype=torch.float32).unsqueeze(0)  # (batch_size, seq_len, input_size + 2)
+
+    x_oh = model._prep_inputs(x, y)
+    assert torch.equal(x_oh, x_oh_truth), "Prepared inputs do not match expected values."
+    assert x_oh.shape == (1, 4, 5), "Prepared inputs shape mismatch."
+
+    # rope test
+    rope = RotaryPositionalEmbeddings(dim=8, max_seq_len=10)
+    q = torch.randn(2, 4, 10, 8)
+    k = torch.randn(2, 4, 10, 8)
+    q_out, k_out = rope(q, k)
+    assert q_out.shape == q.shape
+    assert k_out.shape == k.shape
+    assert not torch.equal(q, q_out)
+    assert not torch.equal(k, k_out)
