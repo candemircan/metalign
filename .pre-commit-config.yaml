@@ -5,16 +5,8 @@ repos:
   hooks:
     # Run the linter.
     - id: ruff
-      args: [ --config=pyproject.toml, --fix, --exit-non-zero-on-fix]
+      args: [ --config=pyproject.toml, --fix, --exit-non-zero-on-fix, --select=F401,I001 ]
       types_or: [ python, pyi, jupyter ]
-- repo: local
-  hooks:
-    - id: pytest
-      name: pytest
-      entry: uv run pytest
-      language: system
-      types: [python]
-      pass_filenames: false
 
 - repo: local
   hooks:

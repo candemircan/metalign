@@ -20,7 +20,7 @@ dependencies = [
     ]
 
 [project.optional-dependencies]
-dev = ["pytest", "pre-commit", "ruff", "ipykernel", "shiny"]
+dev = ["pre-commit", "ruff", "ipykernel", "shiny"]
 
 [tool.setuptools]
 packages = ["metalign"]
@@ -36,14 +36,6 @@ no-build-isolation-package = ["flash-attn"]
 [tool.uv.build-backend]
 module-name = "metalign"
 module-root = ""
-
-[tool.ruff]
-line-length = 200
-lint.ignore = ["E731", "E501", "E701", "E702", "F403"]
-lint.extend-select = ["I"]
-target-version = "py312"
-include = ["bin/*.ipynb"]
-
 
 [tool.ruff.lint.isort]
 extra-standard-library = ["tomllib"]

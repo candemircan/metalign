@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = "==3.12.5"
 resolution-markers = [
     "sys_platform == 'linux'",
@@ -947,7 +947,6 @@ dependencies = [
 dev = [
     { name = "ipykernel" },
     { name = "pre-commit" },
-    { name = "pytest" },
     { name = "ruff" },
     { name = "shiny" },
 ]
@@ -961,7 +960,6 @@ requires-dist = [
     { name = "ipykernel", marker = "extra == 'dev'" },
     { name = "nnsight" },
     { name = "pre-commit", marker = "extra == 'dev'" },
-    { name = "pytest", marker = "extra == 'dev'" },
     { name = "ruff", marker = "extra == 'dev'" },
     { name = "schedulefree" },
     { name = "scikit-learn" },
