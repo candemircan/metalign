@@ -15,3 +15,12 @@ repos:
       entry: uv sync --all-extras
       language: system
       pass_filenames: false
+
+  hooks:
+    - id: run-metalign-tests
+      name: Run metalign tests
+      language: system
+      entry: bash bin/run_tests.sh
+      types: [ python ]
+      files: ^metalign/.*\.py$      
+      pass_filenames: true

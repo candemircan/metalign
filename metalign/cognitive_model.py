@@ -41,7 +41,7 @@ class CategoryLearner:
     def fit(self,
             x:np.ndarray, # observations shaped (n_trials, n_features)
             y:np.ndarray, # categories shaped (n_trials,)
-           ):
+           ) -> "CategoryLearner":
         "Sequentially fit the model to the task."
         self.x,self.y = x,y
         self.values = np.zeros((self.x.shape[0], 2))
@@ -83,7 +83,7 @@ class RewardLearner:
     def fit(self,
             x:np.ndarray, # observations shaped (n_trials, n_options, n_features)
             y:np.ndarray, # rewards shaped (n_trials, n_options)
-           ):
+           ) -> "RewardLearner":
         "sequentially fit the model to the task."
         self.x,self.y = x,y
         n_trials, _, n_feats = self.x.shape
