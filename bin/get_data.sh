@@ -5,7 +5,7 @@ if [ ! -d "data/external" ]; then
 fi
 
 ## Models ##
-for model in timm/vit_base_patch16_224.mae timm/vit_base_patch16_dinov3.lvd1689m timm/vit_base_patch16_siglip_512.v2_webli timm/vit_base_patch16_224.augreg2_in21k_ft_in1k Prisma-Multimodal/sae-top_k-64-cls_only-layer_6-hook_resid_post Prisma-Multimodal/sae-top_k-64-cls_only-layer_11-hook_resid_post; do
+for model in timm/vit_base_patch16_224.mae timm/vit_base_patch16_dinov3.lvd1689m timm/vit_base_patch16_siglip_512.v2_webli Prisma-Multimodal/sae-top_k-64-cls_only-layer_6-hook_resid_post Prisma-Multimodal/sae-top_k-64-cls_only-layer_11-hook_resid_post; do
     uv run huggingface-cli download $model
 done
 
