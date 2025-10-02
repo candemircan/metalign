@@ -98,7 +98,7 @@ def main(
     train_episode_dataset = FunctionDataset(
         inputs=train_inputs, features_path=train_features_path,
         seq_len=args.sl, min_nonzero=args.min_nonzero,
-        epoch_size=args.training_steps
+        epoch_size=args.training_steps * args.batch_size
     )
     
     eval_episode_dataset = FunctionDataset(
@@ -156,12 +156,7 @@ def main(
         model.train()
         optimizer.train()
 
-        try:
-            X_batch, Y_batch = next(train_iterator)
-        except StopIteration:
-            train_iterator = iter(train_loader)
-            X_batch, Y_batch = next(train_iterator)
-
+        X_batch, Y_batch = next(train_iterator)
         X_batch = X_batch.to(device)
         Y_batch = Y_batch.to(device)
 
