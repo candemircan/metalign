@@ -1,4 +1,3 @@
-act = "gelu"
 bias = true
 sl = 120
 logit_bias = true
@@ -7,7 +6,6 @@ warmup_steps = 1000
 training_steps = 1000000
 attn_drop = 0.1
 n_heads = 12
-int_sz = 3072
 weight_decay = 0.0001
 n_layers = 2
 batch_size = 4096
