@@ -13,8 +13,6 @@ repos:
       entry: uv sync --all-extras
       language: system
       pass_filenames: false
-
-  hooks:
     - id: run-metalign-tests
       name: Run metalign tests
       language: system

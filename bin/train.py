@@ -97,13 +97,13 @@ def main(
 
     train_episode_dataset = FunctionDataset(
         inputs=train_inputs, features_path=train_features_path,
-        seq_len=args.sequence_length, min_nonzero=args.min_nonzero,
+        seq_len=args.sl, min_nonzero=args.min_nonzero,
         epoch_size=args.training_steps
     )
     
     eval_episode_dataset = FunctionDataset(
         inputs=eval_inputs, features_path=eval_features_path,
-        seq_len=args.sequence_length, min_nonzero=args.min_nonzero,
+        seq_len=args.sl, min_nonzero=args.min_nonzero,
         epoch_size=args.num_eval_episodes
     )
 

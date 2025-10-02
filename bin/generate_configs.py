@@ -63,7 +63,7 @@ def main(output_dir: Path = Path("data/configs"), base_config_path: Path = Path(
                 short_model_name = "mae"
             else:
                 raise ValueError(f"Unknown model name {config['model_name']}")         
-            config["name"] = f"[{setup_name}]_{short_model_name}_l{config['reg_lambda']}_a{config['reg_alpha']}"
+            config["name"] = f"[{setup_name}]_{short_model_name}"
             config["train_backbone"] = f"coco_train_{config['model_name']}"
             config["eval_backbone"] = f"coco_eval_{config['model_name']}"
             config["train_features"] = setup_params["train_features"]
