@@ -15,9 +15,7 @@ def main(output_dir: Path = Path("data/configs"), base_config_path: Path = Path(
         base_config = tomllib.load(f)
 
     param_grid = {
-        "reg_alpha": [0.05,0.1,0.25,0.5],
-        "reg_lambda": [0.001, 0.01, 0.1, 1.],
-        "model_name": ["vit_base_patch16_224.mae", "vit_base_patch16_224.augreg2_in21k_ft_in1k", "CLIP-ViT-B-32-DataComp.XL-s13B-b90K_sae-top_k-64-cls_only-layer_11-hook_resid_post_raw",  "vit_base_patch14_reg4_dinov2.lvd142m", "vit_base_patch16_siglip_512.v2_webli"]
+        "model_name": ["vit_base_patch16_224.mae", "CLIP-ViT-B-32-DataComp.XL-s13B-b90K_sae-top_k-64-cls_only-layer_11-hook_resid_post_raw",  "vit_base_patch16_dinov3.lvd1689m", "vit_base_patch16_siglip_512.v2_webli"]
     }
 
     keys, values = zip(*param_grid.items())
@@ -57,14 +55,12 @@ def main(output_dir: Path = Path("data/configs"), base_config_path: Path = Path(
             config.update(params) 
             if "siglip" in config["model_name"].lower():
                 short_model_name = "siglip2"
-            elif "dinov2" in config["model_name"].lower():
-                short_model_name = "dinov2"
+            elif "dinov3" in config["model_name"].lower():
+                short_model_name = "dinov3"
             elif "clip" in config["model_name"].lower():
                 short_model_name = "clip"
             elif "mae" in config["model_name"].lower():
                 short_model_name = "mae"
-            elif "vit" in config["model_name"].lower(): # this is hacky, but vit has to come in the end. bc other models have vit in their names too
-                short_model_name = "vit"
             else:
                 raise ValueError(f"Unknown model name {config['model_name']}")         
             config["name"] = f"[{setup_name}]_{short_model_name}_l{config['reg_lambda']}_a{config['reg_alpha']}"

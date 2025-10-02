@@ -103,7 +103,7 @@ def _evaluate_few_shot(train_backbone_reps, train_metalign_reps, train_targets,
 @call_parse
 def main(
     experiment_name: str, # has to be one of main, raw, midsae
-    backbone_name: str, # has to be one of vit, clip, siglip2, dinov2
+    backbone_name: str, # has to be one of mae, clip, siglip2, dinov3
     n_runs: int = 20 # number of runs for few-shot evaluation
 ):
     """

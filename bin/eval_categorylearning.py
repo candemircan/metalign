@@ -18,7 +18,7 @@ _ = torch.set_grad_enabled(False)
 @call_parse
 def main(
     experiment_name: str, # has to be one of main, raw, midsae
-    backbone_name: str, # has to be one of vit, clip, siglip2, dinov2
+    backbone_name: str, # has to be one of  clip, siglip2, dinov3, or mae
 ):
     """
     Compare metalign to baselines with linear probes in how aligned they are with human category learning

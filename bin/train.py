@@ -6,6 +6,7 @@ from pprint import pprint
 import torch
 import wandb
 from fastcore.script import Param, bool_arg, call_parse
+from fastcore.utils import dict2obj
 from schedulefree import AdamWScheduleFree
 from torch.amp import autocast
 from torch.nn import functional as F
@@ -23,18 +24,17 @@ def main(
     config_file: str = None,  # path to a config file. If provided, any parameters in the file will override the corresponding command line arguments.
     wandb_log: bool_arg = True,  # whether to log the model to wandb. If False, no logging is done.
     wandb_name: str = "metalign",  # name of the wandb project. Used to log the model.
-    num_attention_heads: int = 12,  # number of attention heads in the transformer model
-    intermediate_size: int = 3072,  # size of the intermediate layer in the MLP of the transformer model
-    num_layers: int = 6,  # number of transformer layers
-    hidden_act: str = "gelu",  # activation function for the MLP in the transformer model
+    n_heads: int = 12,  # number of attention heads in the transformer model
+    int_sz: int = 3072,  # size of the intermediate layer in the MLP of the transformer model
+    n_layers: int = 6,  # number of transformer layers
+    act: str = "gelu",  # activation function for the MLP in the transformer model
     bias: bool_arg = True,  # whether to use bias in the linear layers of the transformer model
     logit_bias: bool_arg = True,  # whether to use bias in the final linear layer of the transformer model. If False, the final layer will not have a bias term.
-    attention_dropout: float = 0.0,  # dropout rate for the attention layers in the transformer model
-    sequence_length: int = 120,  # maximum number of position embeddings in the transformer model, also the sequence length of the input data
-    reg_lambda: float = 0.1,  # regularization strength for embedding weights
-    reg_alpha: float = 1.0,  # scaling factor for identity matrix in regularization
+    attn_drop: float = 0.0,  # dropout rate for the attention layers in the transformer model
+    sl: int = 120,  # maximum number of position embeddings in the transformer model, also the sequence length of the input data
     batch_size: int = 256,  # batch size for training the model
     training_steps: int = 50000,  # number of training steps per epoch
+    use_mlp: bool_arg = True,  # whether to use an MLP after the transformer layers
     seed: int = 1234, # random seed for reproducibility
     lr: float = 0.0025,  # learning rate for the optimizer
     weight_decay: float = 0.,  # weight decay for the optimizer
@@ -45,12 +45,12 @@ def main(
     num_eval_episodes: int = 128,  # number of episodes to sample for evaluation
     checkpoint_dir: str = "checkpoints", # directory to save checkpoints. this will be placed under data/checkpoints/{name} if name is provided. If name is None, it will be saved under data/checkpoints
     compile: bool_arg = True,  # whether to compile the model with torch.compile
-    train_backbone: str = "coco_train_dinov3-vitb16-pretrain-lvd1689m",  # backbone for train data. the name must match data/backbone_reps/{train_backbone}.h5
-    eval_backbone: str = "coco_eval_dinov3-vitb16-pretrain-lvd1689m",  # backbone for eval data. the name must match data/backbone_reps/{eval_backbone}.h5
+    train_backbone: str = "coco_train_vit_base_patch16_dinov3.lvd1689m",  # backbone for train data. the name must match data/backbone_reps/{train_backbone}.h5
+    eval_backbone: str = "coco_eval_vit_base_patch16_dinov3.lvd1689m",  # backbone for eval data. the name must match data/backbone_reps/{eval_backbone}.h5
     train_features: str = "coco_train_sae-top_k-64-cls_only-layer_11-hook_resid_post",  # features for training data. the name must match data/sae/{train_features}.h5
     eval_features: str = "coco_eval_sae-top_k-64-cls_only-layer_11-hook_resid_post",  # features for eval data. the name must match data/sae/{eval_features}.h5
     min_nonzero: int = 120,  # minimum number of non-zero activations per column to keep it in the final array
-    tags: Param(help="tags to use for the wandb run. If empty, no tags are used.", type=str, nargs="*") = [],  # type: ignore
+    tags: Param(help="tags to use for the wandb run. If empty, no tags are used.", type=str, nargs="*") = [],
     early_stopping_patience: int = 20, # number of evaluation intervals to wait for improvement before stopping
     early_stopping_min_delta: float = 0.001, # minimum change in evaluation loss to be considered an improvement
     early_stopping_max_steps: int = 3000, # after this, early stopping will be considered even if improvement is still happening
@@ -66,6 +66,7 @@ def main(
         with open(config_file, "rb") as f:
             config_data = tomllib.load(f)
         args.update(config_data)
+    args = dict2obj(args)
     
     assert torch.cuda.is_available(), "DDP requires CUDA"
     torch.distributed.init_process_group(backend='nccl')
@@ -77,129 +78,92 @@ def main(
 
     if ddp_rank == 0: pprint(args)
 
-    torch.manual_seed(args["seed"])
+    torch.manual_seed(args.seed)
     torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = True # this might introduce some non-determinism in exchange for speed
-    torch.cuda.manual_seed_all(args["seed"])
+    torch.backends.cudnn.benchmark = False
+    torch.cuda.manual_seed_all(args.seed)
 
     if ddp_rank == 0:
-        full_checkpoint_dir = f"data/checkpoints/{args['checkpoint_dir']}" if args["name"] is None else f"data/checkpoints/{args['name']}"
+        full_checkpoint_dir = f"data/checkpoints/{args.checkpoint_dir}" if args.name is None else f"data/checkpoints/{args.name}"
         if not os.path.exists(full_checkpoint_dir): os.makedirs(full_checkpoint_dir)
 
-    train_inputs = load_backbone_representations(f"data/backbone_reps/{args['train_backbone']}.h5")
-    eval_inputs = load_backbone_representations(f"data/backbone_reps/{args['eval_backbone']}.h5")
+    train_inputs = load_backbone_representations(f"data/backbone_reps/{args.train_backbone}.h5")
+    eval_inputs = load_backbone_representations(f"data/backbone_reps/{args.eval_backbone}.h5")
     
-    # Get feature dimension from input data
     feature_dim = train_inputs.shape[1]
     
-    # control experiments need raw representations as targets, so gotta account for that
-    train_features_path = Path(f"data/sae/{args['train_features']}.h5") if "raw" not in args["train_features"] else Path(f"data/backbone_reps/{args['train_features']}.h5")
-    eval_features_path = Path(f"data/sae/{args['eval_features']}.h5") if "raw" not in args["eval_features"] else Path(f"data/backbone_reps/{args['eval_features']}.h5")
+    train_features_path = Path(f"data/sae/{args.train_features}.h5") if "raw" not in args.train_features else Path(f"data/backbone_reps/{args.train_features}.h5")
+    eval_features_path = Path(f"data/sae/{args.eval_features}.h5") if "raw" not in args.eval_features else Path(f"data/backbone_reps/{args.eval_features}.h5")
 
     train_episode_dataset = FunctionDataset(
-        inputs=train_inputs,
-        features_path=train_features_path,
-        seq_len=args["sequence_length"],
-        min_nonzero=args["min_nonzero"],
-        epoch_size=args["training_steps"]
+        inputs=train_inputs, features_path=train_features_path,
+        seq_len=args.sequence_length, min_nonzero=args.min_nonzero,
+        epoch_size=args.training_steps
     )
     
     eval_episode_dataset = FunctionDataset(
-        inputs=eval_inputs,
-        features_path=eval_features_path,
-        seq_len=args["sequence_length"],
-        min_nonzero=args["min_nonzero"],
-        epoch_size=args["num_eval_episodes"]
+        inputs=eval_inputs, features_path=eval_features_path,
+        seq_len=args.sequence_length, min_nonzero=args.min_nonzero,
+        epoch_size=args.num_eval_episodes
     )
 
-    per_device_batch_size = args["batch_size"] // ddp_world_size
+    per_device_batch_size = args.batch_size // ddp_world_size
     
     train_sampler = DistributedSampler(train_episode_dataset, num_replicas=ddp_world_size, rank=ddp_rank, shuffle=True)
     eval_sampler = DistributedSampler(eval_episode_dataset, num_replicas=ddp_world_size, rank=ddp_rank, shuffle=False)
 
     train_loader = DataLoader(
-        train_episode_dataset,
-        batch_size=per_device_batch_size,
-        num_workers=min(4, os.cpu_count()),
-        pin_memory=True,
-        drop_last=True,
-        sampler=train_sampler,
-        persistent_workers=True
+        train_episode_dataset, batch_size=per_device_batch_size, num_workers=min(4, os.cpu_count()),
+        pin_memory=True, drop_last=True, sampler=train_sampler, persistent_workers=True
     )
     
     eval_loader = DataLoader(
-        eval_episode_dataset,
-        batch_size=per_device_batch_size,
-        num_workers=min(2, os.cpu_count()),
-        pin_memory=True,
-        drop_last=False,
-        sampler=eval_sampler,
-        persistent_workers=True
+        eval_episode_dataset, batch_size=per_device_batch_size, num_workers=min(2, os.cpu_count()),
+        pin_memory=True, drop_last=False, sampler=eval_sampler, persistent_workers=True
     )
 
     config = TransformerConfig(
-        input_size=feature_dim,
-        num_attention_heads=args["num_attention_heads"],
-        intermediate_size=args["intermediate_size"],
-        num_layers=args["num_layers"],
-        hidden_act=args["hidden_act"],
-        bias=args["bias"],
-        logit_bias=args["logit_bias"],
-        attention_dropout=args["attention_dropout"],
-        sequence_length=args["sequence_length"],
-        reg_lambda=args["reg_lambda"],
-        reg_alpha=args["reg_alpha"],
+        x_sz=feature_dim, n_heads=args.n_heads,
+        int_sz=args.int_sz, n_layers=args.n_layers,
+        act=args.act, bias=args.bias, logit_bias=args.logit_bias,
+        attn_drop=args.attn_drop, sl=args.sl, use_mlp=args.use_mlp
     )
 
     model = Transformer(config)
     model.to(device)
-    if args["compile"]: model.compile(fullgraph=True, mode="max-autotune")
+    if args.compile: model = torch.compile(model, fullgraph=True, mode="max-autotune")
     model = DDP(model, device_ids=[ddp_local_rank])
 
 
-    optimizer = AdamWScheduleFree(model.parameters(),lr=args["lr"],weight_decay=args["weight_decay"], warmup_steps=args["warmup_steps"])
+    optimizer = AdamWScheduleFree(model.parameters(),lr=args.lr,weight_decay=args.weight_decay, warmup_steps=args.warmup_steps)
 
     best_eval_loss = float('inf')
     early_stopping_counter = 0
     if ddp_rank == 0: best_checkpoint_path = f"{full_checkpoint_dir}/model.pt"
 
-    if args["wandb_log"] and ddp_rank == 0:
-        # hacky way to see if i'm training on juwels, which does not have internet in compute nodes
-        # in this case, gotta also run bin/sync_wandb.sh from the login node
+    if args.wandb_log and ddp_rank == 0:
         device_name = os.uname()[1]
-        wandb.init(project=args["wandb_name"], name=args["name"], config=args, tags=args["tags"], mode="offline" if "juwels" in device_name else "online")
-
-
+        # use offline mode if running on a juwels bc there compute nodes don't have internet
+        wandb.init(project=args.wandb_name, name=args.name, config=args, tags=args.tags, mode="offline" if "juwels" in device_name else "online")
     
     accumulated_train_loss = 0.0
-    accumulated_train_bce_loss = 0.0
-    accumulated_train_reg_loss = 0.0
     accumulated_train_correct = 0
     accumulated_train_total = 0
 
     train_iterator = iter(train_loader)
 
-    for training_step in range(args["training_steps"]):
+    for training_step in range(args.training_steps):
         model.train()
         optimizer.train()
 
-        # get next batch from DataLoader
-        try:
-            X_batch, Y_batch = next(train_iterator)
-        except StopIteration:
-            # this is a bit hacky, but we need to reset the iterator when it "runs out of data", which is not a real thing in our case
-            # because we don't actually have a fixed dataset but generate it on the fly
-            train_iterator = iter(train_loader)
-            X_batch, Y_batch = next(train_iterator)
+        X_batch, Y_batch = next(train_iterator)
 
         X_batch = X_batch.to(device)
         Y_batch = Y_batch.to(device)
 
         with autocast(dtype=torch.bfloat16, device_type="cuda"):
             logits = model(X_batch, Y_batch).squeeze(-1)
-            bce_loss = F.binary_cross_entropy_with_logits(logits, Y_batch)
-            reg_loss = model.module.compute_embedding_regularization()
-            loss = bce_loss + reg_loss
+            loss = F.binary_cross_entropy_with_logits(logits, Y_batch)
 
         optimizer.zero_grad()
         loss.backward()
@@ -207,48 +171,30 @@ def main(
         optimizer.step()
 
         accumulated_train_loss += loss.item()
-        accumulated_train_bce_loss += bce_loss.item()
-        accumulated_train_reg_loss += reg_loss.item()
         predictions = (torch.sigmoid(logits) > 0.5).float()
         accumulated_train_correct += (predictions == Y_batch).sum().item()
         accumulated_train_total += Y_batch.numel()
 
-        if (training_step + 1) % args["log_interval_steps"] == 0:
-            metrics = torch.tensor([accumulated_train_loss, accumulated_train_bce_loss, accumulated_train_reg_loss, accumulated_train_correct, accumulated_train_total], device=device)
-            
-            # sum this tensor across all processes in the DDP group
+        if (training_step + 1) % args.log_interval_steps == 0:
+            metrics = torch.tensor([accumulated_train_loss, accumulated_train_correct, accumulated_train_total], device=device)
             torch.distributed.all_reduce(metrics, op=torch.distributed.ReduceOp.SUM)
 
-            # on the main process, calculate the global average and log
-            if args["wandb_log"] and ddp_rank == 0:
-                # log_interval_steps is multiplied by ddp_world_size because each process ran that many steps
-                global_loss = metrics[0].item() / (args["log_interval_steps"] * ddp_world_size)
-                global_bce_loss = metrics[1].item() / (args["log_interval_steps"] * ddp_world_size)
-                global_reg_loss = metrics[2].item() / (args["log_interval_steps"] * ddp_world_size)
-                global_accuracy = metrics[3].item() / metrics[4].item()
+            if args.wandb_log and ddp_rank == 0:
+                global_loss = metrics[0].item() / (args.log_interval_steps * ddp_world_size)
+                global_accuracy = metrics[1].item() / metrics[2].item()
                 
-                wandb.log({
-                    "loss_train": global_loss,
-                    "bce_loss_train": global_bce_loss, 
-                    "reg_loss_train": global_reg_loss,
-                    "accuracy_train": global_accuracy
-                }, step=training_step)
+                wandb.log({"loss_train": global_loss,"accuracy_train": global_accuracy}, step=training_step)
 
-            # reset local accumulators on all processes
             accumulated_train_loss = 0.0
-            accumulated_train_bce_loss = 0.0
-            accumulated_train_reg_loss = 0.0
             accumulated_train_correct = 0
             accumulated_train_total = 0
 
-        if (training_step + 1) % args["eval_interval_steps"] == 0:
+        if (training_step + 1) % args.eval_interval_steps == 0:
             with torch.no_grad():
                 model.eval()
-                optimizer.eval() # schedule free optimizers need this
+                optimizer.eval()
                 
                 local_sum_eval_loss = 0.0
-                local_sum_eval_bce_loss = 0.0
-                local_sum_eval_reg_loss = 0.0
                 local_correct_predictions = 0
                 local_total_predictions = 0
 
@@ -258,51 +204,35 @@ def main(
 
                     with autocast(dtype=torch.bfloat16, device_type="cuda"):
                         logits_eval = model(batch_X, batch_Y).squeeze(-1)
-                        bce_loss_eval = F.binary_cross_entropy_with_logits(logits_eval, batch_Y)
-                        reg_loss_eval = model.module.compute_embedding_regularization()
-                        loss_eval = bce_loss_eval + reg_loss_eval
+                        loss_eval = F.binary_cross_entropy_with_logits(logits_eval, batch_Y)
                     
                     local_sum_eval_loss += loss_eval.item() * batch_Y.numel()
-                    local_sum_eval_bce_loss += bce_loss_eval.item() * batch_Y.numel()
-                    local_sum_eval_reg_loss += reg_loss_eval.item() * batch_Y.numel()
                     predictions = (torch.sigmoid(logits_eval) > 0.5).float()
                     local_correct_predictions += (predictions == batch_Y).sum().item()
                     local_total_predictions += batch_Y.numel()
 
-                metrics = torch.tensor([local_sum_eval_loss, local_sum_eval_bce_loss, local_sum_eval_reg_loss, local_correct_predictions, local_total_predictions], device=device)
+                metrics = torch.tensor([local_sum_eval_loss, local_correct_predictions, local_total_predictions], device=device)
                 torch.distributed.all_reduce(metrics, op=torch.distributed.ReduceOp.SUM)
 
                 stop_training = torch.tensor(0, device=device)
                 if ddp_rank == 0:
                     global_sum_loss = metrics[0].item()
-                    global_sum_bce_loss = metrics[1].item()
-                    global_sum_reg_loss = metrics[2].item()
-                    global_correct = metrics[3].item()
-                    global_total = metrics[4].item()
+                    global_correct = metrics[1].item()
+                    global_total = metrics[2].item()
                     eval_accuracy = global_correct / global_total
+                    avg_eval_loss = global_sum_loss / global_total
 
-                    if args["wandb_log"]:
-                        avg_eval_loss = global_sum_loss / global_total
-                        avg_eval_bce_loss = global_sum_bce_loss / global_total
-                        avg_eval_reg_loss = global_sum_reg_loss / global_total
-                        wandb.log({
-                            "loss_eval": avg_eval_loss,
-                            "bce_loss_eval": avg_eval_bce_loss,
-                            "reg_loss_eval": avg_eval_reg_loss,
-                            "accuracy_eval": eval_accuracy
-                        }, step=training_step)
+                    if args.wandb_log:
+                        wandb.log({"loss_eval": avg_eval_loss,"accuracy_eval": eval_accuracy}, step=training_step)
 
-                    # Early stopping based on total evaluation loss (lower is better)
-                    if training_step >= args["early_stopping_max_steps"]:
-                        if best_eval_loss - avg_eval_loss > args["early_stopping_min_delta"]:
+                    if training_step >= args.early_stopping_max_steps:
+                        if best_eval_loss - avg_eval_loss > args.early_stopping_min_delta:
                             best_eval_loss = avg_eval_loss
                             early_stopping_counter = 0
                             torch.save({
                                 'state_dict': {k: v.cpu() for k, v in model.module.state_dict().items()},
-                                'eval_loss': avg_eval_loss,
-                                'eval_accuracy': eval_accuracy,
-                                'step': training_step,
-                                'config': config,
+                                'eval_loss': avg_eval_loss, 'eval_accuracy': eval_accuracy,
+                                'step': training_step, 'config': config,
                             }, best_checkpoint_path)
                         else:
                             early_stopping_counter += 1
@@ -310,18 +240,16 @@ def main(
                         best_eval_loss = avg_eval_loss
                         torch.save({
                             'state_dict': {k: v.cpu() for k, v in model.module.state_dict().items()},
-                            'eval_loss': avg_eval_loss,
-                            'eval_accuracy': eval_accuracy,
-                            'step': training_step,
-                            'config': config,
+                            'eval_loss': avg_eval_loss, 'eval_accuracy': eval_accuracy,
+                            'step': training_step, 'config': config,
                         }, best_checkpoint_path)
                     
-                    if early_stopping_counter >= args["early_stopping_patience"]:
-                        print(f"early stopping at step {training_step} due to no improvement in eval loss for {args['early_stopping_patience']} evaluation intervals.")
+                    if early_stopping_counter >= args.early_stopping_patience:
+                        print(f"early stopping at step {training_step} due to no improvement in eval loss for {args.early_stopping_patience} evaluation intervals.")
                         stop_training.fill_(1)
 
             torch.distributed.broadcast(stop_training, src=0)
-
             if stop_training.item() == 1: break
+            
     torch.distributed.destroy_process_group()
-    if args["wandb_log"] and ddp_rank == 0: wandb.finish()
+    if args.wandb_log and ddp_rank == 0: wandb.finish()

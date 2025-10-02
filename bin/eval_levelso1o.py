@@ -43,9 +43,7 @@ def _calculate_accuracy(reps, trials, batch_size=2048):
             if is_correct: num_correct += 1
             num_total += 1
             
-            # update by-type counts
-            if trial_type not in by_type:
-                by_type[trial_type] = {'correct': 0, 'total': 0}
+            if trial_type not in by_type: by_type[trial_type] = {'correct': 0, 'total': 0}
             if is_correct: by_type[trial_type]['correct'] += 1
             by_type[trial_type]['total'] += 1
     
@@ -57,7 +55,7 @@ def _calculate_accuracy(reps, trials, batch_size=2048):
 @call_parse
 def main(
     experiment_name: str, # has to be one of main, raw, midsae
-    backbone_name: str, # has to be one of vit, clip, siglip2, dinov2
+    backbone_name: str, # has to be one of mae, clip, siglip2, dinov3
     batch_size: int = 2048, # batch size for evaluation
     force: bool = False # if True, will overwrite existing eval file
 ):
