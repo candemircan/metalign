@@ -12,6 +12,7 @@ from tqdm import tqdm
 from metalign.cognitive_model import RewardLearner
 from metalign.data import load_backbone_representations
 from metalign.model import Transformer
+from metalign.utils import fix_state_dict
 
 _ = torch.set_grad_enabled(False)
 
@@ -40,8 +41,8 @@ def main(
     things_reps = f"data/backbone_reps/things_{backbone_dict[backbone_name]}.h5"
 
     ckpt = torch.load(ckpt,  weights_only=False)
-    config, state_dict = ckpt['config'], ckpt['state_dict']
-    model = Transformer(config=config)
+    config, state_dict = ckpt['config'], fix_state_dict(ckpt['state_dict'])
+    model = Transformer(c=config)
     model.load_state_dict(state_dict)
     model.eval()
     model = NNsight(model)
@@ -49,7 +50,7 @@ def main(
     human_data = pd.read_csv("data/external/reward_learning.csv")
     backbone_reps = load_backbone_representations(things_reps)
     with model.trace(torch.from_numpy(backbone_reps).unsqueeze(1)): 
-        metalign_reps = model.embedding.output.squeeze().save()
+        metalign_reps = model.embed.output.squeeze().save()
 
     imgs = sorted(glob("data/external/THINGS/*/*jpg"))
     metalign_accuracies, base_accuracies = [], []

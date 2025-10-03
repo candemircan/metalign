@@ -15,7 +15,7 @@ def main(output_dir: Path = Path("data/configs"), base_config_path: Path = Path(
         base_config = tomllib.load(f)
 
     param_grid = {
-        "model_name": ["vit_base_patch16_224.mae", "CLIP-ViT-B-32-DataComp.XL-s13B-b90K_sae-top_k-64-cls_only-layer_11-hook_resid_post_raw",  "vit_base_patch16_dinov3.lvd1689m", "vit_base_patch16_siglip_512.v2_webli"]
+        "model_name": ["vit_base_patch16_224.mae", "CLIP-ViT-B-32-DataComp.XL-s13B-b90K_sae-top_k-64-cls_only-layer_11-hook_resid_post_raw",  "vit_base_patch16_dinov3.lvd1689m", "vit_base_patch16_siglip_256.v2_webli"]
     }
 
     keys, values = zip(*param_grid.items())
