@@ -1,11 +1,4 @@
 repos:
-- repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.11.9
-  hooks:
-    - id: ruff
-      args: [ --config=pyproject.toml, --fix, --exit-non-zero-on-fix, --select=F401,I001 ]
-      types_or: [ python, pyi, jupyter ]
-
 - repo: local
   hooks:
     - id: uv
@@ -13,8 +6,13 @@ repos:
       entry: uv sync --all-extras
       language: system
       pass_filenames: false
-    - id: run-metalign-tests
-      name: Run metalign tests
+    - id: ruff
+      name: ruff
+      entry: uv run ruff check --fix --select F401,I .
+      language: system
+      pass_filenames: false
+    - id: tests
+      name: tests
       language: system
       entry: bash bin/run_tests.sh
       types: [ python ]

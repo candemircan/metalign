@@ -1,11 +1,16 @@
 import os
+
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 
 from pathlib import Path
-import h5py, timm, torch
-from fastcore.script import call_parse, Param
+
+import h5py
+import timm
+import torch
+from fastcore.script import Param, call_parse
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+
 from metalign.data import Coco, Levels, Things
 
 _ = torch.set_grad_enabled(False)
@@ -17,7 +22,7 @@ DATASET_MAKERS = {
 }
 
 def _extract_and_save(model, dl, save_path, device):
-    "Helper function to extract features and save them to an HDF5 file."
+    "helper function to extract features and save them to an HDF5 file."
     with h5py.File(save_path, 'w') as f:
         total_samples, feature_dim = len(dl.dataset), None
         h5_dset = None
@@ -41,7 +46,7 @@ def main(
     batch_size: int = 512, # Batch size for feature extraction
     force: bool = False # Overwrite existing files if True
 ):
-    "Extracts features from a timm model and saves them to data/backbone_reps/."
+    "extracts features from a timm model and saves them to `data/backbone_reps/.`"
     device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
     model_name = f"hf_hub:{repo_id}" if repo_id.startswith("timm/") else repo_id
     model = timm.create_model(model_name, pretrained=True, num_classes=0).to(device).eval()

@@ -4,10 +4,11 @@ simple linear cognitive models
 __all__ = ["CategoryLearner", "RewardLearner"]
 
 import numpy as np
+from einops import rearrange
+from fastcore.script import call_parse
 from sklearn.base import clone
 from sklearn.linear_model import BayesianRidge, LogisticRegression
-from fastcore.script import call_parse
-from einops import rearrange
+
 
 class CategoryLearner:
     def __init__(self,

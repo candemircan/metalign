@@ -1,15 +1,19 @@
 import os
+
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 
 from pathlib import Path
-import h5py, torch
-from fastcore.script import call_parse, Param
+
+import h5py
+import torch
+from fastcore.script import Param, call_parse
 from huggingface_hub import hf_hub_download
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from vit_prisma.models.model_loader import load_hooked_model
 from vit_prisma.sae import SparseAutoencoder
 from vit_prisma.transforms import get_clip_val_transforms
+
 from metalign.data import Coco, Levels, Things
 
 _ = torch.set_grad_enabled(False)

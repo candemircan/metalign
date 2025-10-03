@@ -209,7 +209,14 @@ class FunctionDataset(Dataset):
         # for sparse features, most values are 0
         # for dense features, all values are non-zero
         sparsity = (self.Y == 0).float().mean()
-        self.is_sparse = sparsity > 0.5  # if more than 50% are zeros, treat as sparse
+
+        # heuristic: if more than 50% are zeros, treat as sparse
+        # with SAE feautres sparsity is way higher than 50%
+        # and with raw features sparsity is ~ 0
+        self.is_sparse = sparsity > 0.5  
+        
+        # pre-compute medians for dense features to avoid repeated computation
+        if not self.is_sparse: self.medians = torch.median(self.Y, dim=0).values
             
         self.train_dims = train_dims if train_dims is not None else list(range(self.num_functions))
             
@@ -235,7 +242,8 @@ class FunctionDataset(Dataset):
             neg_mask = ~pos_mask
         else:
             # dense features: positive = above median, negative = below median
-            median_val = torch.median(y_dim)
+            # use pre-computed median instead of computing each time
+            median_val = self.medians[dim]
             pos_mask = y_dim > median_val
             neg_mask = y_dim <= median_val
 
@@ -254,12 +262,10 @@ class FunctionDataset(Dataset):
         indices = indices[torch.randperm(len(indices)).long()]
 
         X_episode = self.X[indices]
-        if self.is_sparse:
-            Y_episode = (self.Y[indices, dim] != 0).float()
-        else:
-            Y_episode = (self.Y[indices, dim] > median_val).float()
+        if self.is_sparse: Y_episode = (self.Y[indices, dim] != 0).float()
+        else: Y_episode = (self.Y[indices, dim] > median_val).float()
 
-        if torch.rand(1).item() < 0.5: Y_episode = 1 - Y_episode
+        if torch.rand(1).item() < 0.5: Y_episode = 1 - Y_episode # 0 and 1 are arbitrary, so flip with 50% chance at the episode level
         return X_episode, Y_episode
     
 
