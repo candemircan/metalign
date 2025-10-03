@@ -109,7 +109,7 @@ class RewardLearner:
 def main():
     # tests for CategoryLearner
     n_trials,n_feats = 20,2
-    # create a simple, linearly separable dataset
+    # create a simple dataset, the specifics don't matter
     x_cat = np.random.randn(n_trials, n_feats)
     x_cat[:n_trials//2] += 3 # create a second cluster
     y_cat = np.array([0]*(n_trials//2) + [1]*(n_trials//2))
@@ -124,9 +124,9 @@ def main():
     assert not np.allclose(cat_learner.std, 1)
 
     # tests for RewardLearner
+    # again the specifics of the function doesn't matter
     n_trials,n_opts,n_feats = 20,2,3
     x_rew = np.random.randn(n_trials, n_opts, n_feats)
-    # make one feature predictive of reward
     y_rew = np.zeros((n_trials, n_opts))
     y_rew[:, 0] = x_rew[:, 0, 1] * 2 + np.random.randn(n_trials) * 0.1 # option 0 reward depends on feature 1
     

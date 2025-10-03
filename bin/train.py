@@ -222,8 +222,7 @@ def main(
                     eval_accuracy = global_correct / global_total
                     avg_eval_loss = global_sum_loss / global_total
 
-                    if args.wandb_log:
-                        wandb.log({"loss_eval": avg_eval_loss,"accuracy_eval": eval_accuracy}, step=training_step)
+                    if args.wandb_log: wandb.log({"loss_eval": avg_eval_loss,"accuracy_eval": eval_accuracy}, step=training_step)
 
                     if training_step >= args.early_stopping_max_steps:
                         if best_eval_loss - avg_eval_loss > args.early_stopping_min_delta:
@@ -234,8 +233,8 @@ def main(
                                 'eval_loss': avg_eval_loss, 'eval_accuracy': eval_accuracy,
                                 'step': training_step, 'config': config,
                             }, best_checkpoint_path)
-                        else:
-                            early_stopping_counter += 1
+                        else: early_stopping_counter += 1
+                    
                     elif avg_eval_loss < best_eval_loss:
                         best_eval_loss = avg_eval_loss
                         torch.save({

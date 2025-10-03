@@ -192,7 +192,7 @@ class Levels(ImageDataset):
 
 
 class FunctionDataset(Dataset):
-    "Episode-based dataset for given features, optimized for DataLoader usage."
+    "episode-based dataset for given features, optimized for DataLoader usage."
     def __init__(self, inputs: np.ndarray, features_path: Path,
                  seq_len: int = 120, min_nonzero: int = 120, train_dims: list = None, epoch_size: int = None):
         X = torch.tensor(inputs, dtype=torch.float32)
@@ -220,9 +220,8 @@ class FunctionDataset(Dataset):
             
         self.train_dims = train_dims if train_dims is not None else list(range(self.num_functions))
             
-    def __len__(self): 
-        # effectively infinite for training (when epoch is not set)
-        return self.epoch_size if self.epoch_size is not None else 2**31 - 1
+    def __len__(self): return self.epoch_size if self.epoch_size is not None else 2**31 - 1 # effectively infinite for training (when epoch is not set)
+
     
     def __getitem__(self, idx):
         # randomly sample a function dimension instead of cycling through them
@@ -308,8 +307,7 @@ def load_backbone_representations(file_path: str) -> np.ndarray:
     some backbone reps are saved under the key 'representations', while others (e.g. SAE raw format) have individual datasets with numeric keys. this function handles both cases.
     """
     with h5py.File(file_path, 'r') as f:
-        if 'representations' in f: 
-            return f['representations'][:]
+        if 'representations' in f: return f['representations'][:]
         else:
             # handle SAE raw format: data stored as individual datasets with numeric keys
             keys = sorted([int(k) for k in f.keys() if k.isdigit()])

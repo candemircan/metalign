@@ -101,7 +101,7 @@ class Transformer(nn.Module):
 
 
     def _prep_inputs(self, x:torch.Tensor, y:torch.Tensor) -> torch.Tensor:
-        "Concatenate one-hot previous targets to input features `x`."
+        "concatenate one-hot previous targets to input features `x`."
         bs = x.shape[0]
         # get the previous targets and prepend with zeros
         prev_targets = torch.cat([torch.zeros(bs, 1, device=x.device), y[:, :-1]], dim=1)
