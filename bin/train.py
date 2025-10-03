@@ -58,7 +58,9 @@ def main(
     """
     train a meta-learning transformer model over function learning tasks.
 
-    some of the defaults are always overriden by the config file. If the config doesn't have some of the fields, the defaults here are used. see data/base_config.toml for the defaults and bin/generate_configs.py for how the config files are generated.
+    some of the defaults are always overriden by the config file.
+    if the config doesn't have some of the fields, the defaults here are used.
+    see `data/base_config.toml` for the defaults and `bin/generate_configs.py` for how the config files are generated.
     """
 
     args = locals()
@@ -98,7 +100,6 @@ def main(
     train_episode_dataset = FunctionDataset(
         inputs=train_inputs, features_path=train_features_path,
         seq_len=args.sl, min_nonzero=args.min_nonzero,
-        epoch_size=args.training_steps * args.batch_size
     )
     
     eval_episode_dataset = FunctionDataset(

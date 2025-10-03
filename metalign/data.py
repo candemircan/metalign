@@ -194,8 +194,7 @@ class Levels(ImageDataset):
 class FunctionDataset(Dataset):
     "Episode-based dataset for given features, optimized for DataLoader usage."
     def __init__(self, inputs: np.ndarray, features_path: Path,
-                 seq_len: int = 120, min_nonzero: int = 120, train_dims: list = None, 
-                 epoch_size: int = 100000):
+                 seq_len: int = 120, min_nonzero: int = 120, train_dims: list = None, epoch_size: int = None):
         X = torch.tensor(inputs, dtype=torch.float32)
         
         Y = torch.from_numpy(h5_to_numpy(features_path, min_nonzero=min_nonzero))
@@ -208,16 +207,19 @@ class FunctionDataset(Dataset):
         
         # detect if this is dense (raw) or sparse (SAE) features
         # for sparse features, most values are 0
-        #  for dense features, all values are non-zero
+        # for dense features, all values are non-zero
         sparsity = (self.Y == 0).float().mean()
         self.is_sparse = sparsity > 0.5  # if more than 50% are zeros, treat as sparse
             
         self.train_dims = train_dims if train_dims is not None else list(range(self.num_functions))
-        
-    def __len__(self): return self.epoch_size
+            
+    def __len__(self): 
+        # effectively infinite for training (when epoch is not set)
+        return self.epoch_size if self.epoch_size is not None else 2**31 - 1
     
     def __getitem__(self, idx):
-        dim = self.train_dims[idx % len(self.train_dims)]
+        # randomly sample a function dimension instead of cycling through them
+        dim = self.train_dims[torch.randint(0, len(self.train_dims), (1,)).item()]
         return self._sample_episode(dim)
         
     def _sample_episode(self, dim: int):
