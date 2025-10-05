@@ -16,7 +16,7 @@ from PIL import Image
 from scipy.stats import gaussian_kde
 from shiny import App, reactive, render, ui
 
-from metalign.data import h5_to_numpy
+from metalign.data import h5_to_np
 
 
 def image_to_base64(img_path, max_size=200):
@@ -81,7 +81,7 @@ def save_annotation(feature_dim, description):
 min_nonzero = 100 
 image_paths = sorted(glob("data/external/THINGS/*/*jpg"))  # Adjust this path as needed
 model_name = "things_sae-top_k-64-cls_only-layer_11-hook_resid_post"
-features = h5_to_numpy(model_name=model_name, min_nonzero=min_nonzero)
+features = h5_to_np(model_name=model_name, min_nonzero=min_nonzero)
 
 if len(image_paths) != features.shape[0]: print(f"Warning: {len(image_paths)} images but {features.shape[0]} feature rows")
 

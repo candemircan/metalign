@@ -14,7 +14,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 
-from metalign.data import FunctionDataset, load_backbone_representations
+from metalign.data import FunctionDataset, load_backbone
 from metalign.model import Transformer, TransformerConfig
 
 torch.set_float32_matmul_precision('high')
@@ -89,8 +89,8 @@ def main(
         full_checkpoint_dir = f"data/checkpoints/{args.checkpoint_dir}" if args.name is None else f"data/checkpoints/{args.name}"
         if not os.path.exists(full_checkpoint_dir): os.makedirs(full_checkpoint_dir)
 
-    train_inputs = load_backbone_representations(f"data/backbone_reps/{args.train_backbone}.h5")
-    eval_inputs = load_backbone_representations(f"data/backbone_reps/{args.eval_backbone}.h5")
+    train_inputs = load_backbone(f"data/backbone_reps/{args.train_backbone}.h5")
+    eval_inputs = load_backbone(f"data/backbone_reps/{args.eval_backbone}.h5")
     
     feature_dim = train_inputs.shape[1]
     

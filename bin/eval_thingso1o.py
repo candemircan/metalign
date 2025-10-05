@@ -8,7 +8,7 @@ from nnsight import NNsight
 from torch.nn import functional as F
 from tqdm import tqdm
 
-from metalign.data import load_backbone_representations, prepare_things_spose
+from metalign.data import load_backbone, prepare_things_spose
 from metalign.model import Transformer
 from metalign.utils import fix_state_dict
 
@@ -65,7 +65,7 @@ def main(
     
 
     df = pd.read_table("data/external/THINGS_triplets.csv")
-    backbone_reps, ceiling_model = prepare_things_spose(load_backbone_representations(things_reps))
+    backbone_reps, ceiling_model = prepare_things_spose(load_backbone(things_reps))
 
     ckpt = torch.load(ckpt, weights_only=False)
     config, state_dict = ckpt['config'], fix_state_dict(ckpt['state_dict'])

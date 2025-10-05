@@ -7,7 +7,7 @@ from nnsight import NNsight
 from torch.nn import functional as F
 from tqdm import tqdm
 
-from metalign.data import load_backbone_representations, prepare_levels_data
+from metalign.data import load_backbone, prepare_levels
 from metalign.model import Transformer
 from metalign.utils import fix_state_dict
 
@@ -76,7 +76,7 @@ def main(
     ckpt = best_models[f"[{experiment_name.upper()}]"][backbone_name]
     levels_reps = f"data/backbone_reps/levels_{backbone_dict[backbone_name]}.h5"
     
-    backbone_reps, trials = prepare_levels_data(load_backbone_representations(levels_reps))
+    backbone_reps, trials = prepare_levels(load_backbone(levels_reps))
 
     ckpt = torch.load(ckpt, weights_only=False)
     config, state_dict = ckpt['config'], fix_state_dict(ckpt['state_dict'])

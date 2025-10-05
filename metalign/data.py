@@ -2,7 +2,7 @@
 common datasets and processing utils  used throughout the project
 """
 
-__all__ = ["ImageDataset", "Things", "Coco", "h5_to_numpy", "FunctionDataset", "prepare_things_spose", "load_backbone_representations", "Levels", "prepare_levels_data"]
+__all__ = ["ImageDataset", "Things", "Coco", "h5_to_np", "FunctionDataset", "prepare_things_spose", "load_backbone", "Levels", "prepare_levels"]
 
 import pickle
 from pathlib import Path
@@ -16,7 +16,7 @@ from torch.utils.data import Dataset
 from .constants import NUM_COCO_TRAIN_IMAGES, NUM_THINGS_CATEGORIES, NUM_THINGS_IMAGES
 
 
-def h5_to_numpy(features_path: Path, # path to the h5 file with the features
+def h5_to_np(features_path: Path, # path to the h5 file with the features
                 min_nonzero: int = 1, # minimum number of non-zero activations per column to keep it in the final array. The default is such that any column that is all 0s is removed.
                 ) -> np.ndarray:
     """
@@ -197,7 +197,7 @@ class FunctionDataset(Dataset):
                  seq_len: int = 120, min_nonzero: int = 120, train_dims: list = None, epoch_size: int = None):
         X = torch.tensor(inputs, dtype=torch.float32)
         
-        Y = torch.from_numpy(h5_to_numpy(features_path, min_nonzero=min_nonzero))
+        Y = torch.from_numpy(h5_to_np(features_path, min_nonzero=min_nonzero))
         
         self.X, self.Y = X, Y
         self.feature_dim = self.X.shape[1]
@@ -302,7 +302,7 @@ def prepare_things_spose(
     return X, Y
 
 
-def load_backbone_representations(file_path: str) -> np.ndarray:
+def load_backbone(file_path: str) -> np.ndarray:
     """
     some backbone reps are saved under the key 'representations', while others (e.g. SAE raw format) have individual datasets with numeric keys. this function handles both cases.
     """
@@ -317,7 +317,7 @@ def load_backbone_representations(file_path: str) -> np.ndarray:
             return np.array(reps)
 
 
-def prepare_levels_data(
+def prepare_levels(
     representations: np.ndarray, # directly loaded backbone representations
     data_root: Path = Path("data/external"), # the root directory containing levels.pkl
     return_tensors: str = "pt", # the type of tensors to return, can be "pt" for PyTorch tensors or "np" for NumPy arrays
@@ -497,8 +497,8 @@ if __name__ == "__main__":
         assert isinstance(tensor, torch.Tensor)
         assert tensor.shape == (3, 224, 224)
 
-    def test_h5_to_numpy_sparse_format(tmp_path: Path):
-        """Test h5_to_numpy with sparse SAE format (original behavior)."""
+    def test_h5_to_np_sparse_format(tmp_path: Path):
+        """Test h5_to_np with sparse SAE format (original behavior)."""
         data_root = tmp_path / "sae"
         data_root.mkdir(exist_ok=True)
         
@@ -513,7 +513,7 @@ if __name__ == "__main__":
             f["1"].create_dataset("activations", data=[4.0, 5.0])
             f["1"].create_dataset("indices", data=[1, 3])
         
-        result = h5_to_numpy(test_file, min_nonzero=1)
+        result = h5_to_np(test_file, min_nonzero=1)
         
         assert result.shape[0] == 2
         assert result[0, 0] == 1.0
@@ -522,8 +522,8 @@ if __name__ == "__main__":
         assert result[1, 1] == 4.0
         assert result[1, 3] == 5.0
 
-    def test_h5_to_numpy_dense_format(tmp_path: Path):
-        """Test h5_to_numpy with dense raw activations format."""
+    def test_h5_to_np_dense_format(tmp_path: Path):
+        """Test h5_to_np with dense raw activations format."""
         data_root = tmp_path / "backbone_reps"
         data_root.mkdir(exist_ok=True)
         
@@ -540,13 +540,13 @@ if __name__ == "__main__":
             for i in range(3):
                 f.create_dataset(str(i), data=dense_data[i])
         
-        result = h5_to_numpy(test_file, min_nonzero=1)
+        result = h5_to_np(test_file, min_nonzero=1)
         
         assert result.shape == (3, 4)
         np.testing.assert_array_equal(result, dense_data)
 
-    def test_h5_to_numpy_dense_format_with_filtering(tmp_path: Path):
-        """Test h5_to_numpy dense format with min_nonzero filtering."""
+    def test_h5_to_np_dense_format_with_filtering(tmp_path: Path):
+        """Test h5_to_np dense format with min_nonzero filtering."""
         data_root = tmp_path / "backbone_reps"
         data_root.mkdir(exist_ok=True)
         
@@ -564,7 +564,7 @@ if __name__ == "__main__":
                 f.create_dataset(str(i), data=dense_data[i])
         
         # Filter out columns with less than 3 non-zero values
-        result = h5_to_numpy(test_file, min_nonzero=3)
+        result = h5_to_np(test_file, min_nonzero=3)
         
         # Should keep columns 0 and 2 (both have 3 non-zero values)
         # Column 1 has 0 non-zero values, column 3 has 2 non-zero values
@@ -643,7 +643,7 @@ if __name__ == "__main__":
         assert isinstance(X_ep, torch.Tensor)
         assert isinstance(Y_ep, torch.Tensor)
 
-    def test_load_backbone_representations_standard_format(tmp_path: Path):
+    def test_load_backbone_standard_format(tmp_path: Path):
         """Test loading backbone representations with standard 'representations' key."""
         backbone_path = tmp_path / "backbone_reps.h5"
         dummy_reps = np.random.rand(50, 768).astype(np.float32)
@@ -651,13 +651,13 @@ if __name__ == "__main__":
         with h5py.File(backbone_path, 'w') as f:
             f.create_dataset('representations', data=dummy_reps, compression='gzip')
         
-        loaded_reps = load_backbone_representations(str(backbone_path))
+        loaded_reps = load_backbone(str(backbone_path))
         
         assert np.array_equal(loaded_reps, dummy_reps)
         assert loaded_reps.shape == (50, 768)
         assert loaded_reps.dtype == np.float32
 
-    def test_load_backbone_representations_sae_raw_format(tmp_path: Path):
+    def test_load_backbone_sae_raw_format(tmp_path: Path):
         """Test loading backbone representations with SAE raw format (numeric keys)."""
         backbone_path = tmp_path / "backbone_reps_raw.h5"
         dummy_reps = np.random.rand(3, 768).astype(np.float32)
@@ -666,7 +666,7 @@ if __name__ == "__main__":
             for i in range(3):
                 f.create_dataset(str(i), data=dummy_reps[i])
         
-        loaded_reps = load_backbone_representations(str(backbone_path))
+        loaded_reps = load_backbone(str(backbone_path))
         
         assert np.array_equal(loaded_reps, dummy_reps)
         assert loaded_reps.shape == (3, 768)
@@ -687,10 +687,10 @@ if __name__ == "__main__":
         
         test_image_dataset(tmp_path)
         test_test_transform()
-        test_h5_to_numpy_sparse_format(tmp_path)
-        test_h5_to_numpy_dense_format(tmp_path)
-        test_h5_to_numpy_dense_format_with_filtering(tmp_path)
+        test_h5_to_np_sparse_format(tmp_path)
+        test_h5_to_np_dense_format(tmp_path)
+        test_h5_to_np_dense_format_with_filtering(tmp_path)
         test_function_dataset_sparse(tmp_path)
         test_function_dataset_dense(tmp_path)
-        test_load_backbone_representations_standard_format(tmp_path)
-        test_load_backbone_representations_sae_raw_format(tmp_path)
+        test_load_backbone_standard_format(tmp_path)
+        test_load_backbone_sae_raw_format(tmp_path)

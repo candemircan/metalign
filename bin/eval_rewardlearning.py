@@ -10,7 +10,7 @@ from nnsight import NNsight
 from tqdm import tqdm
 
 from metalign.cognitive_model import RewardLearner
-from metalign.data import load_backbone_representations
+from metalign.data import load_backbone
 from metalign.model import Transformer
 from metalign.utils import fix_state_dict
 
@@ -48,7 +48,7 @@ def main(
     model = NNsight(model)
 
     human_data = pd.read_csv("data/external/reward_learning.csv")
-    backbone_reps = load_backbone_representations(things_reps)
+    backbone_reps = load_backbone(things_reps)
     with model.trace(torch.from_numpy(backbone_reps).unsqueeze(1)): 
         metalign_reps = model.embed.output.squeeze().save()
 
