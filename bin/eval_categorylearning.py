@@ -20,10 +20,20 @@ _ = torch.set_grad_enabled(False)
 def main(
     experiment_name: str, # has to be one of main, raw, midsae
     backbone_name: str, # has to be one of  clip, siglip2, dinov3, or mae
+    force: bool = False # if True, will overwrite existing eval files
 ):
     """
     Compare metalign to baselines with linear probes in how aligned they are with human category learning
     """
+
+    eval_path = Path("data/evals/categorylearning")
+    eval_path.mkdir(parents=True, exist_ok=True)
+    file_name = f"{experiment_name}_{backbone_name}"
+    eval_file = eval_path / f"{file_name}.csv"
+
+    if eval_file.exists() and not force:
+        print(f"Eval file {eval_file} already exists. Use --force to overwrite.")
+        return
     
     best_models = json.load(open(Path("data/checkpoints") / "best_models.json"))
     backbone_dict = json.load(open(Path("data/backbone_reps") / "backbones.json"))
@@ -83,10 +93,7 @@ def main(
 
 
     result_df = pd.DataFrame({"participant": human_data.participant.unique(),"metalign_accuracy": metalign_accuracies,  "base_accuracy": base_accuracies, "metalign_linear_accuracy": metalign_linear_accuracies})
-    eval_path = Path("data/evals/categorylearning")
-    eval_path.mkdir(parents=True, exist_ok=True)
-    file_name = f"{experiment_name}_{backbone_name}"
-    eval_file = eval_path / f"{file_name}.csv"
+
     result_df.to_csv(eval_file, index=False)
     print(f"Average metalign accuracy: {np.mean(metalign_accuracies)}")
     print(f"Average base accuracy: {np.mean(base_accuracies)}")

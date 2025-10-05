@@ -43,11 +43,20 @@ def _calculate_accuracy(reps, X, y, batch_size=2048):
 def main(
     experiment_name: str, # has to be one of main, raw, midsae
     backbone_name: str, # has to be one of mae, clip, siglip2, dinov3
-    batch_size: int = 2048 # batch size for evaluation
+    batch_size: int = 2048, # batch size for evaluation
+    force:bool = False
 ):
     """
     Evaluate 0-shot accuracy on THINGS odd-one-out task of the base model and the given checkpoint
     """
+
+    eval_path = Path("data/evals/thingso1o")
+    eval_path.mkdir(parents=True, exist_ok=True)
+    file_name = f"{experiment_name}_{backbone_name}"
+    eval_file = eval_path / f"{file_name}.json"
+    if eval_file.exists() and not force:
+        print(f"Eval file {eval_file} already exists, use --force to overwrite")
+        return
     
     best_models = json.load(open(Path("data/checkpoints") / "best_models.json"))
     backbone_dict = json.load(open(Path("data/backbone_reps") / "backbones.json"))
@@ -75,10 +84,6 @@ def main(
     metalign_acc = _calculate_accuracy(metalign_reps, X, y, batch_size=batch_size)
     ceiling_acc = _calculate_accuracy(ceiling_model, X, y, batch_size=batch_size)
 
-    eval_path = Path("data/evals/thingso1o")
-    eval_path.mkdir(parents=True, exist_ok=True)
-    file_name = f"{experiment_name}_{backbone_name}"
-    eval_file = eval_path / f"{file_name}.json"
     eval_data = {
         "model_name": backbone_name,
         "checkpoint_name": file_name,
