@@ -42,7 +42,6 @@ def calculate_cka(X:torch.Tensor, # batch by observations by features
 
     return top / bottom
 
-torch.linalg.matrix_norm
 @call_parse
 def main():
     """
