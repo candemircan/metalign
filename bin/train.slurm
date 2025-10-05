@@ -2,7 +2,7 @@
 #SBATCH --account=hai_1065
 #SBATCH --nodes=1
 #SBATCH --output=logs/train_%j.out
-#SBATCH --time=02:00:00
+#SBATCH --time=05:00:00
 #SBATCH --partition=booster
 #SBATCH --gres=gpu:4
 
