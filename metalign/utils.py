@@ -1,7 +1,7 @@
 __all__ = ["fix_state_dict", "cka"]
 
 import torch
-from einops import einsum, reduce
+from einops import einsum
 from fastcore.script import call_parse
 
 
@@ -24,23 +24,25 @@ def calculate_cka(X:torch.Tensor, # batch by observations by features
                   Y:torch.Tensor # batch by observations by features
                   ):
     """
-    Calculate centered kernel alignment (CKA) between two batched tensors
+    calculate centered kernel alignment (CKA) between two batched tensors
     """
 
     # subtract the mean of each observation
     X -= X.mean(1, keepdim=True)
     Y -= Y.mean(1, keepdim=True)
 
+    # batched matmul
     XTX = einsum(X, X, "b o f1, b o f2 -> b f1 f2")
     YTY = einsum(Y, Y, "b o f1, b o f2 -> b f1 f2")
     YTX = einsum(Y, X, "b o f1, b o f2 -> b f1 f2")
 
-
-    top = reduce(YTX ** 2, "b f1 f2 -> b", "sum")
-    bottom = torch.sqrt(reduce(XTX ** 2, "b f1 f2 -> b", "sum") * reduce(YTY ** 2, "b f1 f2 -> b", "sum"))
+    # l2 (frobenius) norm of YTX squared / l2 norm of XTX * l2 norm of YTY
+    top = torch.linalg.matrix_norm(YTX, ord='fro', dim=(1,2)) ** 2
+    bottom = torch.linalg.matrix_norm(XTX, ord='fro', dim=(1,2)) * torch.linalg.matrix_norm(YTY, ord='fro', dim=(1,2))
 
     return top / bottom
 
+torch.linalg.matrix_norm
 @call_parse
 def main():
     """
