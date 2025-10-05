@@ -1,4 +1,4 @@
-__all__ = ["fix_state_dict"]
+__all__ = ["fix_state_dict", "cka"]
 
 import torch
 from einops import einsum, reduce
