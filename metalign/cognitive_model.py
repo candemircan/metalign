@@ -12,7 +12,7 @@ from sklearn.linear_model import BayesianRidge, LogisticRegression
 
 class CategoryLearner:
     def __init__(self,
-                 est=LogisticRegression(max_iter=4000), # Sklearn-compatible model with a `predict_proba` method.
+                 est=LogisticRegression(max_iter=4000), # sklearn-compatible model with a `predict_proba` method.
                 ):
         "agent that models a category-learning task using a linear model."
         self.est = est

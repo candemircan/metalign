@@ -100,20 +100,25 @@ class Transformer(nn.Module):
         self.head = nn.Linear(c.x_sz, 1, bias=c.logit_bias)
 
 
-    def _prep_inputs(self, x:torch.Tensor, y:torch.Tensor) -> torch.Tensor:
-        "concatenate one-hot previous targets to input features `x`."
+    def _prep_inputs(self, x:torch.Tensor, y:torch.Tensor|None = None) -> torch.Tensor:
+        """concatenate one-hot previous targets to input features `x`.
+           if `y` is `None`, then a vector of `[0. 0.]` is concatenated instead
+        """
         bs = x.shape[0]
-        # get the previous targets and prepend with zeros
-        prev_targets = torch.cat([torch.zeros(bs, 1, device=x.device), y[:, :-1]], dim=1)
-        target_onehot = F.one_hot(prev_targets.long(), num_classes=2).float()
-        target_onehot[:, 0] = 0. # our BOS token is always [0., 0.]
+        if y is not None:
+            # get the previous targets and prepend with zeros
+            prev_targets = torch.cat([torch.zeros(bs, 1, device=x.device), y[:, :-1]], dim=1)
+            target_onehot = F.one_hot(prev_targets.long(), num_classes=2).float()
+            target_onehot[:, 0] = 0. # our BOS token is always [0., 0.]
+
+        # batch by sequence by [0. 0.]
+        else: target_onehot = torch.zeros(bs, x.shape[1], 2, device=x.device) 
         return torch.cat([target_onehot, x], dim=-1)
 
     def forward(self,
                 x:torch.Tensor, # (batch_size, seq_len, feature_dim) - input features
                 y:torch.Tensor | None = None, # (batch_size, seq_len) - binary targets for each position - or None
                 ) -> torch.Tensor:
-        y = y if y is not None else torch.zeros(x.shape[0], x.shape[1], device=x.device)
         x = self._prep_inputs(x, y)
 
         x = self.embed(x)
@@ -265,8 +270,14 @@ def main():
     x_oh_truth = torch.tensor([[0., 0., 10, 20, 30], [0., 1., 40, 50, 60], [1., 0., 70, 80, 90], [1., 0., 100, 110, 120]], dtype=torch.float32).unsqueeze(0)
 
     x_oh = model._prep_inputs(x_prep, y_prep)
-    assert torch.equal(x_oh, x_oh_truth), "Prepared inputs do not match expected values."
-    assert x_oh.shape == (1, 4, 5), "Prepared inputs shape mismatch."
+    assert torch.equal(x_oh, x_oh_truth), "prepared inputs do not match expected values."
+    assert x_oh.shape == (1, 4, 5), "prepared inputs shape mismatch."
+
+    # and if y is None
+    x_noh_truth = torch.tensor([[0., 0., 10, 20, 30], [0., 0., 40, 50, 60], [0., 0., 70, 80, 90], [0., 0., 100, 110, 120]], dtype=torch.float32).unsqueeze(0)
+    x_noh = model._prep_inputs(x_prep)
+    assert torch.equal(x_noh, x_noh_truth), "prepared inputs do not match expected values."
+    assert x_noh.shape == (1, 4, 5), "prepared inputs shape mismatch"
     
     # rope test
     rope = RotaryPositionalEmbeddings(dim=8, max_seq_len=10)
