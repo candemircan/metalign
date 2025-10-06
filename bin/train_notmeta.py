@@ -45,6 +45,8 @@ def main(
     early_stopping_patience: int = 50, # number of evaluation intervals to wait for improvement before stopping
     early_stopping_min_delta: float = 0.001, # minimum change in evaluation loss to be considered an improvement
     early_stopping_max_steps: int = 1000, # after this, early stopping will be considered even if improvement is still happening
+    use_class_weights: bool_arg = True, # whether to use class weights for imbalanced data
+    pos_weight_factor: float = 1.0, # multiplicative factor for positive class weights (higher = more emphasis on rare classes)
 ):
     """
     train a two-layer linear model over multi-label classification tasks.
@@ -88,7 +90,21 @@ def main(
 
     train_episode_dataset = FunctionStaticDataset(inputs=train_inputs, features_path=train_features_path, min_nonzero=args.min_nonzero)
     
-    eval_episode_dataset = FunctionStaticDataset(inputs=eval_inputs, features_path=eval_features_path, min_nonzero=args.min_nonzero)
+    # use the same valid columns for eval dataset to ensure alignment
+    eval_episode_dataset = FunctionStaticDataset(inputs=eval_inputs, features_path=eval_features_path, min_nonzero=args.min_nonzero, valid_columns=train_episode_dataset.valid_columns)
+
+    print(f"train dataset: {train_episode_dataset.Y.shape[0]} samples, {train_episode_dataset.Y.shape[1]} functions")
+    print(f"eval dataset: {eval_episode_dataset.Y.shape[0]} samples, {eval_episode_dataset.Y.shape[1]} functions")
+    assert train_episode_dataset.Y.shape[1] == eval_episode_dataset.Y.shape[1], "train and eval datasets must have the same number of functions"
+
+    pos_weights = None
+    if args.use_class_weights:
+        #  positive class frequencies
+        pos_freq = train_episode_dataset.Y.float().mean(dim=0)
+        #  pos_weight as ratio of negative to positive samples, scaled by factor
+        pos_weights = ((1 - pos_freq) / pos_freq) * args.pos_weight_factor
+        pos_weights = pos_weights.to(device)
+        print(f"using class weights. pos_weight range: {pos_weights.min():.2f} to {pos_weights.max():.2f}")
 
     train_loader = DataLoader(
         train_episode_dataset, batch_size=args.batch_size, num_workers=min(4, os.cpu_count()),
@@ -140,7 +156,7 @@ def main(
 
         with autocast(dtype=torch.bfloat16, device_type=device):
             logits = model(X_batch)
-            loss = F.binary_cross_entropy_with_logits(logits, Y_batch)
+            loss = F.binary_cross_entropy_with_logits(logits, Y_batch, pos_weight=pos_weights)
 
         optimizer.zero_grad()
         loss.backward()
@@ -200,7 +216,7 @@ def main(
 
                     with autocast(dtype=torch.bfloat16, device_type=device if device != "mps" else "cpu"):
                         logits_eval = model(batch_X)
-                        loss_eval = F.binary_cross_entropy_with_logits(logits_eval, batch_Y)
+                        loss_eval = F.binary_cross_entropy_with_logits(logits_eval, batch_Y, pos_weight=pos_weights)
                     
                     local_sum_eval_loss += loss_eval.item()
                     

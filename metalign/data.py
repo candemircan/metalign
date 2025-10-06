@@ -192,10 +192,21 @@ class Levels(ImageDataset):
 
 class FunctionStaticDataset(Dataset):
     "static SAE functions for given features. not used for meta-learning but for a supervised baseline."
-    def __init__(self, inputs: np.ndarray, features_path: Path, min_nonzero: int = 120):
+    def __init__(self, inputs: np.ndarray, features_path: Path, min_nonzero: int = 120, valid_columns: np.ndarray = None):
         X = torch.tensor(inputs, dtype=torch.float32)
         
-        Y = torch.from_numpy(h5_to_np(features_path, min_nonzero=min_nonzero))
+        # if valid_columns is provided, use it to filter columns consistently
+        if valid_columns is not None:
+            Y_full = torch.from_numpy(h5_to_np(features_path, min_nonzero=0))  # don't filter here
+            Y = Y_full[:, valid_columns]
+            self.valid_columns = valid_columns
+        else:
+            # original behavior: filter based on min_nonzero
+            Y = torch.from_numpy(h5_to_np(features_path, min_nonzero=min_nonzero))
+            # store which columns were kept for potential reuse
+            Y_full = torch.from_numpy(h5_to_np(features_path, min_nonzero=0))
+            non_zero_counts = (Y_full != 0).sum(dim=0)
+            self.valid_columns = (non_zero_counts >= min_nonzero).numpy()
         
         self.X, self.Y = X, Y
 

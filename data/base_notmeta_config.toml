@@ -11,3 +11,5 @@ early_stopping_max_steps = 10000
 log_interval_steps = 50
 eval_interval_steps = 1000
 min_nonzero = 120
+use_class_weights = true
+pos_weight_factor = 1.0

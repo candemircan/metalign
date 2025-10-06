@@ -20,7 +20,7 @@ dependencies = [
     ]
 
 [project.optional-dependencies]
-dev = ["pre-commit", "ruff", "ipykernel", "shiny"]
+dev = ["pre-commit", "ruff", "ipykernel", "shiny", "ipdb"]
 
 [tool.setuptools]
 packages = ["metalign"]
