@@ -249,13 +249,14 @@ class TwoLinearConfig:
 class TwoLinear(nn.Module):
     """
     A simple two-layer linear model. Used to learn all the functions without doing meta-learning.
+    Maps inputs directly to multi-label binary outputs.
     """
-    def __init__(self, x_sz:int, y_sz:int, bias:bool):
+    def __init__(self, c:TwoLinearConfig):
         super().__init__()
-        self.fc1 = nn.Linear(x_sz, y_sz, bias=bias)
-        self.fc2 = nn.Linear(y_sz, x_sz, bias=bias)
+        self.embed = nn.Linear(c.x_sz, c.x_sz, bias=c.bias)
+        self.head = nn.Linear(c.x_sz, c.y_sz, bias=c.bias)
 
-    def forward(self, x:torch.Tensor) -> torch.Tensor: return self.fc2(self.fc1(x))
+    def forward(self, x:torch.Tensor) -> torch.Tensor: return self.head(self.embed(x))
 
 @call_parse
 def main():
@@ -309,6 +310,6 @@ def main():
 
     # two linear shape
     tlc = TwoLinearConfig(x_sz=10, y_sz=20)
-    tl = TwoLinear(tlc.x_sz, tlc.y_sz, tlc.bias)
+    tl = TwoLinear(tlc)
     x_tl = torch.randn(bs, tlc.x_sz)
-    assert tl(x_tl).shape == (bs, tlc.x_sz)
+    assert tl(x_tl).shape == (bs, tlc.y_sz)

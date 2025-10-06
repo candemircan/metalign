@@ -157,6 +157,7 @@ figures/**/
 !.gitkeep
 example*
 !data/base_config.toml
+!data/base_notmeta_config.toml
 !data/backbone_reps/backbones.json
 .github/instructions
 wandb
