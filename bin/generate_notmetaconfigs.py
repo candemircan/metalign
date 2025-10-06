@@ -7,7 +7,7 @@ from fastcore.script import call_parse
 
 
 @call_parse
-def main(output_dir: Path = Path("data/notmeta_configs"), base_config_path: Path = Path("data/base_notmeta_config.toml")):
+def main(output_dir: Path = Path("data/configs"), base_config_path: Path = Path("data/base_notmeta_config.toml")):
     "Generates TOML config files for non-meta learning baseline experiments."
 
     with open(base_config_path, "rb") as f:
