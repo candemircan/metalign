@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# Check if uv is installed
+# check if uv is installed
 if command -v uv >/dev/null 2>&1; then
     echo "uv is already installed."
 
-# If uv is not installed, try to install it
+# if uv is not installed, try to install it
 elif command -v curl >/dev/null 2>&1; then
     echo "installing uv using curl..."
     curl -LsSf https://astral.sh/uv/install.sh | sh

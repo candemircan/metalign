@@ -38,7 +38,7 @@ def main(
     seed: int = 1234, # random seed for reproducibility
     lr: float = 0.0025,  # learning rate for the optimizer
     weight_decay: float = 0.,  # weight decay for the optimizer
-    warmup_steps: int = 1000,  # number of warmup steps for the learning rate scheduler
+    warmup_steps: int = 0,  # number of warmup steps for the learning rate scheduler
     name: str = None,  # name of the model. If provided, it will be used to log the model.
     log_interval_steps: int = 10,  # log training loss every N steps
     eval_interval_steps: int = 100,  # evaluate the model every eval_interval_steps steps
@@ -51,9 +51,9 @@ def main(
     eval_features: str = "coco_eval_sae-top_k-64-cls_only-layer_11-hook_resid_post",  # features for eval data. the name must match data/sae/{eval_features}.h5
     min_nonzero: int = 120,  # minimum number of non-zero activations per column to keep it in the final array
     tags: Param(help="tags to use for the wandb run. If empty, no tags are used.", type=str, nargs="*") = [],
-    early_stopping_patience: int = 20, # number of evaluation intervals to wait for improvement before stopping
+    early_stopping_patience: int = 50, # number of evaluation intervals to wait for improvement before stopping
     early_stopping_min_delta: float = 0.001, # minimum change in evaluation loss to be considered an improvement
-    early_stopping_max_steps: int = 3000, # after this, early stopping will be considered even if improvement is still happening
+    early_stopping_max_steps: int = 10000, # after this, early stopping will be considered even if improvement is still happening
 ):
     """
     train a meta-learning transformer model over function learning tasks.

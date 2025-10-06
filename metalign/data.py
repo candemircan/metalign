@@ -231,7 +231,7 @@ class FunctionDataset(Dataset):
     def _sample_episode(self, dim: int):
         y_dim = self.Y[:, dim]
         
-        std_dev = self.seq_len / 20.0
+        std_dev = self.seq_len / 20.0 # with a sequence length of 120, this gives a decent but not too exeggerated of a spread
         n_pos = int(torch.normal(mean=torch.tensor(self.seq_len / 2), std=torch.tensor(std_dev)).round().clamp(0, self.seq_len).item())
         n_neg = self.seq_len - n_pos
 
@@ -270,7 +270,7 @@ class FunctionDataset(Dataset):
 
 
 def prepare_things_spose(
-    representations: np.ndarray, # directly loaded from h5py.File(path, 'r')['representations'][:]
+    representations: np.ndarray, # directly loaded from `load_backbone(h5_path)`
     data_root: Path = Path("data/external"), # the root directory of the THINGS dataset, which contains the images and the unique_id.txt file
     return_tensors: str = "pt", # the type of tensors to return, can be "pt" for PyTorch tensors or "np" for NumPy arrays
 ) -> tuple[torch.Tensor, torch.Tensor] | tuple[np.ndarray, np.ndarray]:

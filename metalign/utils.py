@@ -64,12 +64,12 @@ def main():
     X_coffset[:, :, [0]] += 10
     assert all(torch.isclose(calculate_cka(X, X_coffset), torch.ones(bs)))
 
-    # isotropic scaling should be irrelevant
+    # isotropic scaling shouldnt change cka
     cka1 = calculate_cka(X,Y)
     cka2 = calculate_cka(X * 23, Y * -2)
     assert all(torch.isclose(cka1,cka2))
 
-    # if scaling isnt isotropic, this should change cka
+    # if scaling isnt isotropic, cka should be different
     cka1 = calculate_cka(X,Y)
     Y_noniso = Y.clone()
     Y_noniso[:, :, [0]] *= 4

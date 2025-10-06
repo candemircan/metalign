@@ -32,7 +32,6 @@ build-backend = "uv_build"
 [tool.uv]
 no-build-isolation-package = ["flash-attn"]
 
-
 [tool.uv.build-backend]
 module-name = "metalign"
 module-root = ""
