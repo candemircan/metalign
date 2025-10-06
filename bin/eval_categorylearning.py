@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 from metalign.cognitive_model import CategoryLearner
 from metalign.data import load_backbone
-from metalign.model import Transformer
+from metalign.model import Transformer, TwoLinear
 from metalign.utils import fix_state_dict
 
 _ = torch.set_grad_enabled(False)
@@ -42,15 +42,24 @@ def main(
 
     ckpt = torch.load(ckpt,  weights_only=False)
     config, state_dict = ckpt['config'], fix_state_dict(ckpt['state_dict'])
-    model = Transformer(c=config)
-    model.load_state_dict(state_dict)
-    model.eval()
-    model = NNsight(model)
-
+    
     human_data = pd.read_csv("data/external/category_learning.csv")
     backbone_reps = load_backbone(things_reps)
-    with model.trace(torch.from_numpy(backbone_reps).unsqueeze(1)): 
-        metalign_reps = model.embed.output.squeeze().save()
+    
+    if experiment_name.lower() == 'notmeta':
+        model = TwoLinear(c=config)
+        model.load_state_dict(state_dict)
+        model.eval()
+        # for TwoLinear, we extract representations from the embed layer
+        metalign_reps = model.embed(torch.from_numpy(backbone_reps))
+    else:
+        model = Transformer(c=config)
+        model.load_state_dict(state_dict)
+        model.eval()
+        model = NNsight(model)
+        # for Transformer, we extract representations from the embed layer using nnsight bc there is special processing of inputs
+        with model.trace(torch.from_numpy(backbone_reps).unsqueeze(1)): 
+            metalign_reps = model.embed.output.squeeze().save()
 
     imgs = sorted(glob("data/external/THINGS/*/*jpg"))
     metalign_accuracies, base_accuracies, metalign_linear_accuracies = [], [], []
@@ -66,10 +75,22 @@ def main(
         X = torch.from_numpy(backbone_reps[img_locs]).unsqueeze(0)
         y = torch.from_numpy(participant_data.true_category_binary.values).unsqueeze(0)
         participant_choices = participant_data["choice"].values
-        raw_logits = model(X, y).squeeze().detach().numpy()
-        final_probabilities = 1 / (1 + np.exp(-raw_logits))
-        answers = (final_probabilities > 0.5).astype(int)
-        acc = np.mean(participant_choices == answers)
+        
+        if experiment_name.lower() == 'notmeta':
+            X_batch = torch.from_numpy(backbone_reps[img_locs])
+            # For category learning, we'll use a simple linear probe on the embeddings
+            embeddings = model.embed(X_batch).detach().numpy()
+            learner = CategoryLearner()
+            learner.fit(embeddings, participant_data.true_category_binary.values)
+            model_preds = np.argmax(learner.values, axis=1)
+            acc = np.mean(participant_choices == model_preds)
+        else:
+            # For Transformer, use the full meta-learning approach
+            raw_logits = model(X, y).squeeze().detach().numpy()
+            final_probabilities = 1 / (1 + np.exp(-raw_logits))
+            answers = (final_probabilities > 0.5).astype(int)
+            acc = np.mean(participant_choices == answers)
+        
         metalign_accuracies.append(acc)
 
         # base

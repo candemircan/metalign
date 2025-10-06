@@ -9,7 +9,7 @@ from torch.nn import functional as F
 from tqdm import tqdm
 
 from metalign.data import load_backbone, prepare_things_spose
-from metalign.model import Transformer
+from metalign.model import Transformer, TwoLinear
 from metalign.utils import fix_state_dict
 
 _ = torch.set_grad_enabled(False)
@@ -69,13 +69,19 @@ def main(
 
     ckpt = torch.load(ckpt, weights_only=False)
     config, state_dict = ckpt['config'], fix_state_dict(ckpt['state_dict'])
-    model = Transformer(c=config)
-    model.load_state_dict(state_dict)
-    model.eval()
-    model = NNsight(model)
-
-    with model.trace(backbone_reps.unsqueeze(1)): 
-        metalign_reps = model.embed.output.squeeze().save()
+    
+    if experiment_name.lower() == 'notmeta':
+        model = TwoLinear(c=config)
+        model.load_state_dict(state_dict)
+        model.eval()
+        metalign_reps = model.embed(backbone_reps)
+    else:
+        model = Transformer(c=config)
+        model.load_state_dict(state_dict)
+        model.eval()
+        model = NNsight(model)
+        with model.trace(backbone_reps.unsqueeze(1)): 
+            metalign_reps = model.embed.output.squeeze().save()
 
     X = df[["image1", "image2", "image3"]].values - 1 # 0 index
     y = df["choice"].values -1 # 0 index

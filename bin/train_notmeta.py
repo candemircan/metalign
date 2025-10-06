@@ -129,7 +129,12 @@ def main(
         model.train()
         optimizer.train()
 
-        X_batch, Y_batch = next(train_iterator)
+        try:
+            X_batch, Y_batch = next(train_iterator)
+        except StopIteration:
+            # restart iterator when we've gone through all data
+            train_iterator = iter(train_loader)
+            X_batch, Y_batch = next(train_iterator)
         X_batch = X_batch.to(device)
         Y_batch = Y_batch.to(device)
 
