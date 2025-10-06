@@ -74,5 +74,3 @@ def main(output_dir: Path = Path("data/notmeta_configs"), base_config_path: Path
     with open(backbone_json_path, "w") as f:
         json.dump(backbone_json, f, indent=4)
 
-    print(f"Generated {len(model_names)} config files in {output_dir}")
-    print(f"Config files: {[f'{experiment_setup['prefix']}{short}_{i}.toml' for i, short in enumerate(['mae', 'clip', 'dinov3', 'siglip2'])]}")
