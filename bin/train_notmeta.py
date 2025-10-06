@@ -166,10 +166,10 @@ def main(
                 avg_recall = accumulated_train_recall / accumulated_batches
                 
                 wandb.log({
-                    "loss_train": avg_loss,
-                    "f1_train": avg_f1,
-                    "precision_train": avg_precision,
-                    "recall_train": avg_recall
+                    "notmeta/loss_train": avg_loss,
+                    "notmeta/f1_train": avg_f1,
+                    "notmeta/precision_train": avg_precision,
+                    "notmeta/recall_train": avg_recall
                 }, step=training_step)
 
             accumulated_train_loss = 0.0
@@ -220,10 +220,10 @@ def main(
 
                 if args.wandb_log: 
                     wandb.log({
-                        "loss_eval": avg_eval_loss,
-                        "f1_eval": avg_eval_f1,
-                        "precision_eval": avg_eval_precision,
-                        "recall_eval": avg_eval_recall
+                        "notmeta/loss_eval": avg_eval_loss,
+                        "notmeta/f1_eval": avg_eval_f1,
+                        "notmeta/precision_eval": avg_eval_precision,
+                        "notmeta/recall_eval": avg_eval_recall
                     }, step=training_step)
 
                 if training_step >= args.early_stopping_max_steps:
