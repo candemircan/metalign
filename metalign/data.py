@@ -2,7 +2,7 @@
 common datasets and processing utils  used throughout the project
 """
 
-__all__ = ["ImageDataset", "Things", "Coco", "h5_to_np", "FunctionDataset", "prepare_things_spose", "load_backbone", "Levels", "prepare_levels"]
+__all__ = ["ImageDataset", "Things", "Coco", "h5_to_np", "FunctionStaticDataset", "FunctionDataset", "prepare_things_spose", "load_backbone", "Levels", "prepare_levels"]
 
 import pickle
 from pathlib import Path
@@ -190,6 +190,23 @@ class Levels(ImageDataset):
             return image
 
 
+class FunctionStaticDataset(Dataset):
+    "static SAE functions for given features. not used for meta-learning but for a supervised baseline."
+    def __init__(self, inputs: np.ndarray, features_path: Path, min_nonzero: int = 120):
+        X = torch.tensor(inputs, dtype=torch.float32)
+        
+        Y = torch.from_numpy(h5_to_np(features_path, min_nonzero=min_nonzero))
+        
+        self.X, self.Y = X, Y
+
+        # for Y, we want to binarise the outputs
+        # in this class, we assume all functions are sparse
+        # so a positive is a non-zero value, and a negative is a zero value
+        self.Y = (self.Y != 0).float()
+
+    def __len__(self): return len(self.X)
+
+    def __getitem__(self, idx): return self.X[idx], self.Y[idx]
 
 class FunctionDataset(Dataset):
     "episode-based dataset for given features, optimized for DataLoader usage."

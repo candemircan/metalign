@@ -1,7 +1,7 @@
 """
-transformer and transformer parts for meta-learning
+transformer and transformer parts for meta-learning as well as some baselines
 """
-__all__ = ["TransformerConfig", "Transformer", "TransformerBlock", "SelfAttention", "MLP", "RotaryPositionalEmbeddings"]
+__all__ = ["TransformerConfig", "Transformer", "TransformerBlock", "SelfAttention", "MLP", "RotaryPositionalEmbeddings", "TwoLinear", "TwoLinearConfig"]
 
 from dataclasses import dataclass
 from typing import Optional
@@ -237,7 +237,25 @@ class RotaryPositionalEmbeddings(nn.Module):
         return q_out, k_out
     
 
-    
+@dataclass
+class TwoLinearConfig:
+    """
+    Configuration for a two-layer linear model.
+    """
+    x_sz:int = 512
+    y_sz:int = 512
+    bias:bool = True
+        
+class TwoLinear(nn.Module):
+    """
+    A simple two-layer linear model. Used to learn all the functions without doing meta-learning.
+    """
+    def __init__(self, x_sz:int, y_sz:int, bias:bool):
+        super().__init__()
+        self.fc1 = nn.Linear(x_sz, y_sz, bias=bias)
+        self.fc2 = nn.Linear(y_sz, x_sz, bias=bias)
+
+    def forward(self, x:torch.Tensor) -> torch.Tensor: return self.fc2(self.fc1(x))
 
 @call_parse
 def main():
@@ -288,3 +306,9 @@ def main():
     assert k_out.shape == k.shape
     assert not torch.equal(q, q_out)
     assert not torch.equal(k, k_out)
+
+    # two linear shape
+    tlc = TwoLinearConfig(x_sz=10, y_sz=20)
+    tl = TwoLinear(tlc.x_sz, tlc.y_sz, tlc.bias)
+    x_tl = torch.randn(bs, tlc.x_sz)
+    assert tl(x_tl).shape == (bs, tlc.x_sz)

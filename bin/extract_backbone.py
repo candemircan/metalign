@@ -52,7 +52,7 @@ def main(
     
     The timm implementation simply does a forward pass through the model with no classification head. 
     timm internally handles what the features are for a given model (e.g. siglip2 has its own attention pooling, whereas DINOv3 doesn't).
-    
+
     The hf implementation assumes that 1) there is a CLS token at index 0, and 2) extracts the mean of the patch tokens (no CLS)
     """
 
@@ -68,11 +68,11 @@ def main(
         hf_model = AutoModel.from_pretrained(repo_id).to(device).eval()
 
 
-        class Lambda(torch.nn.Module):
+        class LambdaModel(torch.nn.Module):
             def __init__(self, func): super().__init__(); self.func = func
             def forward(self, x): return self.func(x)
         
-        model = torch.nn.Sequential(hf_model,Lambda(lambda out: out.last_hidden_state[:, 1:].mean(dim=1)))
+        model = torch.nn.Sequential(hf_model,LambdaModel(lambda out: out.last_hidden_state[:, 1:].mean(dim=1)))
         transform = lambda img: processor(images=img, return_tensors="pt")['pixel_values'].squeeze(0)
     
     file_model_name = repo_id.split('/')[-1]
