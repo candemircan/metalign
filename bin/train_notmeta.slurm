@@ -10,7 +10,7 @@ module load CUDA/12
 
 for file in data/configs/notmeta*toml; do
 
-srun --exclusive -n 1 --gres=gpu:1  --cpus-per-task=4 uv run bin/train_notmeta.py --config_file $file
+srun --exclusive -n 1 --gres=gpu:1  --cpus-per-task=4 uv run bin/train_notmeta.py --config_file $file &
 
 done
 
