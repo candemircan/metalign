@@ -1,7 +1,6 @@
 import os
 import tomllib
 from pathlib import Path
-from pprint import pprint
 
 import torch
 import wandb
@@ -87,7 +86,7 @@ def main(
     args = dict2obj(args)
 
     device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
-    pprint(args)
+    print(args, flush=True)
 
     torch.manual_seed(args.seed)
     if device == "cuda":
@@ -109,8 +108,8 @@ def main(
     train_episode_dataset = FunctionStaticDataset(inputs=train_inputs, features_path=train_features_path, min_nonzero=args.min_nonzero)
     eval_episode_dataset = FunctionStaticDataset(inputs=eval_inputs, features_path=eval_features_path, min_nonzero=args.min_nonzero, valid_columns=train_episode_dataset.valid_columns)
 
-    print(f"train dataset: {train_episode_dataset.Y.shape[0]} samples, {train_episode_dataset.Y.shape[1]} functions")
-    print(f"eval dataset: {eval_episode_dataset.Y.shape[0]} samples, {eval_episode_dataset.Y.shape[1]} functions")
+    print(f"train dataset: {train_episode_dataset.Y.shape[0]} samples, {train_episode_dataset.Y.shape[1]} functions", flush=True)
+    print(f"eval dataset: {eval_episode_dataset.Y.shape[0]} samples, {eval_episode_dataset.Y.shape[1]} functions", flush=True)
     assert train_episode_dataset.Y.shape[1] == eval_episode_dataset.Y.shape[1], "train and eval datasets must have the same number of functions"
 
     pos_weights = None
@@ -237,13 +236,13 @@ def main(
                         early_stopping_counter += 1
                 elif avg_eval_map > best_eval_map:
                     best_eval_map = avg_eval_map
-                    early_stopping_counter = 0 # Reset counter on improvement
+                    early_stopping_counter = 0 
                     torch.save({'state_dict': {k: v.cpu() for k, v in model.state_dict().items()}, 'eval_mAP': avg_eval_map, 'step': training_step, 'config': config}, best_checkpoint_path)
                 else:
-                    early_stopping_counter += 1 # Only increment if no improvement
+                    early_stopping_counter += 1
                 
                 if early_stopping_counter >= args.early_stopping_patience:
-                    print(f"Early stopping at step {training_step} due to no improvement in eval mAP for {args.early_stopping_patience} evaluation intervals.")
+                    print(f"Early stopping at step {training_step} due to no improvement in eval mAP for {args.early_stopping_patience} evaluation intervals.", flush=True)
                     break
             
     if args.wandb_log: wandb.finish()

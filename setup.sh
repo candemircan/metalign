@@ -21,3 +21,7 @@ uv sync --no-install-package flash-attn
 uv sync --all-extras
 uv run pre-commit install
 uv run pre-commit run --all-files
+
+# i use jq for some json processing
+curl -sS https://webi.sh/jq | sh; \
+source ~/.config/envman/PATH.env
