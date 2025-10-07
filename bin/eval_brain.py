@@ -85,12 +85,26 @@ def main(
         trial_types = stim_df['trial_type'].tolist()
         trial_ids = stim_df['trial_id'].tolist()
         
+        # Debug info
+        print(f"Subject {sub}: {len(stim_names)} stimuli, response shape: {all_responses.shape}")
+        
         valid_trials = []
         model_indices = []
         for i, stim_name in enumerate(stim_names):
-            if stim_name in img_to_idx: # this is maybe too defensive but just in case
+            if stim_name in img_to_idx:
                 valid_trials.append(i)
                 model_indices.append(img_to_idx[stim_name])
+        
+        print(f"  Valid trials: {len(valid_trials)}/{len(stim_names)}")
+        print(f"  Model indices range: {min(model_indices) if model_indices else 'N/A'} to {max(model_indices) if model_indices else 'N/A'}")
+        print(f"  Backbone reps shape: {backbone_reps.shape}")
+        
+        # Check for duplicates in model_indices (this would be bad)
+        unique_indices = len(set(model_indices))
+        print(f"  Unique model indices: {unique_indices}/{len(model_indices)}")
+        
+        if unique_indices != len(model_indices):
+            print("  WARNING: Duplicate model indices found! This suggests repeated stimuli.")
         
         # filter brain responses to valid trials only (which should be all)
         valid_responses = all_responses[valid_trials]  # n_valid_trials, n_voxels
