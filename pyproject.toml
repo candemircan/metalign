@@ -15,6 +15,8 @@ dependencies = [
     "tomli-w",
     "timm",
     "nnsight",
+    "tables",
+    "torchmetrics",
     "flash-attn ; sys_platform == 'linux'",
     "vit_prisma @ git+https://github.com/Prisma-Multimodal/ViT-Prisma.git@97dd26fc01dfd856060c4a234b882c6f16836c15", 
     ]

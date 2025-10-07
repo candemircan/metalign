@@ -7,10 +7,10 @@ import wandb
 from fastcore.script import Param, bool_arg, call_parse
 from fastcore.utils import dict2obj
 from schedulefree import AdamWScheduleFree
-from sklearn.metrics import average_precision_score, roc_auc_score
 from torch.amp import autocast
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
+from torchmetrics.functional import auroc, average_precision
 
 from metalign.data import FunctionStaticDataset, load_backbone
 from metalign.model import TwoLinear, TwoLinearConfig
@@ -56,7 +56,6 @@ def main(
     name: str = None,  # name of the model. If provided, it will be used to log the model.
     log_interval_steps: int = 10,  # log training loss every N steps
     eval_interval_steps: int = 100,  # evaluate the model every eval_interval_steps steps
-    num_eval_episodes: int = 128,  # number of episodes to sample for evaluation
     checkpoint_dir: str = "checkpoints", # directory to save checkpoints. this will be placed under data/checkpoints/{name} if name is provided. If name is None, it will be saved under data/checkpoints
     compile: bool_arg = True,  # whether to compile the model with torch.compile
     train_backbone: str = "coco_train_vit_base_patch16_dinov3.lvd1689m",  # backbone for train data. the name must match data/backbone_reps/{train_backbone}.h5
@@ -172,11 +171,9 @@ def main(
         accumulated_train_loss += loss.item()
         
         with torch.no_grad():
-            y_true_np = Y_batch.cpu().numpy()
-            y_score_np = torch.sigmoid(logits).float().cpu().numpy()
-            
-            accumulated_train_map += average_precision_score(y_true_np, y_score_np, average='micro')
-            accumulated_train_auc += roc_auc_score(y_true_np, y_score_np, average='micro')
+            probs = torch.sigmoid(logits)
+            accumulated_train_map += average_precision(probs, Y_batch.long(), task="multilabel", num_labels=Y_batch.shape[1], average="micro").item()
+            accumulated_train_auc += auroc(probs, Y_batch.long(), task="multilabel", num_labels=Y_batch.shape[1], average="micro").item()
         accumulated_batches += 1
 
         if (training_step + 1) % args.log_interval_steps == 0 and accumulated_batches > 0:
@@ -205,17 +202,16 @@ def main(
                     
                     sum_eval_loss += loss_eval.item()
                     eval_batches += 1
-                    all_eval_logits.append(logits_eval.cpu())
-                    all_eval_labels.append(batch_Y.cpu())
+                    all_eval_logits.append(logits_eval)
+                    all_eval_labels.append(batch_Y)
 
                 avg_eval_loss = sum_eval_loss / eval_batches
                 all_eval_logits = torch.cat(all_eval_logits, dim=0)
                 all_eval_labels = torch.cat(all_eval_labels, dim=0)
 
-                y_true_np = all_eval_labels.cpu().numpy()
-                y_score_np = torch.sigmoid(all_eval_logits).float().cpu().numpy()
-                avg_eval_map = average_precision_score(y_true_np, y_score_np, average='micro')
-                avg_eval_auc = roc_auc_score(y_true_np, y_score_np, average='micro')
+                probs_eval = torch.sigmoid(all_eval_logits)
+                avg_eval_map = average_precision(probs_eval, all_eval_labels.long(), task="multilabel", num_labels=all_eval_labels.shape[1], average="micro").item()
+                avg_eval_auc = auroc(probs_eval, all_eval_labels.long(), task="multilabel", num_labels=all_eval_labels.shape[1], average="micro").item()
 
                 if args.wandb_log: 
                     wandb.log({
@@ -224,7 +220,6 @@ def main(
                         "notmeta/AUC_eval": avg_eval_auc
                     }, step=training_step)
 
-                # Early stopping logic now based on mean Average Precision (mAP)
                 is_improvement = (avg_eval_map - best_eval_map) > args.early_stopping_min_delta
                 
                 if training_step >= args.early_stopping_max_steps:
