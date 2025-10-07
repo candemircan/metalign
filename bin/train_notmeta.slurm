@@ -23,12 +23,10 @@ fi
 module load CUDA/12
 
 if [ "$LOSS_TYPE" = "ce" ]; then
-    echo "Running Cross-Entropy loss experiments..."
     for file in data/configs/notmeta_ce_*.toml; do
         srun --exclusive -n 1 --gres=gpu:1 --cpus-per-task=4 uv run bin/train_notmeta.py --config_file "$file" &
     done
 elif [ "$LOSS_TYPE" = "focal" ]; then
-    echo "Running Focal loss experiments..."
     for file in data/configs/notmeta_focal_*.toml; do
         srun --exclusive -n 1 --gres=gpu:1 --cpus-per-task=4 uv run bin/train_notmeta.py --config_file "$file" &
     done
