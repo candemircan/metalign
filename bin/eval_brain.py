@@ -38,7 +38,6 @@ def main(
     ckpt = torch.load(ckpt,  weights_only=False)
     config, state_dict = ckpt['config'], fix_state_dict(ckpt['state_dict'])
     
-    human_data = pd.read_csv("data/external/category_learning.csv")
     backbone_reps = load_backbone(things_reps)
     
     if experiment_name.lower() == 'notmeta':
@@ -56,10 +55,7 @@ def main(
         with model.trace(torch.from_numpy(backbone_reps).unsqueeze(1)): 
             metalign_reps = model.embed.output.squeeze().save()
 
-    # use things dataset ordering to match backbone feature extraction
-    things_dataset = Things()
-    imgs = [str(img) for img in things_dataset.images]
-    
+    imgs = Things().images
     brain_root = Path("data/external/brain_data")
     subs = brain_root.glob("sub-*ResponseData.h5")
     subs = [str(x).split("-")[-1].split("_")[0] for x in subs]
@@ -71,18 +67,13 @@ def main(
         response_df = pd.read_hdf(brain_root/f"sub-{sub}_ResponseData.h5")
         voxel_meta_df = pd.read_csv(brain_root/f"sub-{sub}_VoxelMetadata.csv")
 
-        # Debug: check the structure
-        print(f"Response df columns: {list(response_df.columns)[:10]}...")  # First 10 columns
-        print(f"Response df shape: {response_df.shape}")
-        print(f"Stim df shape: {stim_df.shape}")
-        print(f"Trial IDs in stim_df: {stim_df['trial_id'].min()} to {stim_df['trial_id'].max()}")
-        
+
         it_voxels = voxel_meta_df[voxel_meta_df.IT == 1]["voxel_id"].tolist()
         response_df = response_df[response_df.voxel_id.isin(it_voxels)].reset_index(drop=True)
         assert len(it_voxels) == len(response_df)
         del response_df["voxel_id"]
         
-        all_responses = response_df.to_numpy()  # Keep as (voxels, trials) - don't transpose yet
+        all_responses = response_df.to_numpy().T # obs by voxels now
         
         img_to_idx = {Path(img).name: i for i, img in enumerate(imgs)}
         
@@ -90,29 +81,16 @@ def main(
         trial_types = stim_df['trial_type'].tolist()
         trial_ids = stim_df['trial_id'].tolist()
         
-        # Debug info
-        print(f"Subject {sub}: {len(stim_names)} stimuli")
-        print(f"  Response shape: {all_responses.shape} (voxels, trials)")
-        print(f"  Available trial columns: {response_df.columns[:10].tolist()}...")
-        
+ 
         valid_trials = []
         model_indices = []
-        valid_trial_ids = []
-        
-        for i, (stim_name, trial_id) in enumerate(zip(stim_names, trial_ids)):
-            # Check if stimulus exists and trial_id column exists (as int, not string)
-            if stim_name in img_to_idx and trial_id in response_df.columns:
+        for i, stim_name in enumerate(stim_names):
+            if stim_name in img_to_idx: # this is maybe too defensive but just in case
                 valid_trials.append(i)
                 model_indices.append(img_to_idx[stim_name])
-                valid_trial_ids.append(trial_id)
         
-        print(f"  Valid trials: {len(valid_trials)}/{len(stim_names)}")
-        print(f"  Model indices range: {min(model_indices) if model_indices else 'N/A'} to {max(model_indices) if model_indices else 'N/A'}")
-        print(f"  Trial IDs range: {min(valid_trial_ids) if valid_trial_ids else 'N/A'} to {max(valid_trial_ids) if valid_trial_ids else 'N/A'}")
-        
-        # Get brain responses for valid trials using trial_ids as column names
-        valid_response_columns = valid_trial_ids  # Use integers directly, not strings
-        valid_responses = response_df[valid_response_columns].to_numpy().T  # Now (trials, voxels)
+        # filter brain responses to valid trials only (which should be all)
+        valid_responses = all_responses[valid_trials]  # n_valid_trials, n_voxels
         valid_stim_names = [stim_names[i] for i in valid_trials]
         valid_trial_types = [trial_types[i] for i in valid_trials]
         
@@ -147,20 +125,17 @@ def main(
             stim_mask = test_df['stimulus'] == stim
             stim_indices = test_df[stim_mask]['trial_idx'].tolist()
             
-            # get all brain reps (these differ across repetitions)
+            # get all reps
             stim_brain_reps = valid_responses[stim_indices]
+            stim_backbone_reps = backbone_reps_aligned[stim_indices]
+            stim_metalign_reps = metalign_reps_aligned[stim_indices]
             
-            # get backbone/metalign reps (these are identical across repetitions, so just take first)
-            first_idx = stim_indices[0]
-            stim_backbone_rep = backbone_reps_aligned[first_idx]
-            stim_metalign_rep = metalign_reps_aligned[first_idx]
-            
-            # average brain across reps, use single backbone/metalign rep
+            # average across reps
             test_brain_avg.append(stim_brain_reps.mean(axis=0))
-            test_backbone_avg.append(stim_backbone_rep)
-            test_metalign_avg.append(stim_metalign_rep)
+            test_backbone_avg.append(stim_backbone_reps.mean(axis=0))
+            test_metalign_avg.append(stim_metalign_reps.mean(axis=0))
             
-            # keep individual brain reps for noise ceiling
+            # keep individuals reps for noise ceiling
             test_brain_individual.append(stim_brain_reps)
         
         test_brain_avg = np.array(test_brain_avg)

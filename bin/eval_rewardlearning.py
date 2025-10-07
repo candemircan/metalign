@@ -1,5 +1,4 @@
 import json
-from glob import glob
 from pathlib import Path
 
 import numpy as np
@@ -10,7 +9,7 @@ from nnsight import NNsight
 from tqdm import tqdm
 
 from metalign.cognitive_model import RewardLearner
-from metalign.data import load_backbone
+from metalign.data import Things, load_backbone
 from metalign.model import Transformer, TwoLinear
 from metalign.utils import fix_state_dict
 
@@ -59,7 +58,7 @@ def main(
         with model.trace(torch.from_numpy(backbone_reps).unsqueeze(1)): 
             metalign_reps = model.embed.output.squeeze().save()
 
-    imgs = sorted(glob("data/external/THINGS/*/*jpg"))
+    imgs = Things().images
     metalign_accuracies, base_accuracies = [], []
 
 
