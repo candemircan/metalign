@@ -54,17 +54,6 @@ if [ ! -f "data/external/reward_learning.csv" ]; then
     wget -O data/external/reward_learning.csv https://osf.io/6exjm/download
 fi
 
-# brain data
-if [ ! -f "data/external/brain_data" ]; then
-    # i was getting 403 forbidden with just wget, so added user-agent
-    wget  --user-agent="Mozilla" -O data/external/brain_data.zip https://plus.figshare.com/ndownloader/files/43635873 
-    # the zip file is a bit funky, so using python to unzip which seems to deal with it better
-    uv run python -m zipfile -e data/external/brain_data.zip data/external/brain_data_temp
-    rm -r data/external/brain_data_temp/__MACOSX
-    mv data/external/brain_data_temp/betas_csv data/external/brain_data
-    rm -r data/external/brain_data_temp
-    rm data/external/brain_data.zip
-fi
 
 ## COCO ##
 
