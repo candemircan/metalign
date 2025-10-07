@@ -100,7 +100,8 @@ def main(
         valid_trial_ids = []
         
         for i, (stim_name, trial_id) in enumerate(zip(stim_names, trial_ids)):
-            if stim_name in img_to_idx and str(trial_id) in response_df.columns:
+            # Check if stimulus exists and trial_id column exists (as int, not string)
+            if stim_name in img_to_idx and trial_id in response_df.columns:
                 valid_trials.append(i)
                 model_indices.append(img_to_idx[stim_name])
                 valid_trial_ids.append(trial_id)
@@ -110,7 +111,7 @@ def main(
         print(f"  Trial IDs range: {min(valid_trial_ids) if valid_trial_ids else 'N/A'} to {max(valid_trial_ids) if valid_trial_ids else 'N/A'}")
         
         # Get brain responses for valid trials using trial_ids as column names
-        valid_response_columns = [str(trial_id) for trial_id in valid_trial_ids]
+        valid_response_columns = valid_trial_ids  # Use integers directly, not strings
         valid_responses = response_df[valid_response_columns].to_numpy().T  # Now (trials, voxels)
         valid_stim_names = [stim_names[i] for i in valid_trials]
         valid_trial_types = [trial_types[i] for i in valid_trials]
