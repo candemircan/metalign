@@ -190,8 +190,8 @@ def main(
                 model.eval()
                 optimizer.eval()
                 
-                all_eval_logits, all_eval_labels = [], []
-                sum_eval_loss, eval_batches = 0.0, 0
+                sum_eval_loss, sum_eval_map, sum_eval_auc = 0.0, 0.0, 0.0
+                eval_batches = 0
 
                 for batch_X, batch_Y in eval_loader:
                     batch_X, batch_Y = batch_X.to(device), batch_Y.to(device)
@@ -201,17 +201,15 @@ def main(
                         loss_eval = sigmoid_focal_loss(logits_eval, batch_Y, alpha=args.focal_loss_alpha, gamma=args.focal_loss_gamma) if args.use_focal_loss else F.binary_cross_entropy_with_logits(logits_eval, batch_Y, pos_weight=pos_weights)
                     
                     sum_eval_loss += loss_eval.item()
+                    
+                    probs_eval = torch.sigmoid(logits_eval)
+                    sum_eval_map += average_precision(probs_eval, batch_Y.long(), task="multilabel", num_labels=batch_Y.shape[1], average="micro").item()
+                    sum_eval_auc += auroc(probs_eval, batch_Y.long(), task="multilabel", num_labels=batch_Y.shape[1], average="micro").item()
                     eval_batches += 1
-                    all_eval_logits.append(logits_eval)
-                    all_eval_labels.append(batch_Y)
 
                 avg_eval_loss = sum_eval_loss / eval_batches
-                all_eval_logits = torch.cat(all_eval_logits, dim=0)
-                all_eval_labels = torch.cat(all_eval_labels, dim=0)
-
-                probs_eval = torch.sigmoid(all_eval_logits)
-                avg_eval_map = average_precision(probs_eval, all_eval_labels.long(), task="multilabel", num_labels=all_eval_labels.shape[1], average="micro").item()
-                avg_eval_auc = auroc(probs_eval, all_eval_labels.long(), task="multilabel", num_labels=all_eval_labels.shape[1], average="micro").item()
+                avg_eval_map = sum_eval_map / eval_batches
+                avg_eval_auc = sum_eval_auc / eval_batches
 
                 if args.wandb_log: 
                     wandb.log({
