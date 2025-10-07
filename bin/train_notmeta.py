@@ -173,7 +173,7 @@ def main(
         
         with torch.no_grad():
             y_true_np = Y_batch.cpu().numpy()
-            y_score_np = torch.sigmoid(logits).cpu().numpy()
+            y_score_np = torch.sigmoid(logits).float().cpu().numpy()
             
             accumulated_train_map += average_precision_score(y_true_np, y_score_np, average='micro')
             accumulated_train_auc += roc_auc_score(y_true_np, y_score_np, average='micro')
@@ -213,7 +213,7 @@ def main(
                 all_eval_labels = torch.cat(all_eval_labels, dim=0)
 
                 y_true_np = all_eval_labels.cpu().numpy()
-                y_score_np = torch.sigmoid(all_eval_logits).cpu().numpy()
+                y_score_np = torch.sigmoid(all_eval_logits).float().cpu().numpy()
                 avg_eval_map = average_precision_score(y_true_np, y_score_np, average='micro')
                 avg_eval_auc = roc_auc_score(y_true_np, y_score_np, average='micro')
 
