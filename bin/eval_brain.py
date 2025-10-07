@@ -173,7 +173,7 @@ def main(
         backbone_brain_cka = calculate_cka(backbone_tensor, brain_tensor)
         metalign_brain_cka = calculate_cka(metalign_tensor, brain_tensor)
 
-        print(f"subject {sub}: backbone CKA {backbone_brain_cka:.4f}, metalign CKA {metalign_brain_cka:.4f}, noise ceiling {noise_ceiling:.4f}")
+        print(f"subject {sub}: backbone CKA {backbone_brain_cka.item():.4f}, metalign CKA {metalign_brain_cka.item():.4f}, noise ceiling {noise_ceiling.item():.4f}")
         
         result = {
             'subject': sub,
