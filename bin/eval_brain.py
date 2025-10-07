@@ -142,17 +142,20 @@ def main(
             stim_mask = test_df['stimulus'] == stim
             stim_indices = test_df[stim_mask]['trial_idx'].tolist()
             
-            # get all reps
+            # get all brain reps (these differ across repetitions)
             stim_brain_reps = valid_responses[stim_indices]
-            stim_backbone_reps = backbone_reps_aligned[stim_indices]
-            stim_metalign_reps = metalign_reps_aligned[stim_indices]
             
-            # average across reps
+            # get backbone/metalign reps (these are identical across repetitions, so just take first)
+            first_idx = stim_indices[0]
+            stim_backbone_rep = backbone_reps_aligned[first_idx]
+            stim_metalign_rep = metalign_reps_aligned[first_idx]
+            
+            # average brain across reps, use single backbone/metalign rep
             test_brain_avg.append(stim_brain_reps.mean(axis=0))
-            test_backbone_avg.append(stim_backbone_reps.mean(axis=0))
-            test_metalign_avg.append(stim_metalign_reps.mean(axis=0))
+            test_backbone_avg.append(stim_backbone_rep)
+            test_metalign_avg.append(stim_metalign_rep)
             
-            # keep individuals reps for noise ceiling
+            # keep individual brain reps for noise ceiling
             test_brain_individual.append(stim_brain_reps)
         
         test_brain_avg = np.array(test_brain_avg)
