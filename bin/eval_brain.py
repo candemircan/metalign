@@ -1,5 +1,4 @@
 import json
-from glob import glob
 from pathlib import Path
 
 import numpy as np
@@ -9,7 +8,7 @@ from fastcore.script import call_parse
 from nnsight import NNsight
 from tqdm import tqdm
 
-from metalign.data import load_backbone
+from metalign.data import Things, load_backbone
 from metalign.model import Transformer, TwoLinear
 from metalign.utils import calculate_cka, fix_state_dict
 
@@ -57,7 +56,10 @@ def main(
         with model.trace(torch.from_numpy(backbone_reps).unsqueeze(1)): 
             metalign_reps = model.embed.output.squeeze().save()
 
-    imgs = sorted(glob("data/external/THINGS/*/*jpg"))
+    # use things dataset ordering to match backbone feature extraction
+    things_dataset = Things()
+    imgs = [str(img) for img in things_dataset.images]
+    
     brain_root = Path("data/external/brain_data")
     subs = brain_root.glob("sub-*ResponseData.h5")
     subs = [str(x).split("-")[-1].split("_")[0] for x in subs]
@@ -83,7 +85,6 @@ def main(
         trial_types = stim_df['trial_type'].tolist()
         trial_ids = stim_df['trial_id'].tolist()
         
- 
         valid_trials = []
         model_indices = []
         for i, stim_name in enumerate(stim_names):
