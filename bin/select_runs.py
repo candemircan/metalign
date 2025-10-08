@@ -25,7 +25,8 @@ def main(
             for checkpoint in all_cpts:
                 cur_eval = torch.load(checkpoint, weights_only=False)
                 metric = "eval_accuracy" if "eval_accuracy" in cur_eval.keys() else "eval_mAP"
-                if cur_eval[metric] > best_eval:
+                cur_eval = cur_eval[metric]
+                if cur_eval > best_eval:
                     best_eval = cur_eval
                     best_models[exp][bb] = checkpoint
 
