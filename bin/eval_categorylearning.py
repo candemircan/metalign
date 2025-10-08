@@ -60,7 +60,7 @@ def main(
         with model.trace(torch.from_numpy(backbone_reps).unsqueeze(1)): 
             metalign_reps = model.embed.output.squeeze().save()
 
-    imgs = Things().images
+    imgs = [str(x) for x in Things().images]
     metalign_accuracies, base_accuracies, metalign_linear_accuracies = [], [], []
 
 
@@ -69,7 +69,6 @@ def main(
         images = participant_data["image"].tolist()
         images = [f"data/external/THINGS/{image.split("stimuli/")[-1]}" for image in images]  # Extract the file names
         img_locs = [imgs.index(image) for image in images]
-
         # metalign
         X = torch.from_numpy(backbone_reps[img_locs]).unsqueeze(0)
         y = torch.from_numpy(participant_data.true_category_binary.values).unsqueeze(0)

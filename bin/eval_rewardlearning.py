@@ -58,7 +58,7 @@ def main(
         with model.trace(torch.from_numpy(backbone_reps).unsqueeze(1)): 
             metalign_reps = model.embed.output.squeeze().save()
 
-    imgs = Things().images
+    imgs = [str(x) for x in Things().images]
     metalign_accuracies, base_accuracies = [], []
 
 

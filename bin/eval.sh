@@ -10,6 +10,7 @@ fi
 
 for eval_type in "${eval_types[@]}"; do
     for experiment in $experiments; do
+        experiment=$(echo $experiment | tr -d "[]")
         for backbone in $backbones; do
             uv run bin/eval_"${eval_type}".py "$experiment" "$backbone"
         done
