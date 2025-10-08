@@ -21,7 +21,7 @@ def main(
     for exp in tqdm(experiment_patterns):
         for bb in tqdm(backbone_patterns, leave=False):
             best_eval = -float("inf")
-            all_cpts = glob(str(checkpoints_dir / f"*{exp}*{bb}*" / "model.pt"))
+            all_cpts = glob(str(checkpoints_dir / f"*{exp.strip("[]")}*{bb}*" / "model.pt"))
             for checkpoint in all_cpts:
                 cur_eval = torch.load(checkpoint, weights_only=False)
                 metric = "eval_accuracy" if "eval_accuracy" in cur_eval.keys() else "eval_mAP"
