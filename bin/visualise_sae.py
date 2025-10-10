@@ -5,7 +5,6 @@ Almost all of this script (basically everything shiny) is AI generated.
 """
 
 import base64
-from glob import glob
 from io import BytesIO
 from pathlib import Path
 
@@ -79,9 +78,12 @@ def save_annotation(feature_dim, description):
     annotation_path.write_text(description)
 
 min_nonzero = 100 
-image_paths = sorted(glob("data/external/THINGS/*/*jpg"))  # Adjust this path as needed
-model_name = "things_sae-top_k-64-cls_only-layer_11-hook_resid_post"
-features = h5_to_np(model_name=model_name, min_nonzero=min_nonzero)
+image_paths = Path("data/external/coco/train2017").glob("*.jpg")
+image_paths = [str(x) for x in sorted(image_paths)]
+
+model_name = "coco_train_sae-top_k-64-cls_only-layer_11-hook_resid_post"
+feature_path = f"data/sae/{model_name}.h5"
+features = h5_to_np(features_path=feature_path, min_nonzero=min_nonzero)
 
 if len(image_paths) != features.shape[0]: print(f"Warning: {len(image_paths)} images but {features.shape[0]} feature rows")
 
