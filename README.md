@@ -49,7 +49,7 @@ For setup, you need to do the following things:
 
 #### fMRI
 
-- [ ] THINGS fMRI recordings
+- [ ] BOLD 5000
 
 #### Misc.
 
@@ -87,4 +87,4 @@ For setup, you need to do the following things:
 
 - [x] Train over functions that came from middle block SAEs
 - [x] Train over functions that are sampled from the neurons of the representations
-- [ ] Train a linear layer on top of the backbone directly to the SAE features. Do you really need meta-learning or is it enough to learn all the features at the same time? Actually probably makes sense to train two linear layers. one from backbone to a new feature space that is of the same size as the backbone, and then from there to the SAE features. Then we can use the intermediate feature space for comparisons. It would be comparable to the original setup, as they are both just affine transformations of the backbone features.
+- [x] Train a linear layer on top of the backbone directly to the SAE features. Do you really need meta-learning or is it enough to learn all the features at the same time? Actually probably makes sense to train two linear layers. one from backbone to a new feature space that is of the same size as the backbone, and then from there to the SAE features. Then we can use the intermediate feature space for comparisons. It would be comparable to the original setup, as they are both just affine transformations of the backbone features.

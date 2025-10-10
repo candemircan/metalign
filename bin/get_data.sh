@@ -80,12 +80,29 @@ if [ ! -d "data/external/coco/test2017" ]; then
 fi
 
 ## Open Images
-if [ ! -d "data/external/openimages"]; then
+if [ ! -d "data/external/openimages" ]; then
     mkdir -p data/external/openimages
     aws s3 --no-sign-request sync s3://open-images-dataset/train data/external/openimages/train
+    uv run bin/compress_openimages.py data/external/openimages/train
     aws s3 --no-sign-request sync s3://open-images-dataset/validation data/external/openimages/validation
+    uv run bin/compress_openimages.py data/external/openimages/validation
     aws s3 --no-sign-request sync s3://open-images-dataset/test data/external/openimages/test
+    uv run bin/compress_openimages.py data/external/openimages/test
 fi
+
+## BOLD 5000
+if [ ! -d "data/external/BOLD5000" ]; then
+    mkdir -p data/external/BOLD5000
+    wget -O data/external/BOLD5000/stimuli.zip https://www.dropbox.com/s/5ie18t4rjjvsl47/BOLD5000_Stimuli.zip?dl=1
+    unzip data/external/BOLD5000/stimuli.zip -d data/external/BOLD5000/
+    # i was getting 403 forbidden with just wget, so added user-agent
+    wget --user-agent="Mozilla" -O data/external/BOLD5000/brain.zip https://figshare.com/ndownloader/files/12965447
+    unzip data/external/BOLD5000/brain.zip -d data/external/BOLD5000/
+    rm data/external/BOLD5000/stimuli.zip
+    rm data/external/BOLD5000/brain.zip
+
+fi
+
 ## Levels ##
 if [ ! -f "data/external/levels.pkl" ]; then
     wget -O data/external/levels.pkl https://gin.g-node.org/fborn/Dataset_Levels/raw/master/processed_data/pruned_dataset.pkl

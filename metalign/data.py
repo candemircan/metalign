@@ -2,7 +2,7 @@
 common datasets and processing utils  used throughout the project
 """
 
-__all__ = ["ImageDataset", "Things", "Coco", "h5_to_np", "FunctionStaticDataset", "FunctionDataset", "prepare_things_spose", "load_backbone", "Levels", "prepare_levels", "images_to_h5"]
+__all__ = ["ImageDataset", "Things", "Coco", "h5_to_np", "FunctionStaticDataset", "FunctionDataset", "prepare_things_spose", "load_backbone", "Levels", "prepare_levels"]
 
 import pickle
 from pathlib import Path
@@ -12,7 +12,6 @@ import numpy as np
 import torch
 from PIL import Image
 from torch.utils.data import Dataset
-from tqdm import tqdm
 
 from .constants import NUM_COCO_TRAIN_IMAGES, NUM_THINGS_CATEGORIES, NUM_THINGS_IMAGES
 
@@ -414,37 +413,6 @@ def prepare_levels(
     
     return X, trials
 
-def images_to_h5(
-    image_dir: Path, # directory containing images
-    h5_path: Path, # path to save the h5 file
-):
-    """
-    reads all JPG files from a directory, converts them to np arrays,
-    and saves each one as a separate dataset in a single HDF5 file.
-    """
-    imgs = sorted(image_dir.glob("*.jpg"))
-    
-    with h5py.File(h5_path, 'w') as f:
-        print(f"Creating HDF5 file at {h5_path} with {len(imgs)} images.")
-        
-        for img_path in tqdm(imgs):
-
-            img = Image.open(img_path)
-            
-            img_array = np.array(img)
-            
-            dataset_name = img_path.stem
-            
-            f.create_dataset(
-                dataset_name, 
-                data=img_array,
-                compression="gzip",
-                compression_opts=9 # compression level (0-9, 9 is highest)
-            )
-            
-            f[dataset_name].attrs['original_filename'] = img_path.name
-
-                
 
 if __name__ == "__main__":
     import tempfile
