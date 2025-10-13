@@ -163,6 +163,22 @@ class Coco(ImageDataset):
             test_images = sorted((root / "test2017").glob("*.jpg"))
             self.images = val_images + test_images
 
+class BOLD5000(ImageDataset):
+    """
+    Images used in BOLD5000.
+
+    They are under `data/external/BOLD5000/BOLD5000_Stimuli/Scene_Stimuli/Presented_Stimuli`.
+
+    Under that root folder, the iamges are at `COCO/*jpg`, `ImageNet/*JPEG`, and `Scene/*jpg`.
+    """
+    def __init__(self, root: Path =  Path("data/external/BOLD5000/BOLD5000_Stimuli/Scene_Stimuli/Presented_Stimuli"), transform=None):
+
+        self.transform = transform
+        coco = sorted((root / "COCO").glob("*jpg"))
+        imagenet = sorted((root / "ImageNet").glob("*JPEG"))
+        scenes = sorted((root / "scenes").glob("jpg"))
+        self.images = sorted(coco + imagenet + scenes)
+
 class Levels(ImageDataset):
     """
     This is an odd-one-out similarity dataset that uses a subset of the ImageNet dataset.
@@ -439,7 +455,8 @@ DATASET_MAKERS = {
     'coco':     lambda **kwargs: Coco(train=kwargs['split']=='train', transform=kwargs['transform']),
     'levels':   lambda **kwargs: Levels(transform=kwargs['transform']),
     'openimages_train': lambda **kwargs: OpenImagesTrain(transform=kwargs['transform']),
-    'openimages_test':  lambda **kwargs: OpenImagesTest(transform=kwargs['transform'])
+    'openimages_test':  lambda **kwargs: OpenImagesTest(transform=kwargs['transform']),
+    "bold5000": lambda **kwargs: BOLD5000(transform=kwargs['transform'])
 }
 
 

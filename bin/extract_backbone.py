@@ -37,7 +37,7 @@ def _extract_and_save(model, dl, save_path, device):
 
 @call_parse
 def main(
-    dataset: Param(help="Dataset to use", choices=['things', 'coco', 'levels', 'openimages_train', 'openimages_test']),
+    dataset: Param(help="Dataset to use", choices=['things', 'coco', 'levels', 'openimages_train', 'openimages_test', 'bold5000']),
     repo_id: str, # Repository ID on the Hub (e.g., "timm/vit_base_patch16_224" or "facebook/webssl-mae300m-full2b-224")
     batch_size: int = 512, # Batch size for feature extraction
     force: bool = False, # Overwrite existing files if True

@@ -52,7 +52,7 @@ def _extract_and_save(model, sae, dl, sae_path, raw_path, device, force):
 
 @call_parse
 def main(
-    dataset: Param(help="Dataset to use", choices=['things', 'coco', 'levels', 'openimages_train', 'openimages_test']),
+    dataset: Param(help="Dataset to use", choices=['things', 'coco', 'levels', 'openimages_train', 'openimages_test', 'bold5000']),
     repo_id: str, # The repository ID of the SAE model on Hugging Face Hub
     batch_size: int = 256, # Batch size for processing images
     force: bool = False, # Overwrite existing files if True
