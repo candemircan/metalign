@@ -14,15 +14,10 @@ from vit_prisma.models.model_loader import load_hooked_model
 from vit_prisma.sae import SparseAutoencoder
 from vit_prisma.transforms import get_clip_val_transforms
 
-from metalign.data import Coco, Levels, Things
+from metalign.data import DATASET_MAKERS
 
 _ = torch.set_grad_enabled(False)
 
-DATASET_MAKERS = {
-    'things':   lambda **kwargs: Things(transform=kwargs['transform']),
-    'coco':     lambda **kwargs: Coco(train=kwargs['split']=='train', transform=kwargs['transform']),
-    'levels':   lambda **kwargs: Levels(transform=kwargs['transform']),
-}
 
 def _extract_and_save(model, sae, dl, sae_path, raw_path, device, force):
     "Extracts SAE and raw activations and saves them to HDF5 files."
@@ -57,7 +52,7 @@ def _extract_and_save(model, sae, dl, sae_path, raw_path, device, force):
 
 @call_parse
 def main(
-    dataset: Param(help="Dataset to use", choices=['things', 'coco', 'levels']),
+    dataset: Param(help="Dataset to use", choices=['things', 'coco', 'levels', 'openimages_train', 'openimages_test']),
     repo_id: str, # The repository ID of the SAE model on Hugging Face Hub
     batch_size: int = 256, # Batch size for processing images
     force: bool = False, # Overwrite existing files if True
@@ -86,5 +81,5 @@ def main(
         raw_file_path = raw_dir / f"{split_prefix}{save_model_name}_raw.h5"
 
         ds = DATASET_MAKERS[dataset](transform=transform, split=split)
-        dl = DataLoader(ds, batch_size=batch_size, shuffle=False, num_workers=4, pin_memory=True)
+        dl = DataLoader(ds, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True)
         _extract_and_save(model, sae, dl, sae_file_path, raw_file_path, device, force)

@@ -12,15 +12,10 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AutoImageProcessor, AutoModel
 
-from metalign.data import Coco, Levels, Things
+from metalign.data import DATASET_MAKERS
 
 _ = torch.set_grad_enabled(False)
 
-DATASET_MAKERS = {
-    'things':   lambda **kwargs: Things(transform=kwargs['transform']),
-    'coco':     lambda **kwargs: Coco(train=kwargs['split']=='train', transform=kwargs['transform']),
-    'levels':   lambda **kwargs: Levels(transform=kwargs['transform']),
-}
 
 def _extract_and_save(model, dl, save_path, device):
     "helper function to extract features and save them to an HDF5 file."
@@ -42,7 +37,7 @@ def _extract_and_save(model, dl, save_path, device):
 
 @call_parse
 def main(
-    dataset: Param(help="Dataset to use", choices=['things', 'coco', 'levels']),
+    dataset: Param(help="Dataset to use", choices=['things', 'coco', 'levels', 'openimages_train', 'openimages_test']),
     repo_id: str, # Repository ID on the Hub (e.g., "timm/vit_base_patch16_224" or "facebook/webssl-mae300m-full2b-224")
     batch_size: int = 512, # Batch size for feature extraction
     force: bool = False, # Overwrite existing files if True
@@ -89,5 +84,5 @@ def main(
             continue
 
         ds = DATASET_MAKERS[dataset](transform=transform, split=split)
-        dl = DataLoader(ds, batch_size=batch_size, shuffle=False, num_workers=4, pin_memory=True)
+        dl = DataLoader(ds, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True)
         _extract_and_save(model, dl, save_path, device)

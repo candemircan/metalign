@@ -2,7 +2,7 @@
 common datasets and processing utils  used throughout the project
 """
 
-__all__ = ["ImageDataset", "Things", "Coco", "h5_to_np", "FunctionStaticDataset", "FunctionDataset", "prepare_things_spose", "load_backbone", "Levels", "prepare_levels"]
+__all__ = ["ImageDataset", "Things", "Coco", "h5_to_np", "FunctionStaticDataset", "FunctionDataset", "prepare_things_spose", "load_backbone", "Levels", "prepare_levels", "OpenImagesTrain", "OpenImagesTest", "DATASET_MAKERS"]
 
 import pickle
 from pathlib import Path
@@ -125,6 +125,26 @@ class Things(ImageDataset):
 
     def __init__(self, root: Path = Path("data/external/THINGS"), total_images: int = NUM_THINGS_IMAGES, transform=None):
         super().__init__(root=root, glob_pattern="*/*.jpg", total_images=total_images, transform=transform)
+
+class OpenImagesTrain(ImageDataset):
+    """
+    The OpenImages training dataset, which contains a large number of images.
+
+    The images are expected to be in the format `data/external/openimages/train/{image}.jpg`, which matches the original structure of the OpenImages dataset.
+    """
+
+    def __init__(self, root: Path = Path("/p/scratch/hai_1065/train"), transform=None):
+        super().__init__(root=root, glob_pattern="*.jpg", transform=transform)
+
+class OpenImagesTest(ImageDataset):
+    """
+    The OpenImages test dataset, which contains a large number of images.
+
+    The images are expected to be in the format `data/external/openimages/test/{image}.jpg`, which matches the original structure of the OpenImages dataset.
+    """
+
+    def __init__(self, root: Path = Path("/p/scratch/hai_1065/test"), transform=None):
+        super().__init__(root=root, glob_pattern="*.jpg", transform=transform)
 
 class Coco(ImageDataset):
     """
@@ -412,6 +432,15 @@ def prepare_levels(
     else: raise ValueError(f"Unknown return_tensors type: {return_tensors}. Must be 'pt' or 'np'.")
     
     return X, trials
+
+
+DATASET_MAKERS = {
+    'things':   lambda **kwargs: Things(transform=kwargs['transform']),
+    'coco':     lambda **kwargs: Coco(train=kwargs['split']=='train', transform=kwargs['transform']),
+    'levels':   lambda **kwargs: Levels(transform=kwargs['transform']),
+    'openimages_train': lambda **kwargs: OpenImagesTrain(transform=kwargs['transform']),
+    'openimages_test':  lambda **kwargs: OpenImagesTest(transform=kwargs['transform'])
+}
 
 
 if __name__ == "__main__":
