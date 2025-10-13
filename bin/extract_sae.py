@@ -81,5 +81,5 @@ def main(
         raw_file_path = raw_dir / f"{split_prefix}{save_model_name}_raw.h5"
 
         ds = DATASET_MAKERS[dataset](transform=transform, split=split)
-        dl = DataLoader(ds, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True)
+        dl = DataLoader(ds, batch_size=batch_size, shuffle=False, num_workers=min(4, os.cpu_count()), pin_memory=True)
         _extract_and_save(model, sae, dl, sae_file_path, raw_file_path, device, force)

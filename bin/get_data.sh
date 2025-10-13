@@ -83,11 +83,8 @@ fi
 if [ ! -d "data/external/openimages" ]; then
     mkdir -p data/external/openimages
     aws s3 --no-sign-request sync s3://open-images-dataset/train data/external/openimages/train
-    uv run bin/compress_openimages.py data/external/openimages/train
-    aws s3 --no-sign-request sync s3://open-images-dataset/validation data/external/openimages/validation
-    uv run bin/compress_openimages.py data/external/openimages/validation
     aws s3 --no-sign-request sync s3://open-images-dataset/test data/external/openimages/test
-    uv run bin/compress_openimages.py data/external/openimages/test
+    aws s3 --no-sign-request sync s3://open-images-dataset/validation data/external/openimages/test
 fi
 
 ## BOLD 5000
