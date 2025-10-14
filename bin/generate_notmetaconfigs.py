@@ -15,7 +15,6 @@ def main(output_dir: Path = Path("data/configs"), base_config_path: Path = Path(
 
     # Four backbone models to test
     model_names = [
-        "webssl-mae300m-full2b-224", 
         "CLIP-ViT-B-32-DataComp.XL-s13B-b90K_sae-top_k-64-cls_only-layer_11-hook_resid_post_raw",  
         "vit_base_patch16_dinov3.lvd1689m", 
         "vit_base_patch16_siglip_256.v2_webli"
@@ -48,8 +47,6 @@ def main(output_dir: Path = Path("data/configs"), base_config_path: Path = Path(
             short_model_name = "dinov3"
         elif "clip" in model_name.lower():
             short_model_name = "clip"
-        elif "mae" in model_name.lower():
-            short_model_name = "mae"
         else:
             raise ValueError(f"Unknown model name {model_name}")         
         

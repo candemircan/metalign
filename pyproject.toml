@@ -40,3 +40,5 @@ module-root = ""
 [tool.ruff.lint.isort]
 extra-standard-library = ["tomllib"]
 known-third-party = ["wandb"]
+[tool.ruff.lint]
+ignore = ["E701"]

@@ -1,5 +1,4 @@
 {
-    "mae": "webssl-mae300m-full2b-224",
     "clip": "CLIP-ViT-B-32-DataComp.XL-s13B-b90K_sae-top_k-64-cls_only-layer_11-hook_resid_post_raw",
     "dinov3": "vit_base_patch16_dinov3.lvd1689m",
     "siglip2": "vit_base_patch16_siglip_256.v2_webli"

@@ -18,7 +18,7 @@ _ = torch.set_grad_enabled(False)
 @call_parse
 def main(
     experiment_name: str, # has to be one of main, raw, midsae
-    backbone_name: str, # has to be one of mae, clip, siglip2, dinov3
+    backbone_name: str, # has to be one of clip, siglip2, dinov3
     force: bool = False # if True, will overwrite existing eval files
 ):
     """

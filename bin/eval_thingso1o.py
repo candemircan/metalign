@@ -42,7 +42,7 @@ def _calculate_accuracy(reps, X, y, batch_size=2048):
 @call_parse
 def main(
     experiment_name: str, # has to be one of main, raw, midsae
-    backbone_name: str, # has to be one of mae, clip, siglip2, dinov3
+    backbone_name: str, # has to be one of  clip, siglip2, dinov3
     batch_size: int = 2048, # batch size for evaluation
     force:bool = False
 ):
