@@ -227,94 +227,270 @@ class Levels(ImageDataset):
 
 
 class FunctionStaticDataset(Dataset):
-    "static SAE functions for given features. not used for meta-learning but for a supervised baseline."
-    def __init__(self, inputs: np.ndarray, features_path: Path, min_nonzero: int = 120, valid_columns: np.ndarray = None):
-        X = torch.tensor(inputs, dtype=torch.float32)
+    "static SAE functions for given features with lazy loading, safe for multiprocessing."
+    def __init__(self, inputs_path: Path, features_path: Path, min_nonzero: int = 120, valid_columns: np.ndarray = None):
+        self.inputs_path = inputs_path
+        self.features_path = features_path
+        self.min_nonzero = min_nonzero
         
-        # if valid_columns is provided, use it to filter columns consistently
+        # load metadata
+        with h5py.File(inputs_path, 'r') as f:
+            if 'representations' in f:
+                self.n_samples = f['representations'].shape[0]
+                self.feature_dim = f['representations'].shape[1]
+            else:
+                self.n_samples = len([k for k in f.keys() if k.isdigit()])
+                self.feature_dim = f['0'].shape[0]
+        
+        # determine valid columns
         if valid_columns is not None:
-            Y_full = torch.from_numpy(h5_to_np(features_path, min_nonzero=0))  # don't filter here
-            Y = Y_full[:, valid_columns]
             self.valid_columns = valid_columns
         else:
-            # original behavior: filter based on min_nonzero
-            Y = torch.from_numpy(h5_to_np(features_path, min_nonzero=min_nonzero))
-            # store which columns were kept for potential reuse
-            Y_full = torch.from_numpy(h5_to_np(features_path, min_nonzero=0))
-            non_zero_counts = (Y_full != 0).sum(dim=0)
-            self.valid_columns = (non_zero_counts >= min_nonzero).numpy()
+            self.valid_columns = self._get_valid_columns()
         
-        self.X, self.Y = X, Y
+        self.num_functions = len(self.valid_columns)
+        
+        # file handles - will be initialized per worker
+        self._inputs_h5 = None
+        self._features_h5 = None
+        
+        # cache for lazy loading (optional, can help with repeated access)
+        self._X_cache = None
+        self._Y_cache = None
+    
+    def _get_valid_columns(self):
+        "determine which columns have at least min_nonzero non-zero activations"
+        with h5py.File(self.features_path, 'r') as f:
+            first_key = str(0)
+            if first_key in f and isinstance(f[first_key], h5py.Group):
+                # sparse format
+                index_counts = {}
+                for i in range(self.n_samples):
+                    if str(i) in f:
+                        indices = f[str(i)]['indices'][:]
+                        for idx in indices:
+                            index_counts[idx] = index_counts.get(idx, 0) + 1
+                return np.array([idx for idx, cnt in sorted(index_counts.items()) if cnt >= self.min_nonzero])
+            else:
+                # dense format
+                if 'representations' in f:
+                    data = f['representations'][:]
+                else:
+                    data = np.array([f[str(i)][:] for i in range(self.n_samples)])
+                non_zero_counts = np.count_nonzero(data, axis=0)
+                return np.where(non_zero_counts >= self.min_nonzero)[0]
+    
+    def _ensure_h5_handles(self):
+        "open h5 files if not already open"
+        if self._inputs_h5 is None:
+            self._inputs_h5 = h5py.File(self.inputs_path, 'r')
+        if self._features_h5 is None:
+            self._features_h5 = h5py.File(self.features_path, 'r')
+    
+    def _load_all_data(self):
+        "load all data into memory (called on first access in worker)"
+        if self._X_cache is not None:
+            return
+        
+        self._ensure_h5_handles()
+        
+        # load inputs
+        if 'representations' in self._inputs_h5:
+            X = torch.from_numpy(self._inputs_h5['representations'][:])
+        else:
+            X = torch.stack([torch.from_numpy(self._inputs_h5[str(i)][:]) for i in range(self.n_samples)])
+        
+        # load features
+        first_key = str(0)
+        if first_key in self._features_h5 and isinstance(self._features_h5[first_key], h5py.Group):
+            # sparse format - convert to dense
+            max_idx = self.valid_columns.max() if len(self.valid_columns) > 0 else 0
+            Y_full = np.zeros((self.n_samples, max_idx + 1), dtype=np.float32)
+            for i in range(self.n_samples):
+                if str(i) in self._features_h5:
+                    indices = self._features_h5[str(i)]['indices'][:].astype(np.int64)
+                    activations = self._features_h5[str(i)]['activations'][:]
+                    Y_full[i, indices] = activations
+            Y = torch.from_numpy(Y_full[:, self.valid_columns])
+        else:
+            # dense format
+            if 'representations' in self._features_h5:
+                Y = torch.from_numpy(self._features_h5['representations'][:, self.valid_columns])
+            else:
+                Y_full = np.array([self._features_h5[str(i)][:] for i in range(self.n_samples)])
+                Y = torch.from_numpy(Y_full[:, self.valid_columns])
+        
+        # binarize outputs: positive = non-zero, negative = zero
+        Y = (Y != 0).float()
+        
+        self._X_cache = X
+        self._Y_cache = Y
+    
+    def __del__(self):
+        "ensure h5 files are closed"
+        if self._inputs_h5 is not None:
+            self._inputs_h5.close()
+        if self._features_h5 is not None:
+            self._features_h5.close()
 
-        # for Y, we want to binarise the outputs
-        # in this class, we assume all functions are sparse
-        # so a positive is a non-zero value, and a negative is a zero value
-        self.Y = (self.Y != 0).float()
+    def __len__(self): 
+        return self.n_samples
 
-    def __len__(self): return len(self.X)
+    def __getitem__(self, idx): 
+        self._load_all_data()  # load once per worker
+        return self._X_cache[idx], self._Y_cache[idx]
+    
+    @property
+    def Y(self):
+        "property for backward compatibility - loads all data"
+        self._load_all_data()
+        return self._Y_cache
 
-    def __getitem__(self, idx): return self.X[idx], self.Y[idx]
 
 class FunctionDataset(Dataset):
-    "episode-based dataset for given features, optimized for DataLoader usage."
-    def __init__(self, inputs: np.ndarray, features_path: Path,
+    "episode-based dataset for given features with lazy loading from h5, safe for DDP/multiprocessing."
+    def __init__(self, inputs_path: Path, features_path: Path,
                  seq_len: int = 120, min_nonzero: int = 120, train_dims: list = None, epoch_size: int = None):
-        X = torch.tensor(inputs, dtype=torch.float32)
-        
-        Y = torch.from_numpy(h5_to_np(features_path, min_nonzero=min_nonzero))
-        
-        self.X, self.Y = X, Y
-        self.feature_dim = self.X.shape[1]
-        self.num_functions = self.Y.shape[1]
+        self.inputs_path = inputs_path
+        self.features_path = features_path
         self.seq_len = seq_len
+        self.min_nonzero = min_nonzero
         self.epoch_size = epoch_size
         
-        # detect if this is dense (raw) or sparse (SAE) features
-        # for sparse features, most values are 0
-        # for dense features, all values are non-zero
-        sparsity = (self.Y == 0).float().mean()
-
-        # heuristic: if more than 50% are zeros, treat as sparse
-        # with SAE feautres sparsity is way higher than 50%
-        # and with raw features sparsity is ~ 0
-        self.is_sparse = sparsity > 0.5  
+        # only load metadata, not actual data
+        with h5py.File(inputs_path, 'r') as f:
+            if 'representations' in f:
+                self.n_samples = f['representations'].shape[0]
+                self.feature_dim = f['representations'].shape[1]
+            else:
+                self.n_samples = len([k for k in f.keys() if k.isdigit()])
+                self.feature_dim = f['0'].shape[0]
         
-        # pre-compute medians for dense features to avoid repeated computation
-        if not self.is_sparse: self.medians = torch.median(self.Y, dim=0).values
+        with h5py.File(features_path, 'r') as f:
+            first_key = str(0)
+            if first_key in f and isinstance(f[first_key], h5py.Group):
+                # sparse format - need to check max index to determine dimension
+                max_idx = 0
+                for i in range(min(100, self.n_samples)):
+                    if str(i) in f:
+                        indices = f[str(i)]['indices'][:]
+                        max_idx = max(max_idx, indices.max() if len(indices) > 0 else 0)
+                self.num_functions = max_idx + 1
+                self.is_sparse = True
+            else:
+                # dense format
+                if 'representations' in f:
+                    self.num_functions = f['representations'].shape[1]
+                else:
+                    self.num_functions = f['0'].shape[0]
+                self.is_sparse = False
+        
+        # for filtering columns by min_nonzero, we need to scan once
+        self.valid_columns = self._get_valid_columns()
+        self.num_functions = len(self.valid_columns)
+        
+        # pre-compute medians for dense features
+        if not self.is_sparse:
+            self.medians = self._compute_medians()
             
         self.train_dims = train_dims if train_dims is not None else list(range(self.num_functions))
-            
-    def __len__(self): return self.epoch_size if self.epoch_size is not None else 2**31 - 1 # effectively infinite for training (when epoch is not set)
+        
+        # file handles - will be initialized per worker
+        self._inputs_h5 = None
+        self._features_h5 = None
+    
+    def _get_valid_columns(self):
+        "determine which columns have at least min_nonzero non-zero activations"
+        with h5py.File(self.features_path, 'r') as f:
+            if self.is_sparse:
+                # for sparse format, count occurrences of each index
+                index_counts = {}
+                for i in range(self.n_samples):
+                    if str(i) in f:
+                        indices = f[str(i)]['indices'][:]
+                        for idx in indices:
+                            index_counts[idx] = index_counts.get(idx, 0) + 1
+                return np.array([idx for idx, cnt in index_counts.items() if cnt >= self.min_nonzero])
+            else:
+                # for dense format, load all and count non-zeros
+                if 'representations' in f:
+                    data = f['representations'][:]
+                else:
+                    data = np.array([f[str(i)][:] for i in range(self.n_samples)])
+                non_zero_counts = np.count_nonzero(data, axis=0)
+                return np.where(non_zero_counts >= self.min_nonzero)[0]
+    
+    def _compute_medians(self):
+        "compute medians for dense features for threshold-based sampling"
+        with h5py.File(self.features_path, 'r') as f:
+            if 'representations' in f:
+                data = f['representations'][:, self.valid_columns]
+            else:
+                data = np.array([f[str(i)][:] for i in range(self.n_samples)])[:, self.valid_columns]
+        return torch.from_numpy(np.median(data, axis=0))
+    
+    def _ensure_h5_handles(self):
+        "open h5 files if not already open (called in worker processes)"
+        if self._inputs_h5 is None:
+            self._inputs_h5 = h5py.File(self.inputs_path, 'r')
+        if self._features_h5 is None:
+            self._features_h5 = h5py.File(self.features_path, 'r')
+    
+    def __del__(self):
+        "ensure h5 files are closed when dataset is deleted"
+        if self._inputs_h5 is not None:
+            self._inputs_h5.close()
+        if self._features_h5 is not None:
+            self._features_h5.close()
+    
+    def __len__(self): 
+        return self.epoch_size if self.epoch_size is not None else 2**31 - 1
 
     
     def __getitem__(self, idx):
-        # randomly sample a function dimension instead of cycling through them
+        self._ensure_h5_handles()
+        # randomly sample a function dimension
         dim = self.train_dims[torch.randint(0, len(self.train_dims), (1,)).item()]
         return self._sample_episode(dim)
         
     def _sample_episode(self, dim: int):
-        y_dim = self.Y[:, dim]
+        "sample an episode for a given function dimension with lazy loading"
+        self._ensure_h5_handles()
         
-        std_dev = self.seq_len / 20.0 # with a sequence length of 120, this gives a decent but not too exeggerated of a spread
+        actual_dim = self.valid_columns[dim]
+        
+        # load features for this dimension lazily
+        if self.is_sparse:
+            y_dim = np.zeros(self.n_samples, dtype=np.float32)
+            for i in range(self.n_samples):
+                if str(i) in self._features_h5:
+                    indices = self._features_h5[str(i)]['indices'][:]
+                    if actual_dim in indices:
+                        idx_pos = np.where(indices == actual_dim)[0][0]
+                        y_dim[i] = self._features_h5[str(i)]['activations'][idx_pos]
+            y_dim = torch.from_numpy(y_dim)
+        else:
+            # load dense features for this dimension
+            if 'representations' in self._features_h5:
+                y_dim = torch.from_numpy(self._features_h5['representations'][:, actual_dim])
+            else:
+                y_dim = torch.from_numpy(np.array([self._features_h5[str(i)][actual_dim] for i in range(self.n_samples)]))
+        
+        std_dev = self.seq_len / 20.0
         n_pos = int(torch.normal(mean=torch.tensor(self.seq_len / 2), std=torch.tensor(std_dev)).round().clamp(0, self.seq_len).item())
         n_neg = self.seq_len - n_pos
 
         if self.is_sparse:
-            # sparse features: positive = non-zero, negative = zero
             pos_mask = y_dim != 0
-            neg_mask = ~pos_mask
+            neg_mask = y_dim == 0
         else:
-            # dense features: positive = above median, negative = below median
-            # use pre-computed median instead of computing each time
-            median_val = self.medians[dim]
-            pos_mask = y_dim > median_val
-            neg_mask = y_dim <= median_val
+            median = self.medians[dim]
+            pos_mask = y_dim > median
+            neg_mask = y_dim <= median
 
         pos_indices = torch.where(pos_mask)[0]
         neg_indices = torch.where(neg_mask)[0]
 
-
-        # normal sampling
         n_pos = min(n_pos, len(pos_indices))
         n_neg = min(n_neg, len(neg_indices))
         
@@ -324,11 +500,26 @@ class FunctionDataset(Dataset):
         indices = torch.cat([pos_sample_indices, neg_sample_indices])
         indices = indices[torch.randperm(len(indices)).long()]
 
-        X_episode = self.X[indices]
-        if self.is_sparse: Y_episode = (self.Y[indices, dim] != 0).float()
-        else: Y_episode = (self.Y[indices, dim] > median_val).float()
+        # h5py requires sorted indices for fancy indexing
+        sorted_indices, sort_order = torch.sort(indices)
 
-        if torch.rand(1).item() < 0.5: Y_episode = 1 - Y_episode # 0 and 1 are arbitrary, so flip with 50% chance at the episode level
+        # load inputs for sampled indices lazily
+        if 'representations' in self._inputs_h5:
+            X_episode = torch.from_numpy(self._inputs_h5['representations'][sorted_indices.numpy()])
+        else:
+            X_episode = torch.stack([torch.from_numpy(self._inputs_h5[str(i.item())][:]) for i in sorted_indices])
+        
+        # restore original random order
+        X_episode = X_episode[torch.argsort(sort_order)]
+        
+        if self.is_sparse: 
+            Y_episode = (y_dim[indices] != 0).float()
+        else: 
+            Y_episode = (y_dim[indices] > median).float()
+
+        if torch.rand(1).item() < 0.5: 
+            Y_episode = 1 - Y_episode
+        
         return X_episode, Y_episode
     
 
@@ -647,10 +838,53 @@ if __name__ == "__main__":
         assert result.shape == (3, 2)
         np.testing.assert_array_equal(result, expected)
 
+    def test_function_static_dataset(tmp_path: Path):
+        """Test FunctionStaticDataset with lazy loading."""
+        # Create dummy inputs h5 file
+        inputs_path = tmp_path / "inputs_static.h5"
+        inputs = np.random.rand(50, 10).astype(np.float32)
+        with h5py.File(inputs_path, 'w') as f:
+            f.create_dataset('representations', data=inputs)
+        
+        # Create dummy h5 file with sparse activations
+        features_path = tmp_path / "features_static.h5"
+        with h5py.File(features_path, 'w') as f:
+            for i in range(50):
+                g = f.create_group(str(i))
+                if i % 3 == 0:
+                    g.create_dataset("activations", data=[1.5, 2.5])
+                    g.create_dataset("indices", data=[0, 2])
+                else:
+                    g.create_dataset("activations", data=[])
+                    g.create_dataset("indices", data=[])
+        
+        dataset = FunctionStaticDataset(
+            inputs_path=inputs_path,
+            features_path=features_path,
+            min_nonzero=5
+        )
+        
+        assert len(dataset) == 50
+        assert dataset.feature_dim == 10
+        assert dataset.num_functions > 0
+        
+        X, Y = dataset[0]
+        assert X.shape[0] == 10
+        assert Y.shape[0] == dataset.num_functions
+        assert isinstance(X, torch.Tensor)
+        assert isinstance(Y, torch.Tensor)
+        
+        # test Y property for backward compatibility
+        Y_all = dataset.Y
+        assert Y_all.shape == (50, dataset.num_functions)
+
     def test_function_dataset_sparse(tmp_path: Path):
         """Test FunctionDataset with sparse features (SAE format)."""
-        # Create dummy inputs
+        # Create dummy inputs h5 file
+        inputs_path = tmp_path / "inputs.h5"
         inputs = np.random.rand(100, 10).astype(np.float32)
+        with h5py.File(inputs_path, 'w') as f:
+            f.create_dataset('representations', data=inputs)
         
         # Create dummy h5 file with sparse activations
         features_path = tmp_path / "features_sparse.h5"
@@ -666,7 +900,7 @@ if __name__ == "__main__":
                     g.create_dataset("indices", data=[])
 
         dataset = FunctionDataset(
-            inputs=inputs,
+            inputs_path=inputs_path,
             features_path=features_path,
             seq_len=20,
             epoch_size=50,
@@ -687,8 +921,11 @@ if __name__ == "__main__":
 
     def test_function_dataset_dense(tmp_path: Path):
         """Test FunctionDataset with dense features (raw format)."""
-        # Create dummy inputs
+        # Create dummy inputs h5 file
+        inputs_path = tmp_path / "inputs_dense.h5"
         inputs = np.random.rand(100, 10).astype(np.float32)
+        with h5py.File(inputs_path, 'w') as f:
+            f.create_dataset('representations', data=inputs)
         
         # Create dummy h5 file with dense activations
         features_path = tmp_path / "features_dense.h5"
@@ -699,7 +936,7 @@ if __name__ == "__main__":
                 f.create_dataset(str(i), data=dense_data[i])
 
         dataset = FunctionDataset(
-            inputs=inputs,
+            inputs_path=inputs_path,
             features_path=features_path,
             seq_len=20,
             epoch_size=50,
@@ -765,6 +1002,7 @@ if __name__ == "__main__":
         test_h5_to_np_sparse_format(tmp_path)
         test_h5_to_np_dense_format(tmp_path)
         test_h5_to_np_dense_format_with_filtering(tmp_path)
+        test_function_static_dataset(tmp_path)
         test_function_dataset_sparse(tmp_path)
         test_function_dataset_dense(tmp_path)
         test_load_backbone_standard_format(tmp_path)

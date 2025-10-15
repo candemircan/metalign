@@ -3,6 +3,7 @@ import tomllib
 from pathlib import Path
 from pprint import pprint
 
+import h5py
 import torch
 import wandb
 from fastcore.script import Param, bool_arg, call_parse
@@ -14,7 +15,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 
-from metalign.data import FunctionDataset, load_backbone
+from metalign.data import FunctionDataset
 from metalign.model import Transformer, TransformerConfig
 
 torch.set_float32_matmul_precision('high')
@@ -89,21 +90,27 @@ def main(
         full_checkpoint_dir = f"data/checkpoints/{args.checkpoint_dir}" if args.name is None else f"data/checkpoints/{args.name}"
         if not os.path.exists(full_checkpoint_dir): os.makedirs(full_checkpoint_dir)
 
-    train_inputs = load_backbone(f"data/backbone_reps/{args.train_backbone}.h5")
-    eval_inputs = load_backbone(f"data/backbone_reps/{args.eval_backbone}.h5")
+    # get paths instead of loading data
+    train_inputs_path = Path(f"data/backbone_reps/{args.train_backbone}.h5")
+    eval_inputs_path = Path(f"data/backbone_reps/{args.eval_backbone}.h5")
     
-    feature_dim = train_inputs.shape[1]
+    # determine feature_dim by peeking at the file
+    with h5py.File(train_inputs_path, 'r') as f:
+        if 'representations' in f:
+            feature_dim = f['representations'].shape[1]
+        else:
+            feature_dim = f['0'].shape[0]
     
     train_features_path = Path(f"data/sae/{args.train_features}.h5") if "raw" not in args.train_features else Path(f"data/backbone_reps/{args.train_features}.h5")
     eval_features_path = Path(f"data/sae/{args.eval_features}.h5") if "raw" not in args.eval_features else Path(f"data/backbone_reps/{args.eval_features}.h5")
 
     train_episode_dataset = FunctionDataset(
-        inputs=train_inputs, features_path=train_features_path,
+        inputs_path=train_inputs_path, features_path=train_features_path,
         seq_len=args.sl, min_nonzero=args.min_nonzero,
     )
     
     eval_episode_dataset = FunctionDataset(
-        inputs=eval_inputs, features_path=eval_features_path,
+        inputs_path=eval_inputs_path, features_path=eval_features_path,
         seq_len=args.sl, min_nonzero=args.min_nonzero,
         epoch_size=args.num_eval_episodes
     )
