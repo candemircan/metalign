@@ -277,12 +277,19 @@ class FunctionStaticDataset(Dataset):
     
     def _get_valid_columns(self):
         "determine which columns have at least min_nonzero non-zero activations"
+        # check for cached valid columns
+        cache_path = self.features_path.with_suffix(f'.valid_cols_min{self.min_nonzero}.npy')
+        if cache_path.exists():
+            return np.load(cache_path)
+        
         # try memory-mapped npy first
         npy_path = self.features_path.with_suffix('.npy')
         if npy_path.exists():
             data_mmap = np.load(npy_path, mmap_mode='r')
             non_zero_counts = np.count_nonzero(data_mmap, axis=0)
-            return np.where(non_zero_counts >= self.min_nonzero)[0]
+            valid_cols = np.where(non_zero_counts >= self.min_nonzero)[0]
+            np.save(cache_path, valid_cols)
+            return valid_cols
         
         # fallback to h5
         with h5py.File(self.features_path, 'r') as f:
@@ -295,7 +302,7 @@ class FunctionStaticDataset(Dataset):
                         indices = f[str(i)]['indices'][:]
                         for idx in indices:
                             index_counts[idx] = index_counts.get(idx, 0) + 1
-                return np.array([idx for idx, cnt in sorted(index_counts.items()) if cnt >= self.min_nonzero])
+                valid_cols = np.array([idx for idx, cnt in sorted(index_counts.items()) if cnt >= self.min_nonzero])
             else:
                 # dense format
                 if 'representations' in f:
@@ -303,7 +310,11 @@ class FunctionStaticDataset(Dataset):
                 else:
                     data = np.array([f[str(i)][:] for i in range(self.n_samples)])
                 non_zero_counts = np.count_nonzero(data, axis=0)
-                return np.where(non_zero_counts >= self.min_nonzero)[0]
+                valid_cols = np.where(non_zero_counts >= self.min_nonzero)[0]
+        
+        # cache for next time
+        np.save(cache_path, valid_cols)
+        return valid_cols
     
     def _load_Y_data(self):
         "load Y data once (features for all samples)"
@@ -411,9 +422,16 @@ class FunctionDataset(Dataset):
     
     def _get_valid_columns(self):
         "determine which columns have at least min_nonzero non-zero activations"
+        # check for cached valid columns
+        cache_path = self.features_path.with_suffix(f'.valid_cols_min{self.min_nonzero}.npy')
+        if cache_path.exists():
+            return np.load(cache_path)
+        
         if self.Y_mmap is not None:
             non_zero_counts = np.count_nonzero(self.Y_mmap, axis=0)
-            return np.where(non_zero_counts >= self.min_nonzero)[0]
+            valid_cols = np.where(non_zero_counts >= self.min_nonzero)[0]
+            np.save(cache_path, valid_cols)
+            return valid_cols
         
         # fallback to h5
         with h5py.File(self.features_path, 'r') as f:
@@ -424,14 +442,18 @@ class FunctionDataset(Dataset):
                         indices = f[str(i)]['indices'][:]
                         for idx in indices:
                             index_counts[idx] = index_counts.get(idx, 0) + 1
-                return np.array([idx for idx, cnt in index_counts.items() if cnt >= self.min_nonzero])
+                valid_cols = np.array([idx for idx, cnt in index_counts.items() if cnt >= self.min_nonzero])
             else:
                 if 'representations' in f:
                     data = f['representations'][:]
                 else:
                     data = np.array([f[str(i)][:] for i in range(self.n_samples)])
                 non_zero_counts = np.count_nonzero(data, axis=0)
-                return np.where(non_zero_counts >= self.min_nonzero)[0]
+                valid_cols = np.where(non_zero_counts >= self.min_nonzero)[0]
+        
+        # cache for next time
+        np.save(cache_path, valid_cols)
+        return valid_cols
     
     def _compute_medians(self):
         "compute medians for dense features for threshold-based sampling"

@@ -36,10 +36,16 @@ def main(
         print(f"converting {h5_file.name}...", end=" ", flush=True)
         
         with h5py.File(h5_file, 'r') as f:
+            # check if this is sparse SAE format (groups with indices/activations)
+            first_key = list(f.keys())[0]
+            if isinstance(f[first_key], h5py.Group) and 'indices' in f[first_key]:
+                print(f"⚠️  SKIPPED (sparse SAE format - keep as H5)")
+                continue
+                
             if 'representations' in f:
                 data = f['representations'][:]
             else:
-                # numeric keys format (SAE raw or individual datasets)
+                # numeric keys format (dense arrays per sample)
                 n_samples = len([k for k in f.keys() if k.isdigit()])
                 data = np.array([f[str(i)][:] for i in range(n_samples)])
         

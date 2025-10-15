@@ -3,7 +3,6 @@ import tomllib
 from pathlib import Path
 from pprint import pprint
 
-import h5py
 import torch
 import wandb
 from fastcore.script import Param, bool_arg, call_parse
@@ -15,7 +14,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 
-from metalign.data import FunctionDataset
+from metalign.data import FunctionDataset, load_data_mmap
 from metalign.model import Transformer, TransformerConfig
 
 torch.set_float32_matmul_precision('high')
@@ -94,12 +93,9 @@ def main(
     train_inputs_path = Path(f"data/backbone_reps/{args.train_backbone}.h5")
     eval_inputs_path = Path(f"data/backbone_reps/{args.eval_backbone}.h5")
     
-    # determine feature_dim by peeking at the file
-    with h5py.File(train_inputs_path, 'r') as f:
-        if 'representations' in f:
-            feature_dim = f['representations'].shape[1]
-        else:
-            feature_dim = f['0'].shape[0]
+    # determine feature_dim using mmap (fast)
+    train_inputs_mmap = load_data_mmap(train_inputs_path)
+    feature_dim = train_inputs_mmap.shape[1]
     
     train_features_path = Path(f"data/sae/{args.train_features}.h5") if "raw" not in args.train_features else Path(f"data/backbone_reps/{args.train_features}.h5")
     eval_features_path = Path(f"data/sae/{args.eval_features}.h5") if "raw" not in args.eval_features else Path(f"data/backbone_reps/{args.eval_features}.h5")
