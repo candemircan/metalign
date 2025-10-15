@@ -133,7 +133,7 @@ class OpenImagesTrain(ImageDataset):
     The images are expected to be in the format `data/external/openimages/train/{image}.jpg`, which matches the original structure of the OpenImages dataset.
     """
 
-    def __init__(self, root: Path = Path("/p/scratch/hai_1065/train"), transform=None):
+    def __init__(self, root: Path = Path("data/external/openimages/train"), transform=None):
         super().__init__(root=root, glob_pattern="*.jpg", transform=transform)
 
 class OpenImagesTest(ImageDataset):
@@ -143,7 +143,7 @@ class OpenImagesTest(ImageDataset):
     The images are expected to be in the format `data/external/openimages/test/{image}.jpg`, which matches the original structure of the OpenImages dataset.
     """
 
-    def __init__(self, root: Path = Path("/p/scratch/hai_1065/test"), transform=None):
+    def __init__(self, root: Path = Path("data/external/openimages/test"), transform=None):
         super().__init__(root=root, glob_pattern="*.jpg", transform=transform)
 
 class Coco(ImageDataset):
