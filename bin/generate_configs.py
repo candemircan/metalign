@@ -31,20 +31,20 @@ def main(output_dir: Path = Path("data/configs"), base_config_path: Path = Path(
             "prefix" : "",
             "tags" : ["main"],
             "train_features" : "coco_train_sae-top_k-64-cls_only-layer_11-hook_resid_post",
-            "eval_features" : "coco_test_sae-top_k-64-cls_only-layer_11-hook_resid_post",
+            "eval_features" : "coco_eval_sae-top_k-64-cls_only-layer_11-hook_resid_post",
 
         },
         "RAW" : {
             "prefix" : "raw_",
             "tags" : ["raw"],
             "train_features" : "coco_train_CLIP-ViT-B-32-DataComp.XL-s13B-b90K_sae-top_k-64-cls_only-layer_11-hook_resid_post_raw",
-            "eval_features" : "coco_test_CLIP-ViT-B-32-DataComp.XL-s13B-b90K_sae-top_k-64-cls_only-layer_11-hook_resid_post_raw",
+            "eval_features" : "coco_eval_CLIP-ViT-B-32-DataComp.XL-s13B-b90K_sae-top_k-64-cls_only-layer_11-hook_resid_post_raw",
         },
         "MIDSAE": {
             "prefix" : "midsae_",
             "tags" : ["midsae"],
             "train_features" : "coco_train_sae-top_k-64-cls_only-layer_6-hook_resid_post",
-            "eval_features" : "coco_test_sae-top_k-64-cls_only-layer_6-hook_resid_post",
+            "eval_features" : "coco_eval_sae-top_k-64-cls_only-layer_6-hook_resid_post",
         },
     }
 
@@ -63,7 +63,7 @@ def main(output_dir: Path = Path("data/configs"), base_config_path: Path = Path(
                 raise ValueError(f"Unknown model name {config['model_name']}")         
             config["name"] = f"[{setup_name}]_{short_model_name}"
             config["train_backbone"] = f"coco_train_{config['model_name']}"
-            config["eval_backbone"] = f"coco_test_{config['model_name']}"
+            config["eval_backbone"] = f"coco_eval_{config['model_name']}"
             config["train_features"] = setup_params["train_features"]
             config["eval_features"] = setup_params["eval_features"]
             config["tags"] = setup_params["tags"]
