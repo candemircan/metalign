@@ -79,13 +79,6 @@ if [ ! -d "data/external/coco/test2017" ]; then
     rm data/external/coco_test.zip
 fi
 
-## Open Images
-if [ ! -d "data/external/openimages" ]; then
-    mkdir -p data/external/openimages
-    aws s3 --no-sign-request sync s3://open-images-dataset/train data/external/openimages/train
-    aws s3 --no-sign-request sync s3://open-images-dataset/test data/external/openimages/test
-    aws s3 --no-sign-request sync s3://open-images-dataset/validation data/external/openimages/test
-fi
 
 ## BOLD 5000
 if [ ! -d "data/external/BOLD5000" ]; then
