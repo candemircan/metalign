@@ -14,7 +14,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 
-from metalign.data import FunctionDataset, load_data_mmap
+from metalign.data import FunctionDataset, load_backbone
 from metalign.model import Transformer, TransformerConfig
 
 torch.set_float32_matmul_precision('high')
@@ -89,24 +89,21 @@ def main(
         full_checkpoint_dir = f"data/checkpoints/{args.checkpoint_dir}" if args.name is None else f"data/checkpoints/{args.name}"
         if not os.path.exists(full_checkpoint_dir): os.makedirs(full_checkpoint_dir)
 
-    # get paths instead of loading data
-    train_inputs_path = Path(f"data/backbone_reps/{args.train_backbone}.h5")
-    eval_inputs_path = Path(f"data/backbone_reps/{args.eval_backbone}.h5")
+    train_inputs = load_backbone(f"data/backbone_reps/{args.train_backbone}.h5")
+    eval_inputs = load_backbone(f"data/backbone_reps/{args.eval_backbone}.h5")
     
-    # determine feature_dim using mmap (fast)
-    train_inputs_mmap = load_data_mmap(train_inputs_path)
-    feature_dim = train_inputs_mmap.shape[1]
+    feature_dim = train_inputs.shape[1]
     
     train_features_path = Path(f"data/sae/{args.train_features}.h5") if "raw" not in args.train_features else Path(f"data/backbone_reps/{args.train_features}.h5")
     eval_features_path = Path(f"data/sae/{args.eval_features}.h5") if "raw" not in args.eval_features else Path(f"data/backbone_reps/{args.eval_features}.h5")
 
     train_episode_dataset = FunctionDataset(
-        inputs_path=train_inputs_path, features_path=train_features_path,
+        inputs=train_inputs, features_path=train_features_path,
         seq_len=args.sl, min_nonzero=args.min_nonzero,
     )
     
     eval_episode_dataset = FunctionDataset(
-        inputs_path=eval_inputs_path, features_path=eval_features_path,
+        inputs=eval_inputs, features_path=eval_features_path,
         seq_len=args.sl, min_nonzero=args.min_nonzero,
         epoch_size=args.num_eval_episodes
     )

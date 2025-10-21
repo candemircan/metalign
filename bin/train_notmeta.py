@@ -64,7 +64,7 @@ def main(
     eval_features: str = "coco_eval_sae-top_k-64-cls_only-layer_11-hook_resid_post",  # features for eval data. the name must match data/sae/{eval_features}.h5
     min_nonzero: int = 120,  # minimum number of non-zero activations per column to keep it in the final array
     tags: Param(help="tags to use for the wandb run. If empty, no tags are used.", type=str, nargs="*") = [],
-    early_stopping_patience: int = 50, # number of evaluation intervals to wait for improvement before stopping
+    early_stopping_patience: int = 20, # number of evaluation intervals to wait for improvement before stopping
     early_stopping_min_delta: float = 0.005, # minimum change in evaluation mAP to be considered an improvement (0.5%)
     early_stopping_max_steps: int = 1000, # after this, early stopping will be considered even if improvement is still happening
     use_focal_loss: bool_arg = True, # whether to use Focal Loss instead of weighted BCE
