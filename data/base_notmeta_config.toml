@@ -1,12 +1,12 @@
 bias = true
 compile = true
 warmup_steps = 0
-training_steps = 100000
+training_steps = 20000
 weight_decay = 0.0001
 batch_size = 1024
-early_stopping_patience = 50
+early_stopping_patience = 10
 lr = 0.00025
-early_stopping_max_steps = 10000
+early_stopping_max_steps = 1000
 log_interval_steps = 50
 eval_interval_steps = 100
 min_nonzero = 120
