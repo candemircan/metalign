@@ -54,6 +54,7 @@ def main(
     early_stopping_patience: int = 10, # number of evaluation intervals to wait for improvement before stopping
     early_stopping_min_delta: float = 0.001, # minimum change in evaluation loss to be considered an improvement
     early_stopping_max_steps: int = 1000, # after this, early stopping will be considered even if improvement is still happening
+    early_stopping_acc_threshold: float = 0.6, # early stopping max_steps is only applied after eval accuracy exceeds this threshold
 ):
     """
     train a meta-learning transformer model over function learning tasks.
@@ -224,7 +225,7 @@ def main(
 
                     if args.wandb_log: wandb.log({"loss_eval": avg_eval_loss,"accuracy_eval": eval_accuracy}, step=training_step)
 
-                    if training_step >= args.early_stopping_max_steps:
+                    if training_step >= args.early_stopping_max_steps and eval_accuracy >= args.early_stopping_acc_threshold:
                         if best_eval_loss - avg_eval_loss > args.early_stopping_min_delta:
                             best_eval_loss = avg_eval_loss
                             early_stopping_counter = 0
