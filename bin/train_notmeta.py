@@ -12,7 +12,7 @@ from torch.nn import functional as F
 from torch.utils.data import DataLoader
 from torchmetrics.functional import auroc, average_precision
 
-from metalign.data import FunctionStaticDataset, load_data_mmap
+from metalign.data import FunctionStaticDataset, load_backbone
 from metalign.model import TwoLinear, TwoLinearConfig
 
 torch.set_float32_matmul_precision('high')
@@ -96,23 +96,20 @@ def main(
     full_checkpoint_dir = f"data/checkpoints/{args.checkpoint_dir}" if args.name is None else f"data/checkpoints/{args.name}"
     os.makedirs(full_checkpoint_dir, exist_ok=True)
 
-    # get paths instead of loading data
-    train_inputs_path = Path(f"data/backbone_reps/{args.train_backbone}.h5")
-    eval_inputs_path = Path(f"data/backbone_reps/{args.eval_backbone}.h5")
+    train_inputs = load_backbone(f"data/backbone_reps/{args.train_backbone}.h5")
+    eval_inputs = load_backbone(f"data/backbone_reps/{args.eval_backbone}.h5")
     
-    # determine feature_dim using mmap (fast)
-    train_inputs_mmap = load_data_mmap(train_inputs_path)
-    feature_dim = train_inputs_mmap.shape[1]
+    feature_dim = train_inputs.shape[1]
     
     train_features_path = Path(f"data/sae/{args.train_features}.h5") if "raw" not in args.train_features else Path(f"data/backbone_reps/{args.train_features}.h5")
     eval_features_path = Path(f"data/sae/{args.eval_features}.h5") if "raw" not in args.eval_features else Path(f"data/backbone_reps/{args.eval_features}.h5")
 
-    train_episode_dataset = FunctionStaticDataset(inputs_path=train_inputs_path, features_path=train_features_path, min_nonzero=args.min_nonzero)
-    eval_episode_dataset = FunctionStaticDataset(inputs_path=eval_inputs_path, features_path=eval_features_path, min_nonzero=args.min_nonzero, valid_columns=train_episode_dataset.valid_columns)
+    train_episode_dataset = FunctionStaticDataset(inputs=train_inputs, features_path=train_features_path, min_nonzero=args.min_nonzero)
+    eval_episode_dataset = FunctionStaticDataset(inputs=eval_inputs, features_path=eval_features_path, min_nonzero=args.min_nonzero, valid_columns=train_episode_dataset.valid_columns)
 
-    print(f"train dataset: {train_episode_dataset.n_samples} samples, {train_episode_dataset.num_functions} functions", flush=True)
-    print(f"eval dataset: {eval_episode_dataset.n_samples} samples, {eval_episode_dataset.num_functions} functions", flush=True)
-    assert train_episode_dataset.num_functions == eval_episode_dataset.num_functions, "train and eval datasets must have the same number of functions"
+    print(f"train dataset: {train_episode_dataset.Y.shape[0]} samples, {train_episode_dataset.Y.shape[1]} functions", flush=True)
+    print(f"eval dataset: {eval_episode_dataset.Y.shape[0]} samples, {eval_episode_dataset.Y.shape[1]} functions", flush=True)
+    assert train_episode_dataset.Y.shape[1] == eval_episode_dataset.Y.shape[1], "train and eval datasets must have the same number of functions"
 
     pos_weights = None
     if not args.use_focal_loss and args.use_class_weights:
