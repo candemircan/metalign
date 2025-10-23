@@ -33,7 +33,7 @@ def main(
     attn_drop: float = 0.0,  # dropout rate for the attention layers in the transformer model
     sl: int = 120,  # maximum number of position embeddings in the transformer model, also the sequence length of the input data
     batch_size: int = 256,  # batch size for training the model
-    training_steps: int = 50000,  # number of training steps per epoch
+    training_steps: int = 50000,  # number of training steps
     use_mlp: bool_arg = True,  # whether to use an MLP after the transformer layers
     seed: int = 1234, # random seed for reproducibility
     lr: float = 0.0025,  # learning rate for the optimizer
@@ -51,7 +51,7 @@ def main(
     eval_features: str = "coco_eval_sae-top_k-64-cls_only-layer_11-hook_resid_post",  # features for eval data. the name must match data/sae/{eval_features}.h5
     min_nonzero: int = 120,  # minimum number of non-zero activations per column to keep it in the final array
     tags: Param(help="tags to use for the wandb run. If empty, no tags are used.", type=str, nargs="*") = [],
-    early_stopping_patience: int = 20, # number of evaluation intervals to wait for improvement before stopping
+    early_stopping_patience: int = 10, # number of evaluation intervals to wait for improvement before stopping
     early_stopping_min_delta: float = 0.001, # minimum change in evaluation loss to be considered an improvement
     early_stopping_max_steps: int = 10000, # after this, early stopping will be considered even if improvement is still happening
 ):
