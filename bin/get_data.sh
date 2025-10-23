@@ -86,10 +86,12 @@ if [ ! -d "data/external/BOLD5000" ]; then
     wget -O data/external/BOLD5000/stimuli.zip https://www.dropbox.com/s/5ie18t4rjjvsl47/BOLD5000_Stimuli.zip?dl=1
     unzip data/external/BOLD5000/stimuli.zip -d data/external/BOLD5000/
     # i was getting 403 forbidden with just wget, so added user-agent
-    wget --user-agent="Mozilla" -O data/external/BOLD5000/brain.zip https://figshare.com/ndownloader/files/12965447
+    wget --user-agent="Mozilla" -O data/external/BOLD5000/brain.zip https://figshare.com/ndownloader/files/28404132
     unzip data/external/BOLD5000/brain.zip -d data/external/BOLD5000/
+    mv data/external/BOLD5000/BOLD5000_GLMsingle_ROI_betas data/external/BOLD5000/brain
     rm data/external/BOLD5000/stimuli.zip
     rm data/external/BOLD5000/brain.zip
+    rm -r data/external/BOLD5000/__MACOSX
 
 fi
 

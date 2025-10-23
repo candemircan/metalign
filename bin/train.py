@@ -53,7 +53,7 @@ def main(
     tags: Param(help="tags to use for the wandb run. If empty, no tags are used.", type=str, nargs="*") = [],
     early_stopping_patience: int = 10, # number of evaluation intervals to wait for improvement before stopping
     early_stopping_min_delta: float = 0.001, # minimum change in evaluation loss to be considered an improvement
-    early_stopping_max_steps: int = 10000, # after this, early stopping will be considered even if improvement is still happening
+    early_stopping_max_steps: int = 4000, # after this, early stopping will be considered even if improvement is still happening
 ):
     """
     train a meta-learning transformer model over function learning tasks.
