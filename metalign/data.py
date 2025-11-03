@@ -157,7 +157,7 @@ class BOLD5000(ImageDataset):
         self.transform = transform
         coco = sorted((root / "COCO").glob("*jpg"))
         imagenet = sorted((root / "ImageNet").glob("*JPEG"))
-        scenes = sorted((root / "scenes").glob("jpg"))
+        scenes = sorted((root / "Scene").glob("jpg"))
         self.images = sorted(coco + imagenet + scenes)
 
 class Levels(ImageDataset):
