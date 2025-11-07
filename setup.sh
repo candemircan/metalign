@@ -20,7 +20,7 @@ export PATH="$HOME/.local/bin:$PATH"
 export UV_TORCH_BACKEND=auto
 uv sync --no-install-package flash-attn
 
-# if nvidia-smi is a command
+
 if command -v nvidia-smi >/dev/null 2>&1; then
     echo "CUDA is available. Syncing with base, dev, and cuda extras..."
     uv sync --extra dev,cuda
