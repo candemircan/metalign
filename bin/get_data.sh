@@ -54,6 +54,29 @@ if [ ! -f "data/external/reward_learning.csv" ]; then
     wget -O data/external/reward_learning.csv https://osf.io/6exjm/download
 fi
 
+if [ ! -f "data/external/brain_data" ]; then
+    # i was getting 403 forbidden with just wget, so added user-agent
+    wget  --user-agent="Mozilla" -O data/external/brain_data.zip https://plus.figshare.com/ndownloader/files/43635873 
+    # the zip file is a bit funky, so using python to unzip which seems to deal with it better
+    uv run python -m zipfile -e data/external/brain_data.zip data/external/brain_data_temp
+    rm -r data/external/brain_data_temp/__MACOSX
+    mv data/external/brain_data_temp/betas_csv data/external/brain_data
+    rm -r data/external/brain_data_temp
+    rm data/external/brain_data.zip
+
+    wget --user-agent="Mozilla" -O data/external/brain_data/masks.zip https://plus.figshare.com/ndownloader/files/36682242
+    uv run python -m zipfile -e data/external/brain_data/masks.zip data/external/brain_data/masks_temp
+    mv data/external/brain_data/masks_temp/brainmasks data/external/brain_data/masks
+    rm -r data/external/brain_data/masks_temp
+    rm data/external/brain_data/masks.zip
+
+    wget --user-agent="Mozilla" -O data/external/brain_data/surface.zip https://plus.figshare.com/ndownloader/files/36693528
+    uv run python -m zipfile -e data/external/brain_data/surface.zip data/external/brain_data/surface_temp
+    mv data/external/brain_data/surface_temp/pycortex_filestore data/external/brain_data/surface
+    rm -r data/external/brain_data/surface_temp
+    rm data/external/brain_data/surface.zip
+fi
+
 
 ## COCO ##
 
@@ -79,21 +102,6 @@ if [ ! -d "data/external/coco/test2017" ]; then
     rm data/external/coco_test.zip
 fi
 
-
-## BOLD 5000
-if [ ! -d "data/external/BOLD5000" ]; then
-    mkdir -p data/external/BOLD5000
-    wget -O data/external/BOLD5000/stimuli.zip https://www.dropbox.com/s/5ie18t4rjjvsl47/BOLD5000_Stimuli.zip?dl=1
-    unzip data/external/BOLD5000/stimuli.zip -d data/external/BOLD5000/
-    # i was getting 403 forbidden with just wget, so added user-agent
-    wget --user-agent="Mozilla" -O data/external/BOLD5000/brain.zip https://figshare.com/ndownloader/files/28404132
-    unzip data/external/BOLD5000/brain.zip -d data/external/BOLD5000/
-    mv data/external/BOLD5000/BOLD5000_GLMsingle_ROI_betas data/external/BOLD5000/brain
-    rm data/external/BOLD5000/stimuli.zip
-    rm data/external/BOLD5000/brain.zip
-    rm -r data/external/BOLD5000/__MACOSX
-
-fi
 
 ## Levels ##
 if [ ! -f "data/external/levels.pkl" ]; then

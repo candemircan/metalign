@@ -37,7 +37,7 @@ def _extract_and_save(model, dl, save_path, device):
 
 @call_parse
 def main(
-    dataset: Param(help="Dataset to use", choices=['things', 'coco', 'levels', 'bold5000']),
+    dataset: Param(help="Dataset to use", choices=['things', 'coco', 'levels']),
     repo_id: str, # Repository ID on the Hub (e.g., "timm/vit_base_patch16_224")
     batch_size: int = 512, # Batch size for feature extraction
     force: bool = False, # Overwrite existing files if True

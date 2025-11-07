@@ -3,26 +3,28 @@ name = "metalign"
 requires-python = "==3.12.5"
 version = "0.0.1"
 dependencies = [
-    "torch", 
+    "torch",
     "seaborn",
-    "schedulefree", 
-    "fastcore", 
-    "einops", 
-    "torchvision", 
-    "scikit-learn", 
-    "h5py", 
-    "wandb", 
+    "schedulefree",
+    "fastcore",
+    "einops",
+    "torchvision",
+    "scikit-learn",
+    "h5py",
+    "wandb",
     "tomli-w",
     "timm",
     "nnsight",
     "torchmetrics",
     "tables",
-    "flash-attn ; sys_platform == 'linux'",
-    "vit_prisma @ git+https://github.com/Prisma-Multimodal/ViT-Prisma.git@97dd26fc01dfd856060c4a234b882c6f16836c15", 
-    ]
+    "vit_prisma @ git+https://github.com/Prisma-Multimodal/ViT-Prisma.git@97dd26fc01dfd856060c4a234b882c6f16836c15",
+    "nilearn>=0.12.1",
+    "pycortex>=1.2.11",
+]
 
 [project.optional-dependencies]
 dev = ["pre-commit", "ruff", "ipykernel", "shiny", "ipdb", "nbclassic"]
+cuda = ["flash-attn"]
 
 [tool.setuptools]
 packages = ["metalign"]

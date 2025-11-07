@@ -5,7 +5,7 @@ backbones=$(jq -r 'to_entries[0].value | keys[]' "data/checkpoints/best_models.j
 
 eval_types=("$@")
 if [ ${#eval_types[@]} -eq 0 ]; then
-    eval_types=("categorylearning" "rewardlearning" "levelso1o" "thingso1o")
+    eval_types=("categorylearning" "rewardlearning" "levelso1o" "thingso1o" "brain")
 fi
 
 for eval_type in "${eval_types[@]}"; do

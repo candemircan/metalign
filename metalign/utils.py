@@ -1,6 +1,10 @@
-__all__ = ["fix_state_dict", "cka"]
+__all__ = ["fix_state_dict", "set_pycortex_filestore_path", "calculate_cka"]
+
+import configparser
+import os
 
 import torch
+from cortex import options
 from einops import einsum
 from fastcore.script import call_parse
 
@@ -41,6 +45,36 @@ def calculate_cka(X:torch.Tensor, # batch by observations by features
     bottom = torch.linalg.matrix_norm(XTX, ord='fro', dim=(1,2)) * torch.linalg.matrix_norm(YTY, ord='fro', dim=(1,2))
 
     return top / bottom
+
+
+def set_pycortex_filestore_path(
+        new_path:str # the absolute path to the desired Pycortex database directory
+        ):
+    """
+    programmatically sets the Pycortex filestore location in the options.cfg file.
+    """
+    config_file_path = options.usercfg
+    
+    new_path_abs = os.path.abspath(new_path)
+    if not os.path.isdir(new_path_abs):
+        print(f"Creating new filestore directory: {new_path_abs}")
+        os.makedirs(new_path_abs, exist_ok=True)
+
+    config = configparser.ConfigParser()
+    
+    if os.path.exists(config_file_path):
+        config.read(config_file_path)
+    else:
+        os.makedirs(os.path.dirname(config_file_path), exist_ok=True)
+        
+    if 'basic' not in config:
+        config['basic'] = {}
+        
+    config['basic']['filestore'] = new_path_abs
+    
+    with open(config_file_path, 'w') as configfile:
+        config.write(configfile)
+        
 
 @call_parse
 def main():

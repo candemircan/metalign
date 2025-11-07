@@ -3,7 +3,7 @@ repos:
   hooks:
     - id: uv
       name: uv
-      entry: uv sync --all-extras
+      entry: bash -c 'if command -v nvidia-smi >/dev/null 2>&1; then uv sync --extra dev,cuda; else uv sync --extra dev; fi'
       language: system
       pass_filenames: false
     - id: ruff
