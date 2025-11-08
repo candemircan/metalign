@@ -49,71 +49,53 @@ def main(
         model = TwoLinear(c=config)
         model.load_state_dict(state_dict)
         model.eval()
-        # for TwoLinear, we extract representations from the embed layer
         metalign_reps = model.embed(torch.from_numpy(backbone_reps))
     else:
         model = Transformer(c=config)
         model.load_state_dict(state_dict)
         model.eval()
         model = NNsight(model)
-        # for Transformer, we extract representations from the embed layer using nnsight bc there is special processing of inputs
         with model.trace(torch.from_numpy(backbone_reps).unsqueeze(1)): 
             metalign_reps = model.embed.output.squeeze().save()
 
     imgs = [str(x) for x in Things().images]
-    metalign_accuracies, base_accuracies, metalign_linear_accuracies = [], [], []
-
+    results = []
 
     for participant in tqdm(human_data.participant.unique()):
         participant_data = human_data[human_data.participant == participant]
         images = participant_data["image"].tolist()
-        images = [f"data/external/THINGS/{image.split("stimuli/")[-1]}" for image in images]  # Extract the file names
+        images = [f"data/external/THINGS/{image.split("stimuli/")[-1]}" for image in images]
         img_locs = [imgs.index(image) for image in images]
-        # metalign
-        X = torch.from_numpy(backbone_reps[img_locs]).unsqueeze(0)
-        y = torch.from_numpy(participant_data.true_category_binary.values).unsqueeze(0)
         participant_choices = participant_data["choice"].values
+        true_labels = participant_data.true_category_binary.values
         
-        if experiment_name.lower() == 'notmeta':
-            X_batch = torch.from_numpy(backbone_reps[img_locs])
-            # For category learning, we'll use a simple linear probe on the embeddings
-            embeddings = model.embed(X_batch).detach().numpy()
-            learner = CategoryLearner()
-            learner.fit(embeddings, participant_data.true_category_binary.values)
-            model_preds = np.argmax(learner.values, axis=1)
-            acc = np.mean(participant_choices == model_preds)
-        else:
-            # For Transformer, use the full meta-learning approach
-            raw_logits = model(X, y).squeeze().detach().numpy()
-            final_probabilities = 1 / (1 + np.exp(-raw_logits))
-            answers = (final_probabilities > 0.5).astype(int)
-            acc = np.mean(participant_choices == answers)
-        
-        metalign_accuracies.append(acc)
-
-        # base
-        # no batch dim and back to numpy for the category learner
-        X = X.squeeze().numpy()
-        y = y.squeeze().numpy()       
+        # base linear probe
+        X = backbone_reps[img_locs]
         learner = CategoryLearner()
-        learner.fit(X, y)
-        model_preds = np.argmax(learner.values, axis=1)
-        acc = np.mean(participant_choices == model_preds)
-        base_accuracies.append(acc)
+        learner.fit(X, true_labels)
+        base_preds = np.argmax(learner.values, axis=1)
 
-        # linear probe on metalign
+        # metalign linear probe
         X = metalign_reps[img_locs].numpy()
-        y = participant_data.true_category_binary.values
         learner = CategoryLearner()
-        learner.fit(X, y)
-        model_preds = np.argmax(learner.values, axis=1)
-        acc = np.mean(participant_choices == model_preds)
-        metalign_linear_accuracies.append(acc)
+        learner.fit(X, true_labels)
+        metalign_preds = np.argmax(learner.values, axis=1)
 
+        for i in range(len(participant_choices)):
+            results.append({
+                "participant": participant,
+                "base_choice": base_preds[i],
+                "metalign_choice": metalign_preds[i],
+                "human_choice": participant_choices[i],
+                "true_label": true_labels[i],
+                "base_correct": base_preds[i] == true_labels[i],
+                "metalign_correct": metalign_preds[i] == true_labels[i],
+                "base_align_human": base_preds[i] == participant_choices[i],
+                "metalign_align_human": metalign_preds[i] == participant_choices[i]
+            })
 
-    result_df = pd.DataFrame({"participant": human_data.participant.unique(),"metalign_accuracy": metalign_accuracies,  "base_accuracy": base_accuracies, "metalign_linear_accuracy": metalign_linear_accuracies})
-
+    result_df = pd.DataFrame(results)
+    print(f"Metalign average accuracy: {result_df.metalign_align_human.mean():.4f}")
+    print(f"Base average accuracy: {result_df.base_align_human.mean():.4f}")
     result_df.to_csv(eval_file, index=False)
-    print(f"Average metalign accuracy: {np.mean(metalign_accuracies)}")
-    print(f"Average base accuracy: {np.mean(base_accuracies)}")
-    print(f"Average metalign linear probe accuracy: {np.mean(metalign_linear_accuracies)}")
+

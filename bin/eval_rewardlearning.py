@@ -59,42 +59,49 @@ def main(
             metalign_reps = model.embed.output.squeeze().save()
 
     imgs = [str(x) for x in Things().images]
-    metalign_accuracies, base_accuracies = [], []
-
-
+    results = []
 
     for participant in tqdm(human_data.participant.unique()):
         participant_data = human_data[human_data.participant == participant]
         left_images = participant_data["left_image"].tolist()
-        left_images = [f"data/external/THINGS/{image.split("stimuli/")[-1]}" for image in left_images]  # Extract the file names
+        left_images = [f"data/external/THINGS/{image.split("stimuli/")[-1]}" for image in left_images]
         right_images = participant_data["right_image"].tolist()
-        right_images = [f"data/external/THINGS/{image.split("stimuli/")[-1]}" for image in right_images]  # Extract the file names
+        right_images = [f"data/external/THINGS/{image.split("stimuli/")[-1]}" for image in right_images]
         left_img_locs = [imgs.index(image) for image in left_images]
         right_img_locs = [imgs.index(image) for image in right_images]
 
-        # X should be observations x (left, right) x features
         X = np.array([[backbone_reps[left], backbone_reps[right]] for left, right in zip(left_img_locs, right_img_locs)])
-        # y should be observations by (left, right) where entries are rewards (continuous)
         y = participant_data[["left_reward", "right_reward"]].values
         participant_choices = participant_data["choice"].values
+        correct_choices = np.argmax(y, axis=1)
 
         # base   
         learner = RewardLearner()
         learner.fit(X, y)
-        model_preds = np.argmax(learner.values, axis=1)
-        acc = np.mean(participant_choices == model_preds)
-        base_accuracies.append(acc)
+        base_choices = np.argmax(learner.values, axis=1)
 
         # metalign
         X = np.array([[metalign_reps[left], metalign_reps[right]] for left, right in zip(left_img_locs, right_img_locs)])
         learner = RewardLearner()
         learner.fit(X, y)
-        model_preds = np.argmax(learner.values, axis=1)
-        acc = np.mean(participant_choices == model_preds)
-        metalign_accuracies.append(acc)
+        metalign_choices = np.argmax(learner.values, axis=1)
 
+        for i in range(len(participant_choices)):
+            results.append({
+                "participant": participant,
+                "trial": i,
+                "human_choice": participant_choices[i],
+                "correct_choice": correct_choices[i],
+                "base_choice": base_choices[i],
+                "metalign_choice": metalign_choices[i],
+                "base_correct": base_choices[i] == correct_choices[i],
+                "metalign_correct": metalign_choices[i] == correct_choices[i],
+                "base_align_human": base_choices[i] == participant_choices[i],
+                "metalign_align_human": metalign_choices[i] == participant_choices[i]
+            })
 
-    result_df = pd.DataFrame({"participant": human_data.participant.unique(),"metalign_accuracy": metalign_accuracies,  "base_accuracy": base_accuracies})
+    result_df = pd.DataFrame(results)
+    print(f"Metalign average accuracy: {result_df.metalign_align_human.mean():.4f}")
+    print(f"Base average accuracy: {result_df.base_align_human.mean():.4f}")
     result_df.to_csv(eval_file, index=False)
-    print(f"Average metalign accuracy: {np.mean(metalign_accuracies)}")
-    print(f"Average base accuracy: {np.mean(base_accuracies)}")
+

@@ -10,7 +10,7 @@ fi
 
 for eval_type in "${eval_types[@]}"; do
     for experiment in $experiments; do
-        experiment=$(echo $experiment | tr -d "[]")
+        experiment=$(echo "$experiment" | tr -d "[]")
         for backbone in $backbones; do
             if [ "$eval_type" = "brain" ]; then
                 for participant in 1 2 3; do
