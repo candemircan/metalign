@@ -49,37 +49,20 @@ For setup, you need to do the following things:
 
 #### fMRI
 
-- [ ] BOLD 5000
+- [x] THINGS fMRI
 
-#### Misc.
+### How did representations change?
 
-- [ ] Texture bias: Not sure about this because 1) I don't know if I care enough about this and 2) I would need to train imagenet heads on top of the representations, which is quite a bit of compute. A workaround might be to use the few-shot linear heads I will train anyway for down-stream evals.
+- [ ] t-SNE plots of the representations before and after alignment
+- [ ] Class separation analysis
 
-### Down-stream evaluations
+### Plots for the paper
 
-*This is taken directly from Lukas's paper.*
-
-#### One-shot and Ten-shot classification
-
-- [ ] Birds
-- [ ] Caltech101
-- [ ] Cars
-- [ ] Cifar100
-- [ ] Colon
-- [ ] DTD
-- [ ] Flowers
-- [ ] ImageNet-1k
-- [ ] Pets
-- [ ] Places365
-- [ ] US Merced
-
-#### Distribution shift
-
-- [ ] BREEDS
-
-#### Model robustness
-
-- [ ] ImageNet-A
+- [ ] Oveview figure (good luck with that)
+- [ ] Metalign vs. Baseline comparison plots for all behavioural evaluations. Have all the data, just put it together.
+- [ ] Ablations vs metalign comparison plots for all behavioural evaluations. Again, have all the data.
+- [ ] fMRI comparison plots for all models. Need to think about the best way to visualize this. Currently, upper row is a cortical flatmap for one model and one participant (showing $\Delta$ $R^2$), and the lower row is a bar plot showing absolute $R^2$ values for all ROIs for each participant. Both for base and metalign models. Though just using one backbone. In the Supplement should go flatmaps from other participants, other backbones, and (if we have them) ablation models.
+- [ ] Representation change plots. t-SNEs and class separation analyses.
 
 ### Ablation Experiments
 

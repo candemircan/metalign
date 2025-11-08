@@ -54,6 +54,11 @@ if [ ! -f "data/external/reward_learning.csv" ]; then
     wget -O data/external/reward_learning.csv https://osf.io/6exjm/download
 fi
 
+# things meta-data
+if [ ! -f "data/external/THINGS_metadata.tsv" ]; then
+    wget -O data/external/THINGS_metadata.tsv https://osf.io//pc98z/download
+fi
+
 if [ ! -f "data/external/brain_data" ]; then
     # i was getting 403 forbidden with just wget, so added user-agent
     wget  --user-agent="Mozilla" -O data/external/brain_data.zip https://plus.figshare.com/ndownloader/files/43635873 
