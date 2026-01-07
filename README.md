@@ -1,6 +1,5 @@
 # metalign
 
-> can we align visual representations to humans better through meta-learning? without using any human data? while also improving down-stream performance?
 
 ## Setup
 
