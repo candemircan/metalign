@@ -35,10 +35,6 @@ def _get_logits(reps, X, batch_size=2048):
         
     return torch.cat(all_sims, dim=0)
 
-def _accuracy_from_logits(logits, y):
-    preds = torch.argmax(logits, dim=1)
-    return (preds == torch.tensor(y)).float().mean().item()
-
 @call_parse
 def main(
     experiment_name: str, # has to be one of main, raw, midsae
@@ -53,11 +49,10 @@ def main(
     eval_path = Path("data/evals/thingso1o")
     eval_path.mkdir(parents=True, exist_ok=True)
     file_name = f"{experiment_name}_{backbone_name}"
-    eval_file = eval_path / f"{file_name}.json"
     stats_file = eval_path / f"{file_name}_stats.csv"
 
-    if eval_file.exists() and stats_file.exists() and not force:
-        print(f"Eval files for {file_name} already exist, use --force to overwrite")
+    if stats_file.exists() and not force:
+        print(f"Stats file for {file_name} already exists, use --force to overwrite")
         return
     
     best_models = json.load(open(Path("data/checkpoints") / "best_models.json"))
@@ -67,7 +62,7 @@ def main(
     
 
     df = pd.read_table("data/external/THINGS_triplets.csv")
-    backbone_reps, ceiling_model = prepare_things_spose(load_backbone(things_reps))
+    backbone_reps, _ = prepare_things_spose(load_backbone(things_reps))
 
     ckpt = torch.load(ckpt, weights_only=False)
     config, state_dict = ckpt['config'], fix_state_dict(ckpt['state_dict'])
@@ -91,25 +86,6 @@ def main(
     # calculate logits for base and metaligned models
     og_logits = _get_logits(backbone_reps, X, batch_size=batch_size)
     metalign_logits = _get_logits(metalign_reps, X, batch_size=batch_size)
-    
-    # Calculate accuracy for reporting
-    og_acc = _accuracy_from_logits(og_logits, y)
-    metalign_acc = _accuracy_from_logits(metalign_logits, y)
-    
-
-    ceiling_acc    = _accuracy_from_logits(_get_logits(ceiling_model, X, batch_size=batch_size), y)
-
-    eval_data = {
-        "model_name": backbone_name,
-        "checkpoint_name": file_name,
-        "base_model_accuracy": og_acc,
-        "metalign_accuracy": metalign_acc,
-        "ceiling_accuracy": ceiling_acc
-    }
-    with open(eval_file, "w") as f: json.dump(eval_data, f, indent=4)
-    print(f"Base model accuracy: {og_acc:.4f}")
-    print(f"Metalign accuracy: {metalign_acc:.4f}")
-
     
     stats_df = pd.DataFrame({
         'subject_id': df['subject_id'],

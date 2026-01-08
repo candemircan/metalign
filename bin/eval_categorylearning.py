@@ -28,11 +28,10 @@ def main(
     eval_path = Path("data/evals/categorylearning")
     eval_path.mkdir(parents=True, exist_ok=True)
     file_name = f"{experiment_name}_{backbone_name}"
-    eval_file = eval_path / f"{file_name}.json"
     stats_file = eval_path / f"{file_name}_stats.csv"
 
-    if eval_file.exists() and stats_file.exists() and not force:
-        print(f"Eval files for {file_name} already exist, use --force to overwrite")
+    if stats_file.exists() and not force:
+        print(f"Stats file for {file_name} already exists, use --force to overwrite")
         return
     
     best_models = json.load(open(Path("data/checkpoints") / "best_models.json"))
@@ -112,25 +111,7 @@ def main(
                 "metalign_logit_1": np.log(metalign_probs[1] / (1 - metalign_probs[1]))
             })
 
-    result_df = pd.DataFrame(results)
     stats_df = pd.DataFrame(stats_data)
-    
-    # Calculate summary metrics
-    base_align = result_df.base_align_human.mean()
-    metalign_align = result_df.metalign_align_human.mean()
-    
-    print(f"Metalign average accuracy: {metalign_align:.4f}")
-    print(f"Base average accuracy: {base_align:.4f}")
-    
-    # Save summary metrics
-    eval_data = {
-        "model_name": backbone_name,
-        "checkpoint_name": file_name,
-        "base_align_human": base_align,
-        "metalign_align_human": metalign_align
-    }
-    with open(eval_file, "w") as f: 
-        json.dump(eval_data, f, indent=4)
     
     # Save stats for mixed effects modeling
     stats_df.to_csv(stats_file, index=False)

@@ -37,14 +37,6 @@ def _get_logits(reps, trials, batch_size=2048):
     
     return torch.stack(all_sims, dim=0).squeeze()
 
-def _accuracy_from_logits(logits, y):
-    preds = torch.argmax(logits, dim=1)
-    if isinstance(y, list):
-        y_tensor = torch.tensor(y, dtype=torch.long)
-    else:
-        y_tensor = y
-    return (preds == y_tensor).float().mean().item()
-
 @call_parse
 def main(
     experiment_name: str, # has to be one of main, raw, midsae
@@ -58,11 +50,10 @@ def main(
     eval_path = Path("data/evals/levelso1o")
     eval_path.mkdir(parents=True, exist_ok=True)
     file_name = f"{experiment_name}_{backbone_name}"
-    eval_file = eval_path / f"{file_name}.json"
     stats_file = eval_path / f"{file_name}_stats.csv"
 
-    if eval_file.exists() and stats_file.exists() and not force:
-        print(f"Eval files for {file_name} already exist, use --force to overwrite")
+    if stats_file.exists() and not force:
+        print(f"Stats file for {file_name} already exists, use --force to overwrite")
         return
 
     best_models = json.load(open(Path("data/checkpoints") / "best_models.json"))
@@ -94,33 +85,6 @@ def main(
     
     # Extract ground truth choices
     y = torch.tensor([trial['selected'] for trial in trials], dtype=torch.long)
-    
-    # Calculate accuracy for reporting
-    og_acc = _accuracy_from_logits(og_logits, y)
-    metalign_acc = _accuracy_from_logits(metalign_logits, y)
-
-    # Calculate by-type accuracies
-    og_type_accs = {}
-    metalign_type_accs = {}
-    for trial_type in set(trial.get('triplet_type') for trial in trials):
-        type_indices = torch.tensor([i for i, t in enumerate(trials) if t.get('triplet_type') == trial_type], dtype=torch.long)
-        if len(type_indices) > 0:
-            type_y = y[type_indices]
-            og_type_accs[trial_type] = _accuracy_from_logits(og_logits[type_indices], type_y)
-            metalign_type_accs[trial_type] = _accuracy_from_logits(metalign_logits[type_indices], type_y)
-
-    eval_data = {
-        "model_name": backbone_name,
-        "checkpoint_name": file_name,
-        "base_model_accuracy": og_acc,
-        "metalign_accuracy": metalign_acc,
-        "base_model_accuracy_by_type": og_type_accs,
-        "metalign_accuracy_by_type": metalign_type_accs,
-        "num_trials": len(trials)
-    }
-    with open(eval_file, "w") as f: json.dump(eval_data, f, indent=4)
-    print(f"Base model accuracy: {og_acc:.4f}")
-    print(f"Metalign accuracy: {metalign_acc:.4f}")
 
     # Save stats for mixed effects modeling
     stats_df = pd.DataFrame({

@@ -107,7 +107,5 @@ def main(
             })
 
     result_df = pd.DataFrame(results)
-    print(f"Metalign average accuracy: {result_df.metalign_align_human.mean():.4f}")
-    print(f"Base average accuracy: {result_df.base_align_human.mean():.4f}")
     result_df.to_csv(eval_file, index=False)
 

@@ -32,10 +32,20 @@ if !is_main
     data.main_logit_1 = main_data.metalign_logit_1
 end
 
+# Normalize predictors to help convergence
+dropmissing!(data)
+data.base_logit_1 = zscore(data.base_logit_1)
+if "metalign_logit_1" in names(data)
+    data.metalign_logit_1 = zscore(data.metalign_logit_1)
+end
+if "main_logit_1" in names(data)
+    data.main_logit_1 = zscore(data.main_logit_1)
+end
+
 if is_main
     # Model 0: Base only
-    formula_0 = @formula(choice ~ base_logit_1 + (1|trial) + (1|participant))
-    model_0 = fit(MixedModel, formula_0, data, Bernoulli(); fast=true)
+    formula_0 = @formula(choice ~ 1 + base_logit_1 + (1 + base_logit_1 | participant))
+    model_0 = fit(MixedModel, formula_0, data, Bernoulli())
     
     println("=" ^ 80)
     println("MODEL 0: Base only")
@@ -43,8 +53,8 @@ if is_main
     println(model_0)
     println()
     # Main model: only compare M0 vs M1
-    formula_1 = @formula(choice ~ base_logit_1 + metalign_logit_1 + (1|trial) + (1|participant))
-    model_1 = fit(MixedModel, formula_1, data, Bernoulli(); fast=true)
+    formula_1 = @formula(choice ~ 1 + base_logit_1 + metalign_logit_1 + (1 + base_logit_1 + metalign_logit_1 | participant))
+    model_1 = fit(MixedModel, formula_1, data, Bernoulli())
     
     println("=" ^ 80)
     println("MODEL 1: Base + Full Metalign")
@@ -112,8 +122,8 @@ if is_main
     )
 else
     # Ablation: only compare M1 vs M2
-    formula_1 = @formula(choice ~ base_logit_1 + metalign_logit_1 + (1|trial) + (1|participant))
-    model_1 = fit(MixedModel, formula_1, data, Bernoulli(); fast=true)
+    formula_1 = @formula(choice ~ 1 + base_logit_1 + metalign_logit_1 + (1 + base_logit_1 + metalign_logit_1 | participant))
+    model_1 = fit(MixedModel, formula_1, data, Bernoulli())
     
     println("=" ^ 80)
     println("MODEL 1: Base + Ablation ($experiment_name)")
@@ -121,8 +131,8 @@ else
     println(model_1)
     println()
     
-    formula_2 = @formula(choice ~ base_logit_1 + metalign_logit_1 + main_logit_1 + (1|trial) + (1|participant))
-    model_2 = fit(MixedModel, formula_2, data, Bernoulli(); fast=true)
+    formula_2 = @formula(choice ~ 1 + base_logit_1 + metalign_logit_1 + main_logit_1 + (1 + base_logit_1 + metalign_logit_1 + main_logit_1 | participant))
+    model_2 = fit(MixedModel, formula_2, data, Bernoulli())
     
     println("=" ^ 80)
     println("MODEL 2: Base + Ablation + Full Metalign")

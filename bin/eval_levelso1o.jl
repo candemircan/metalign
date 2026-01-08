@@ -55,10 +55,18 @@ if !is_main
     data_long = leftjoin(data_long, main_long, on=[:triplet_id, :choice_idx])
 end
 
+# Normalize predictors to help convergence
+dropmissing!(data_long)
+data_long.base_sim = zscore(data_long.base_sim)
+data_long.ablation_sim = zscore(data_long.ablation_sim)
+if "main_sim" in names(data_long)
+    data_long.main_sim = zscore(data_long.main_sim)
+end
+
 if is_main
     # Model 0: Base only
-    formula_0 = @formula(is_choice ~ base_sim + (1|triplet_id) + (1|participant_id))
-    model_0 = fit(MixedModel, formula_0, data_long, Poisson(); fast=true)
+    formula_0 = @formula(is_choice ~ base_sim + (1 + base_sim | participant_id))
+    model_0 = fit(MixedModel, formula_0, data_long, Bernoulli())
     
     println("=" ^ 80)
     println("MODEL 0: Base only")
@@ -66,8 +74,8 @@ if is_main
     println(model_0)
     println()
     # Main model: only compare M0 vs M1
-    formula_1 = @formula(is_choice ~ base_sim + ablation_sim + (1|triplet_id) + (1|participant_id))
-    model_1 = fit(MixedModel, formula_1, data_long, Poisson(); fast=true)
+    formula_1 = @formula(is_choice ~ base_sim + ablation_sim + (1 + base_sim + ablation_sim | participant_id))
+    model_1 = fit(MixedModel, formula_1, data_long, Bernoulli())
     
     println("=" ^ 80)
     println("MODEL 1: Base + Full Metalign")
@@ -136,8 +144,8 @@ if is_main
     )
 else
     # Ablation model: only compare M1 vs M2
-    formula_1 = @formula(is_choice ~ base_sim + ablation_sim + (1|triplet_id) + (1|participant_id))
-    model_1 = fit(MixedModel, formula_1, data_long, Poisson(); fast=true)
+    formula_1 = @formula(is_choice ~ base_sim + ablation_sim + (1 + base_sim + ablation_sim | participant_id))
+    model_1 = fit(MixedModel, formula_1, data_long, Bernoulli())
     
     println("=" ^ 80)
     println("MODEL 1: Base + Ablation ($experiment_name)")
@@ -145,8 +153,8 @@ else
     println(model_1)
     println()
     
-    formula_2 = @formula(is_choice ~ base_sim + ablation_sim + main_sim + (1|triplet_id) + (1|participant_id))
-    model_2 = fit(MixedModel, formula_2, data_long, Poisson(); fast=true)
+    formula_2 = @formula(is_choice ~ base_sim + ablation_sim + main_sim + (1 + base_sim + ablation_sim + main_sim | participant_id))
+    model_2 = fit(MixedModel, formula_2, data_long, Bernoulli())
     
     println("=" ^ 80)
     println("MODEL 2: Base + Ablation + Full Metalign")
