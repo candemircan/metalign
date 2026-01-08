@@ -8,7 +8,6 @@ dependencies = [
     "MixedModels",
     "StatsBase",
     "CategoricalArrays",
-    "GLM",
     "JSON"
 ]
 

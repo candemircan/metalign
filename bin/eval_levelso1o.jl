@@ -1,41 +1,64 @@
 using CSV, DataFrames, MixedModels, StatsBase, CategoricalArrays, JSON
 
 if length(ARGS) < 2
-    error("Usage: julia eval_categorylearning.jl <experiment_name> <backbone_name>")
+    error("Usage: julia eval_levelso1o.jl <experiment_name> <backbone_name>")
 end
 
 experiment_name = ARGS[1]
 backbone_name = ARGS[2]
-csv_file = "data/evals/categorylearning/$(experiment_name)_$(backbone_name)_stats.csv"
+csv_file = "data/evals/levelso1o/$(experiment_name)_$(backbone_name)_stats.csv"
 
 if !isfile(csv_file)
     error("Stats file not found: $csv_file")
 end
 
 data = CSV.read(csv_file, DataFrame)
-data.participant = categorical(data.participant)
-data.trial = categorical(data.trial)
+
+# Reshape from wide to long format
+data_long = DataFrame()
+for choice_idx in 0:2
+    tmp = select(data, :participant_id, :y)
+    tmp.choice_idx = fill(choice_idx, nrow(data))
+    tmp.is_choice = Int.(data.y .== choice_idx)
+    tmp.base_sim = data[:, Symbol("base_sim_$choice_idx")]
+    tmp.ablation_sim = data[:, Symbol("metalign_sim_$choice_idx")]
+    tmp.triplet_id = 1:nrow(data)
+    append!(data_long, tmp)
+end
+
+data_long.participant_id = categorical(data_long.participant_id)
+data_long.triplet_id = categorical(data_long.triplet_id)
 
 # Determine if this is main or an ablation
 is_main = experiment_name == "MAIN"
 
-# If ablation, load the main model data
+# If ablation, load the main model data to get full metalign
 if !is_main
-    main_csv_file = "data/evals/categorylearning/MAIN_$(backbone_name)_stats.csv"
+    main_csv_file = "data/evals/levelso1o/MAIN_$(backbone_name)_stats.csv"
     if !isfile(main_csv_file)
         error("Main model stats file not found: $main_csv_file")
     end
     main_data = CSV.read(main_csv_file, DataFrame)
     
-    # Add main model logits
-    data.main_logit_0 = main_data.metalign_logit_0
-    data.main_logit_1 = main_data.metalign_logit_1
+    # Add main metalign similarities to long format data
+    main_long = DataFrame()
+    for choice_idx in 0:2
+        tmp = DataFrame(
+            triplet_id = 1:nrow(main_data),
+            choice_idx = fill(choice_idx, nrow(main_data)),
+            main_sim = main_data[:, Symbol("metalign_sim_$choice_idx")]
+        )
+        append!(main_long, tmp)
+    end
+    
+    # Merge with ablation data
+    data_long = leftjoin(data_long, main_long, on=[:triplet_id, :choice_idx])
 end
 
 if is_main
     # Model 0: Base only
-    formula_0 = @formula(choice ~ base_logit_1 + (1|trial) + (1|participant))
-    model_0 = fit(MixedModel, formula_0, data, Bernoulli(); fast=true)
+    formula_0 = @formula(is_choice ~ base_sim + (1|triplet_id) + (1|participant_id))
+    model_0 = fit(MixedModel, formula_0, data_long, Poisson(); fast=true)
     
     println("=" ^ 80)
     println("MODEL 0: Base only")
@@ -43,8 +66,8 @@ if is_main
     println(model_0)
     println()
     # Main model: only compare M0 vs M1
-    formula_1 = @formula(choice ~ base_logit_1 + metalign_logit_1 + (1|trial) + (1|participant))
-    model_1 = fit(MixedModel, formula_1, data, Bernoulli(); fast=true)
+    formula_1 = @formula(is_choice ~ base_sim + ablation_sim + (1|triplet_id) + (1|participant_id))
+    model_1 = fit(MixedModel, formula_1, data_long, Poisson(); fast=true)
     
     println("=" ^ 80)
     println("MODEL 1: Base + Full Metalign")
@@ -76,6 +99,7 @@ if is_main
     println("Log10(Bayes Factor B10): ~", round(log10_bf, digits=2))
     println()
     
+    # Save results
     results = Dict(
         "experiment_name" => experiment_name,
         "backbone_name" => backbone_name,
@@ -86,7 +110,7 @@ if is_main
             "loglikelihood" => loglikelihood(model_0),
             "fixed_effects" => Dict(
                 "intercept" => coef(model_0)[1],
-                "base_logit_1" => coef(model_0)[2]
+                "base_sim" => coef(model_0)[2]
             )
         ),
         "model_1" => Dict(
@@ -95,8 +119,8 @@ if is_main
             "loglikelihood" => loglikelihood(model_1),
             "fixed_effects" => Dict(
                 "intercept" => coef(model_1)[1],
-                "base_logit_1" => coef(model_1)[2],
-                "metalign_logit_1" => coef(model_1)[3]
+                "base_sim" => coef(model_1)[2],
+                "metalign_sim" => coef(model_1)[3]
             )
         ),
         "lrt_0_vs_1" => Dict(
@@ -111,9 +135,9 @@ if is_main
         )
     )
 else
-    # Ablation: only compare M1 vs M2
-    formula_1 = @formula(choice ~ base_logit_1 + metalign_logit_1 + (1|trial) + (1|participant))
-    model_1 = fit(MixedModel, formula_1, data, Bernoulli(); fast=true)
+    # Ablation model: only compare M1 vs M2
+    formula_1 = @formula(is_choice ~ base_sim + ablation_sim + (1|triplet_id) + (1|participant_id))
+    model_1 = fit(MixedModel, formula_1, data_long, Poisson(); fast=true)
     
     println("=" ^ 80)
     println("MODEL 1: Base + Ablation ($experiment_name)")
@@ -121,8 +145,8 @@ else
     println(model_1)
     println()
     
-    formula_2 = @formula(choice ~ base_logit_1 + metalign_logit_1 + main_logit_1 + (1|trial) + (1|participant))
-    model_2 = fit(MixedModel, formula_2, data, Bernoulli(); fast=true)
+    formula_2 = @formula(is_choice ~ base_sim + ablation_sim + main_sim + (1|triplet_id) + (1|participant_id))
+    model_2 = fit(MixedModel, formula_2, data_long, Poisson(); fast=true)
     
     println("=" ^ 80)
     println("MODEL 2: Base + Ablation + Full Metalign")
@@ -154,6 +178,7 @@ else
     println("Delta BIC: ", round(delta_bic, digits=2), " | Log10(BF): ~", round(log10_bf, digits=2))
     println()
     
+    # Save results
     results = Dict(
         "experiment_name" => experiment_name,
         "backbone_name" => backbone_name,
@@ -164,8 +189,8 @@ else
             "loglikelihood" => loglikelihood(model_1),
             "fixed_effects" => Dict(
                 "intercept" => coef(model_1)[1],
-                "base_logit_1" => coef(model_1)[2],
-                "ablation_logit_1" => coef(model_1)[3]
+                "base_sim" => coef(model_1)[2],
+                "ablation_sim" => coef(model_1)[3]
             )
         ),
         "model_2" => Dict(
@@ -174,9 +199,9 @@ else
             "loglikelihood" => loglikelihood(model_2),
             "fixed_effects" => Dict(
                 "intercept" => coef(model_2)[1],
-                "base_logit_1" => coef(model_2)[2],
-                "ablation_logit_1" => coef(model_2)[3],
-                "main_logit_1" => coef(model_2)[4]
+                "base_sim" => coef(model_2)[2],
+                "ablation_sim" => coef(model_2)[3],
+                "main_sim" => coef(model_2)[4]
             )
         ),
         "lrt_1_vs_2" => Dict(
@@ -192,7 +217,8 @@ else
     )
 end
 
-output_file = "data/evals/categorylearning/$(experiment_name)_$(backbone_name)_analysis.json"
+# Save results to JSON file
+output_file = "data/evals/levelso1o/$(experiment_name)_$(backbone_name)_analysis.json"
 open(output_file, "w") do f
     JSON.print(f, results, 4)
 end

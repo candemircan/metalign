@@ -114,13 +114,12 @@ def main(
     stats_df = pd.DataFrame({
         'subject_id': df['subject_id'],
         'y': y, # 0, 1, 2
-        'm1_sim_0': og_logits[:, 0].numpy(),
-        'm1_sim_1': og_logits[:, 1].numpy(),
-        'm1_sim_2': og_logits[:, 2].numpy(),
-        'm2_sim_0': metalign_logits[:, 0].numpy(),
-        'm2_sim_1': metalign_logits[:, 1].numpy(),
-        'm2_sim_2': metalign_logits[:, 2].numpy()
+        'base_sim_0': og_logits[:, 0].numpy(),
+        'base_sim_1': og_logits[:, 1].numpy(),
+        'base_sim_2': og_logits[:, 2].numpy(),
+        'metalign_sim_0': metalign_logits[:, 0].numpy(),
+        'metalign_sim_1': metalign_logits[:, 1].numpy(),
+        'metalign_sim_2': metalign_logits[:, 2].numpy()
     })
     
     stats_df.to_csv(stats_file, index=False)
-    print(f"Saved statistical analysis data to {stats_file}")

@@ -106,10 +106,10 @@ def main(
                 "trial": i,
                 "choice": participant_choices[i],
                 "true_label": true_labels[i],
-                "m1_logit_0": np.log(base_probs[0] / (1 - base_probs[0])),
-                "m1_logit_1": np.log(base_probs[1] / (1 - base_probs[1])),
-                "m2_logit_0": np.log(metalign_probs[0] / (1 - metalign_probs[0])),
-                "m2_logit_1": np.log(metalign_probs[1] / (1 - metalign_probs[1]))
+                "base_logit_0": np.log(base_probs[0] / (1 - base_probs[0])),
+                "base_logit_1": np.log(base_probs[1] / (1 - base_probs[1])),
+                "metalign_logit_0": np.log(metalign_probs[0] / (1 - metalign_probs[0])),
+                "metalign_logit_1": np.log(metalign_probs[1] / (1 - metalign_probs[1]))
             })
 
     result_df = pd.DataFrame(results)
@@ -134,5 +134,4 @@ def main(
     
     # Save stats for mixed effects modeling
     stats_df.to_csv(stats_file, index=False)
-    print(f"Saved statistical analysis data to {stats_file}")
 

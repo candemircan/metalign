@@ -382,7 +382,7 @@ def prepare_levels(
     
     # prepare trials with indices and ground truth
     trials = []
-    for participant_data in levels.values():
+    for participant_id, participant_data in levels.items():
         for trial in participant_data:
             if trial.get('exp_trial_type') == 'exp_trial':  # only experimental trials
                 img1_key = trial["image1Path"].split(".")[0]
@@ -406,7 +406,8 @@ def prepare_levels(
                     trials.append({
                         'images': img_indices,
                         'selected': selected_idx,
-                        'triplet_type': trial.get('triplet_type')
+                        'triplet_type': trial.get('triplet_type'),
+                        'participant_id': participant_id
                     })
     
     if return_tensors == "pt": X = torch.from_numpy(X)
