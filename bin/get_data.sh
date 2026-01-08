@@ -6,7 +6,7 @@ fi
 
 ## Models ##
 for model in  timm/vit_base_patch16_dinov3.lvd1689m timm/vit_base_patch16_siglip_256.v2_webli Prisma-Multimodal/sae-top_k-64-cls_only-layer_6-hook_resid_post Prisma-Multimodal/sae-top_k-64-cls_only-layer_11-hook_resid_post; do
-    uv run huggingface-cli download $model
+    uv run hf download $model
 done
 
 ## THINGS ##

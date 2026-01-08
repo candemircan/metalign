@@ -18,6 +18,7 @@ for eval_type in "${eval_types[@]}"; do
                 done
             else
                 uv run bin/eval_"${eval_type}".py "$experiment" "$backbone"
+                julia -t auto --project=. bin/eval_"${eval_type}".jl "data/evals/${experiment}_${backbone}_stats.csv"
             fi
         done
     done

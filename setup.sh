@@ -36,3 +36,12 @@ uv run bin/fix_pycortex.py
 # i use jq for some json processing
 curl -sS https://webi.sh/jq | sh; \
 source ~/.config/envman/PATH.env
+
+
+# julia for mixed models
+if ! command -v julia >/dev/null 2>&1; then
+    curl -fsSL https://install.julialang.org | sh
+else
+    echo "julia is already installed."
+fi
+julia bin/setup_julia.jl

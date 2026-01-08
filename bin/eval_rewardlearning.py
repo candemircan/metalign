@@ -79,12 +79,14 @@ def main(
         learner = RewardLearner()
         learner.fit(X, y)
         base_choices = np.argmax(learner.values, axis=1)
+        base_values = learner.values # (n_trials, 2)
 
         # metalign
         X = np.array([[metalign_reps[left], metalign_reps[right]] for left, right in zip(left_img_locs, right_img_locs)])
         learner = RewardLearner()
         learner.fit(X, y)
         metalign_choices = np.argmax(learner.values, axis=1)
+        metalign_values = learner.values # (n_trials, 2)
 
         for i in range(len(participant_choices)):
             results.append({
@@ -94,6 +96,10 @@ def main(
                 "correct_choice": correct_choices[i],
                 "base_choice": base_choices[i],
                 "metalign_choice": metalign_choices[i],
+                "base_val_0": base_values[i, 0],
+                "base_val_1": base_values[i, 1],
+                "metalign_val_0": metalign_values[i, 0],
+                "metalign_val_1": metalign_values[i, 1],
                 "base_correct": base_choices[i] == correct_choices[i],
                 "metalign_correct": metalign_choices[i] == correct_choices[i],
                 "base_align_human": base_choices[i] == participant_choices[i],

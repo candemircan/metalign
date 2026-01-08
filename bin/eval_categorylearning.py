@@ -28,10 +28,11 @@ def main(
     eval_path = Path("data/evals/categorylearning")
     eval_path.mkdir(parents=True, exist_ok=True)
     file_name = f"{experiment_name}_{backbone_name}"
-    eval_file = eval_path / f"{file_name}.csv"
+    eval_file = eval_path / f"{file_name}.json"
+    stats_file = eval_path / f"{file_name}_stats.csv"
 
-    if eval_file.exists() and not force:
-        print(f"Eval file {eval_file} already exists. Use --force to overwrite.")
+    if eval_file.exists() and stats_file.exists() and not force:
+        print(f"Eval files for {file_name} already exist, use --force to overwrite")
         return
     
     best_models = json.load(open(Path("data/checkpoints") / "best_models.json"))
@@ -60,6 +61,7 @@ def main(
 
     imgs = [str(x) for x in Things().images]
     results = []
+    stats_data = []
 
     for participant in tqdm(human_data.participant.unique()):
         participant_data = human_data[human_data.participant == participant]
@@ -71,15 +73,15 @@ def main(
         
         # base linear probe
         X = backbone_reps[img_locs]
-        learner = CategoryLearner()
-        learner.fit(X, true_labels)
-        base_preds = np.argmax(learner.values, axis=1)
+        base_learner = CategoryLearner()
+        base_learner.fit(X, true_labels)
+        base_preds = np.argmax(base_learner.values, axis=1)
 
         # metalign linear probe
         X = metalign_reps[img_locs].numpy()
-        learner = CategoryLearner()
-        learner.fit(X, true_labels)
-        metalign_preds = np.argmax(learner.values, axis=1)
+        metalign_learner = CategoryLearner()
+        metalign_learner.fit(X, true_labels)
+        metalign_preds = np.argmax(metalign_learner.values, axis=1)
 
         for i in range(len(participant_choices)):
             results.append({
@@ -93,9 +95,44 @@ def main(
                 "base_align_human": base_preds[i] == participant_choices[i],
                 "metalign_align_human": metalign_preds[i] == participant_choices[i]
             })
+            
+            # Convert probabilities to logits for mixed effects modeling
+            # logit = log(p / (1-p)), clip to avoid infinity
+            base_probs = np.clip(base_learner.values[i], 1e-7, 1-1e-7)
+            metalign_probs = np.clip(metalign_learner.values[i], 1e-7, 1-1e-7)
+            
+            stats_data.append({
+                "participant": participant,
+                "trial": i,
+                "choice": participant_choices[i],
+                "true_label": true_labels[i],
+                "m1_logit_0": np.log(base_probs[0] / (1 - base_probs[0])),
+                "m1_logit_1": np.log(base_probs[1] / (1 - base_probs[1])),
+                "m2_logit_0": np.log(metalign_probs[0] / (1 - metalign_probs[0])),
+                "m2_logit_1": np.log(metalign_probs[1] / (1 - metalign_probs[1]))
+            })
 
     result_df = pd.DataFrame(results)
-    print(f"Metalign average accuracy: {result_df.metalign_align_human.mean():.4f}")
-    print(f"Base average accuracy: {result_df.base_align_human.mean():.4f}")
-    result_df.to_csv(eval_file, index=False)
+    stats_df = pd.DataFrame(stats_data)
+    
+    # Calculate summary metrics
+    base_align = result_df.base_align_human.mean()
+    metalign_align = result_df.metalign_align_human.mean()
+    
+    print(f"Metalign average accuracy: {metalign_align:.4f}")
+    print(f"Base average accuracy: {base_align:.4f}")
+    
+    # Save summary metrics
+    eval_data = {
+        "model_name": backbone_name,
+        "checkpoint_name": file_name,
+        "base_align_human": base_align,
+        "metalign_align_human": metalign_align
+    }
+    with open(eval_file, "w") as f: 
+        json.dump(eval_data, f, indent=4)
+    
+    # Save stats for mixed effects modeling
+    stats_df.to_csv(stats_file, index=False)
+    print(f"Saved statistical analysis data to {stats_file}")
 

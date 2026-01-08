@@ -14,13 +14,12 @@ from metalign.utils import fix_state_dict
 
 _ = torch.set_grad_enabled(False)
 
-def _calculate_accuracy(reps, X, y, batch_size=2048):
-    "Calculate triplet accuracy from representations"
-    num_correct, num_total = 0, 0
+def _get_logits(reps, X, batch_size=2048):
+    "Calculate triplet similarities (logits) from representations"
+    all_sims = []
             
     for i in tqdm(range(0, len(X), batch_size)):
         X_batch = X[i:i+batch_size]
-        y_batch = y[i:i+batch_size]
         
         batch_reps = reps[X_batch]
         
@@ -30,14 +29,15 @@ def _calculate_accuracy(reps, X, y, batch_size=2048):
         sim_ik = F.cosine_similarity(i_reps, k_reps)
         sim_jk = F.cosine_similarity(j_reps, k_reps)
         
+        # Stack so that index 0 -> i is odd (j,k similar), 1 -> j odd (i,k similar), 2 -> k odd (i,j similar)
         sims = torch.stack([sim_jk, sim_ik, sim_ij], dim=1)
+        all_sims.append(sims.cpu())
         
-        preds = torch.argmax(sims, dim=1)
-        
-        num_correct += (preds == y_batch).sum().item()
-        num_total += len(X_batch)
-        
-    return num_correct / num_total
+    return torch.cat(all_sims, dim=0)
+
+def _accuracy_from_logits(logits, y):
+    preds = torch.argmax(logits, dim=1)
+    return (preds == torch.tensor(y)).float().mean().item()
 
 @call_parse
 def main(
@@ -54,8 +54,10 @@ def main(
     eval_path.mkdir(parents=True, exist_ok=True)
     file_name = f"{experiment_name}_{backbone_name}"
     eval_file = eval_path / f"{file_name}.json"
-    if eval_file.exists() and not force:
-        print(f"Eval file {eval_file} already exists, use --force to overwrite")
+    stats_file = eval_path / f"{file_name}_stats.csv"
+
+    if eval_file.exists() and stats_file.exists() and not force:
+        print(f"Eval files for {file_name} already exist, use --force to overwrite")
         return
     
     best_models = json.load(open(Path("data/checkpoints") / "best_models.json"))
@@ -86,9 +88,16 @@ def main(
     X = df[["image1", "image2", "image3"]].values - 1 # 0 index
     y = df["choice"].values -1 # 0 index
     
-    og_acc = _calculate_accuracy(backbone_reps, X, y, batch_size=batch_size)
-    metalign_acc = _calculate_accuracy(metalign_reps, X, y, batch_size=batch_size)
-    ceiling_acc = _calculate_accuracy(ceiling_model, X, y, batch_size=batch_size)
+    # calculate logits for base and metaligned models
+    og_logits = _get_logits(backbone_reps, X, batch_size=batch_size)
+    metalign_logits = _get_logits(metalign_reps, X, batch_size=batch_size)
+    
+    # Calculate accuracy for reporting
+    og_acc = _accuracy_from_logits(og_logits, y)
+    metalign_acc = _accuracy_from_logits(metalign_logits, y)
+    
+
+    ceiling_acc    = _accuracy_from_logits(_get_logits(ceiling_model, X, batch_size=batch_size), y)
 
     eval_data = {
         "model_name": backbone_name,
@@ -100,3 +109,18 @@ def main(
     with open(eval_file, "w") as f: json.dump(eval_data, f, indent=4)
     print(f"Base model accuracy: {og_acc:.4f}")
     print(f"Metalign accuracy: {metalign_acc:.4f}")
+
+    
+    stats_df = pd.DataFrame({
+        'subject_id': df['subject_id'],
+        'y': y, # 0, 1, 2
+        'm1_sim_0': og_logits[:, 0].numpy(),
+        'm1_sim_1': og_logits[:, 1].numpy(),
+        'm1_sim_2': og_logits[:, 2].numpy(),
+        'm2_sim_0': metalign_logits[:, 0].numpy(),
+        'm2_sim_1': metalign_logits[:, 1].numpy(),
+        'm2_sim_2': metalign_logits[:, 2].numpy()
+    })
+    
+    stats_df.to_csv(stats_file, index=False)
+    print(f"Saved statistical analysis data to {stats_file}")

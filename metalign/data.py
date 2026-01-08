@@ -315,6 +315,7 @@ def prepare_things_spose(
 
     img_idx = []
     parent_name_list = [img_name.parent.name for img_name in img_names]
+    
     for unique_id in unique_ids:
         img_idx.append(parent_name_list.index(unique_id)) # always gets the first item
 
