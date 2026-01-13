@@ -166,3 +166,6 @@ wandb
 example*
 bin/*ipynb
 bin/matplotlibrc
+*png
+*pdf
+*svg

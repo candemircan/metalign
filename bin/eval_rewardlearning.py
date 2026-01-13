@@ -27,7 +27,7 @@ def main(
 
     eval_path = Path("data/evals/rewardlearning")
     eval_path.mkdir(parents=True, exist_ok=True)
-    file_name = f"{experiment_name}_{backbone_name}"
+    file_name = f"{experiment_name}_{backbone_name}_stats"
     eval_file = eval_path / f"{file_name}.csv"
 
     if eval_file.exists() and not force:
