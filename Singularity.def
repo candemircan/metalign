@@ -29,7 +29,8 @@ From: rocker/r-ver:4.5.2
         libglpk-dev \
         libgmp3-dev \
         libnlopt-dev \
-        locales
+        locales \
+        libx11-dev
 
     echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
     locale-gen en_US.UTF-8
