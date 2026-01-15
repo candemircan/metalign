@@ -97,6 +97,7 @@ if (is_main) {
         data = data_m,
         rpar = c(asc1 = "n", asc2 = "n"),
         panel = TRUE,
+        R = 20,
         iterlim = 2000
     )
     null_ll <- as.numeric(logLik(m_null))
@@ -108,6 +109,7 @@ if (is_main) {
         data = data_m,
         rpar = c(base_sim = "n", asc1 = "n", asc2 = "n"),
         panel = TRUE,
+        R = 20,
         iterlim = 2000
     )
 
@@ -121,6 +123,7 @@ if (is_main) {
         data = data_m,
         rpar = c(base_sim = "n", metalign_sim = "n", asc1 = "n", asc2 = "n"),
         panel = TRUE,
+        R = 20,
         iterlim = 2000
     )
 
@@ -145,6 +148,7 @@ if (is_main) {
         data = data_m,
         rpar = c(asc1 = "n", asc2 = "n"),
         panel = TRUE,
+        R = 20,
         iterlim = 2000
     )
     null_ll <- as.numeric(logLik(m_null))
@@ -156,6 +160,7 @@ if (is_main) {
         data = data_m,
         rpar = c(base_sim = "n", metalign_sim = "n", asc1 = "n", asc2 = "n"),
         panel = TRUE,
+        R = 20,
         iterlim = 2000
     )
     stats1 <- calculate_model_stats(m1, null_model_ll = null_ll)
@@ -167,6 +172,7 @@ if (is_main) {
         data = data_m,
         rpar = c(base_sim = "n", metalign_sim = "n", metalign_sim_main = "n", asc1 = "n", asc2 = "n"),
         panel = TRUE,
+        R = 20,
         iterlim = 2000
     )
     stats2 <- calculate_model_stats(m2, null_model_ll = null_ll)
