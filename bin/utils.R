@@ -96,6 +96,28 @@ calculate_lrt <- function(m_restricted, m_full) {
     ))
 }
 
+calculate_lrt_from_stats <- function(stats_r, stats_f) {
+    ll_r <- stats_r$loglik
+    ll_f <- stats_f$loglik
+
+    df_r <- stats_r$k
+    df_f <- stats_f$k
+
+    chisq_stat <- 2 * (ll_f - ll_r)
+    df_diff <- df_f - df_r
+
+    p_val <- NA
+    if (df_diff > 0) {
+        p_val <- pchisq(chisq_stat, df_diff, lower.tail = FALSE)
+    }
+
+    return(list(
+        chisq = chisq_stat,
+        df = df_diff,
+        p_value = p_val
+    ))
+}
+
 save_results <- function(data, filename) {
     write_json(data, filename, pretty = TRUE, auto_unbox = TRUE)
     cat(sprintf("Results saved to %s\n", filename))

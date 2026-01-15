@@ -42,21 +42,21 @@ results <- list(
     backbone_name = backbone_name
 )
 
-# Fit Null model for McFadden R2
 cat("Fitting Null Model (for R2)...\n")
-m_null <- glmer(human_choice ~ 1 + (1 | participant), data = df, family = binomial)
+ctrl <- glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e5))
+m_null <- glmer(human_choice ~ 1 + (1 | participant), data = df, family = binomial, control = ctrl)
 null_ll <- as.numeric(logLik(m_null))
 
 if (is_main) {
     cat("Fitting Model 0 (Base only)...\n")
     m0 <- glmer(human_choice ~ base_diff + (1 + base_diff | participant),
-        data = df, family = binomial,
+        data = df, family = binomial, control = ctrl
     )
     stats0 <- calculate_model_stats(m0, null_model_ll = null_ll)
 
     cat("Fitting Model 1 (Base + Metalign)...\n")
     m1 <- glmer(human_choice ~ base_diff + metalign_diff + (1 + base_diff + metalign_diff | participant),
-        data = df, family = binomial,
+        data = df, family = binomial, control = ctrl
     )
     stats1 <- calculate_model_stats(m1, null_model_ll = null_ll)
 
@@ -73,13 +73,13 @@ if (is_main) {
 } else {
     cat("Fitting Model 1 (Base + Ablation)...\n")
     m1 <- glmer(human_choice ~ base_diff + metalign_diff + (1 + base_diff + metalign_diff | participant),
-        data = df, family = binomial,
+        data = df, family = binomial, control = ctrl
     )
     stats1 <- calculate_model_stats(m1, null_model_ll = null_ll)
 
     cat("Fitting Model 2 (Base + Ablation + Main)...\n")
     m2 <- glmer(human_choice ~ base_diff + metalign_diff + main_diff + (1 + base_diff + metalign_diff + main_diff | participant),
-        data = df, family = binomial,
+        data = df, family = binomial, control = ctrl
     )
     stats2 <- calculate_model_stats(m2, null_model_ll = null_ll)
 

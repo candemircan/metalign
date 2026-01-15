@@ -39,27 +39,40 @@ results <- list(
     backbone_name = backbone_name
 )
 
-# Fit Null model for McFadden R2
 cat("Fitting Null Model (for R2)...\n")
-m_null <- glmer(choice ~ 1 + (1 | participant), data = df, family = binomial)
+ctrl <- glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e5))
+m_null <- glmer(choice ~ 1 + (1 | participant), data = df, family = binomial, control = ctrl)
 null_ll <- as.numeric(logLik(m_null))
 
 if (is_main) {
     cat("Fitting Model 0 (Base only)...\n")
-    m0 <- glmer(choice ~ base_logit_1 + (1 + base_logit_1 | participant),
-        data = df, family = binomial,
+    formulas_0 <- list(
+        list(name = "full", formula = choice ~ base_logit_1 + (1 + base_logit_1 | participant)),
+        list(name = "uncorrelated", formula = choice ~ base_logit_1 + (1 | participant) + (0 + base_logit_1 | participant)),
+        list(name = "intercept_only", formula = choice ~ base_logit_1 + (1 | participant))
     )
+    res0 <- fit_with_fallback(formulas_0, df, binomial, ctrl)
+    m0 <- res0$model
     stats0 <- calculate_model_stats(m0, null_model_ll = null_ll)
+    stats0$model_type <- res0$type
 
     cat("Fitting Model 1 (Base + Metalign)...\n")
-    m1 <- glmer(choice ~ base_logit_1 + metalign_logit_1 + (1 + base_logit_1 + metalign_logit_1 | participant),
-        data = df, family = binomial,
+    formulas_1 <- list(
+        list(name = "full", formula = choice ~ base_logit_1 + metalign_logit_1 + (1 + base_logit_1 + metalign_logit_1 | participant)),
+        list(name = "uncorrelated", formula = choice ~ base_logit_1 + metalign_logit_1 + (1 | participant) + (0 + base_logit_1 + metalign_logit_1 | participant)),
+        list(name = "intercept_only", formula = choice ~ base_logit_1 + metalign_logit_1 + (1 | participant))
     )
+    res1 <- fit_with_fallback(formulas_1, df, binomial, ctrl)
+    m1 <- res1$model
     stats1 <- calculate_model_stats(m1, null_model_ll = null_ll)
+    stats1$model_type <- res1$type
 
     log10_bf <- calculate_log10_bf(stats0$bic, stats1$bic)
     lrt <- calculate_lrt(m0, m1)
-    cat(sprintf("BIC0: %.2f, BIC1: %.2f, Log10 BF: %.2f, LRT p-value: %.3e\n", stats0$bic, stats1$bic, log10_bf, lrt$p_value))
+    cat(sprintf(
+        "BIC0: %.2f (%s), BIC1: %.2f (%s), Log10 BF: %.2f, LRT p-value: %.3e\n",
+        stats0$bic, stats0$model_type, stats1$bic, stats1$model_type, log10_bf, lrt$p_value
+    ))
 
     results$model_0 <- stats0
     results$model_1 <- stats1
@@ -69,20 +82,33 @@ if (is_main) {
     )
 } else {
     cat("Fitting Model 1 (Base + Ablation)...\n")
-    m1 <- glmer(choice ~ base_logit_1 + metalign_logit_1 + (1 + base_logit_1 + metalign_logit_1 | participant),
-        data = df, family = binomial,
+    formulas_1 <- list(
+        list(name = "full", formula = choice ~ base_logit_1 + metalign_logit_1 + (1 + base_logit_1 + metalign_logit_1 | participant)),
+        list(name = "uncorrelated", formula = choice ~ base_logit_1 + metalign_logit_1 + (1 | participant) + (0 + base_logit_1 + metalign_logit_1 | participant)),
+        list(name = "intercept_only", formula = choice ~ base_logit_1 + metalign_logit_1 + (1 | participant))
     )
+    res1 <- fit_with_fallback(formulas_1, df, binomial, ctrl)
+    m1 <- res1$model
     stats1 <- calculate_model_stats(m1, null_model_ll = null_ll)
+    stats1$model_type <- res1$type
 
     cat("Fitting Model 2 (Base + Ablation + Main)...\n")
-    m2 <- glmer(choice ~ base_logit_1 + metalign_logit_1 + main_logit_1 + (1 + base_logit_1 + metalign_logit_1 + main_logit_1 | participant),
-        data = df, family = binomial,
+    formulas_2 <- list(
+        list(name = "full", formula = choice ~ base_logit_1 + metalign_logit_1 + main_logit_1 + (1 + base_logit_1 + metalign_logit_1 + main_logit_1 | participant)),
+        list(name = "uncorrelated", formula = choice ~ base_logit_1 + metalign_logit_1 + main_logit_1 + (1 | participant) + (0 + base_logit_1 + metalign_logit_1 + main_logit_1 | participant)),
+        list(name = "intercept_only", formula = choice ~ base_logit_1 + metalign_logit_1 + main_logit_1 + (1 | participant))
     )
+    res2 <- fit_with_fallback(formulas_2, df, binomial, ctrl)
+    m2 <- res2$model
     stats2 <- calculate_model_stats(m2, null_model_ll = null_ll)
+    stats2$model_type <- res2$type
 
     log10_bf <- calculate_log10_bf(stats1$bic, stats2$bic)
     lrt <- calculate_lrt(m1, m2)
-    cat(sprintf("BIC1: %.2f, BIC2: %.2f, Log10 BF: %.2f, LRT p-value: %.3e\n", stats1$bic, stats2$bic, log10_bf, lrt$p_value))
+    cat(sprintf(
+        "BIC1: %.2f (%s), BIC2: %.2f (%s), Log10 BF: %.2f, LRT p-value: %.3e\n",
+        stats1$bic, stats1$model_type, stats2$bic, stats2$model_type, log10_bf, lrt$p_value
+    ))
 
     results$model_1 <- stats1
     results$model_2 <- stats2
