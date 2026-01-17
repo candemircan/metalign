@@ -20,7 +20,6 @@ dependencies = [
     "vit_prisma @ git+https://github.com/Prisma-Multimodal/ViT-Prisma.git@97dd26fc01dfd856060c4a234b882c6f16836c15",
     "nilearn>=0.12.1",
     "pycortex>=1.2.11",
-    "jax",
     "numpyro",
 ]
 
