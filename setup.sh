@@ -36,22 +36,3 @@ uv run bin/fix_pycortex.py
 # i use jq for some json processing
 curl -sS https://webi.sh/jq | sh; \
 source ~/.config/envman/PATH.env
-
-
-# install rig (The R Installation Manager) if missing
-if ! command -v rig >/dev/null 2>&1; then
-    echo "Installing rig..."
-    curl -L https://rig.r-pkg.org/install.sh | sudo bash
-fi
-
-# install and set R version (e.g., 4.5)
-TARGET_R="4.5"
-
-if [[ $(rig list) != *"$TARGET_R"* ]]; then
-    echo "Installing R $TARGET_R via rig..."
-    rig add "$TARGET_R"
-fi
-# 3. set it as the default for the shell
-rig default "$TARGET_R"
-
-Rscript bin/setup.R
