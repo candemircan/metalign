@@ -1,12 +1,26 @@
-__all__ = ["fix_state_dict", "set_pycortex_filestore_path", "calc_cka", "calc_class_separation"]
+__all__ = ["fix_state_dict", "set_pycortex_filestore_path", "calc_cka", "calc_class_separation", "calculate_log10_bf", "calculate_lrt"]
 
 import configparser
 import os
 
+import numpy as np
 import torch
 from cortex import options
 from einops import einsum
 from fastcore.script import call_parse
+from scipy.stats import chi2
+
+
+def calculate_log10_bf(bic_h0, bic_h1):
+    "Approximate log10 Bayes Factor from BIC difference"
+    return (bic_h0 - bic_h1) / (2 * np.log(10))
+
+def calculate_lrt(stats_r, stats_f):
+    "Likelihood ratio test between nested models"
+    chisq = 2 * (stats_f['loglik'] - stats_r['loglik'])
+    df = stats_f['k'] - stats_r['k']
+    p_val = chi2.sf(chisq, df) if df > 0 else np.nan
+    return {'chisq': float(chisq), 'df': df, 'p_value': float(p_val)}
 
 
 def fix_state_dict(state_dict: dict) -> dict:

@@ -18,7 +18,7 @@ for eval_type in "${eval_types[@]}"; do
                 done
             else
                 uv run bin/eval_"${eval_type}".py "$experiment" "$backbone"
-                Rscript bin/eval_"${eval_type}".R "$experiment" "$backbone"
+                uv run bin/eval_"${eval_type}"_map.py "$experiment" "$backbone"
             fi
         done
     done
