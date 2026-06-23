@@ -1,0 +1,7 @@
+{
+  "experiment_name": "static_linear",
+  "backbone_name": "siglip2",
+  "base_acc": 0.4861381608627925,
+  "metalign_acc": 0.5053024370312992,
+  "main_acc": 0.535856833987351
+}

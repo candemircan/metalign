@@ -1,0 +1,22 @@
+{
+  "experiment_name": "raw",
+  "backbone_name": "mae",
+  "base_acc": 0.4061181863251059,
+  "metalign_acc": 0.5251578716383704,
+  "main_acc": 0.5496208642507091,
+  "between_class": {
+    "base_acc": 0.39102864716077074,
+    "metalign_acc": 0.5019879702314202,
+    "main_acc": 0.5081251911509838
+  },
+  "class_border": {
+    "base_acc": 0.4581830108232207,
+    "metalign_acc": 0.6760413250245982,
+    "main_acc": 0.7311823548704494
+  },
+  "within_class": {
+    "base_acc": 0.39543603596339155,
+    "metalign_acc": 0.47387412812966173,
+    "main_acc": 0.5013708019191226
+  }
+}

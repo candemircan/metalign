@@ -1,0 +1,22 @@
+{
+  "experiment_name": "mlp",
+  "backbone_name": "clip",
+  "base_acc": 0.6018708906642394,
+  "metalign_acc": 0.6137854246076575,
+  "main_acc": 0.6260250481538974,
+  "between_class": {
+    "base_acc": 0.5098175145274748,
+    "metalign_acc": 0.5265368539096748,
+    "main_acc": 0.5629116117850953
+  },
+  "class_border": {
+    "base_acc": 0.855772384388324,
+    "metalign_acc": 0.8689324368645458,
+    "main_acc": 0.8657346671039685
+  },
+  "within_class": {
+    "base_acc": 0.5680361246623392,
+    "metalign_acc": 0.5745877514816756,
+    "main_acc": 0.5705559811313148
+  }
+}

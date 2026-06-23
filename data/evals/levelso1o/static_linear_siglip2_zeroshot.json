@@ -1,0 +1,22 @@
+{
+  "experiment_name": "static_linear",
+  "backbone_name": "siglip2",
+  "base_acc": 0.6055281486959844,
+  "metalign_acc": 0.6010256576969027,
+  "main_acc": 0.6285201108555546,
+  "between_class": {
+    "base_acc": 0.513793454990315,
+    "metalign_acc": 0.5042919767560403,
+    "main_acc": 0.5597716382913651
+  },
+  "class_border": {
+    "base_acc": 0.8731141357822236,
+    "metalign_acc": 0.8688094457199081,
+    "main_acc": 0.8779517874713021
+  },
+  "within_class": {
+    "base_acc": 0.5646494375680361,
+    "metalign_acc": 0.5649921380478168,
+    "main_acc": 0.5738418739668588
+  }
+}

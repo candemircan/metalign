@@ -1,0 +1,6 @@
+{
+  "experiment_name": "main",
+  "backbone_name": "mae",
+  "base_acc": 0.37651154674452453,
+  "metalign_acc": 0.48065611726351093
+}

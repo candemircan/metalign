@@ -1,0 +1,22 @@
+bias = true
+sl = 120
+logit_bias = true
+compile = true
+warmup_steps = 0
+training_steps = 10000
+attn_drop = 0.1
+n_heads = 32
+weight_decay = 0.0
+n_layers = 1
+batch_size = 4096
+lr = 0.00025
+use_mlp = false
+model_name = "vit_base_patch16_siglip_256.v2_webli"
+name = "[32heads]_siglip2"
+train_backbone = "coco_train_vit_base_patch16_siglip_256.v2_webli"
+eval_backbone = "coco_eval_vit_base_patch16_siglip_256.v2_webli"
+train_features = "coco_train_sae-top_k-64-cls_only-layer_11-hook_resid_post"
+eval_features = "coco_eval_sae-top_k-64-cls_only-layer_11-hook_resid_post"
+tags = [
+    "32heads",
+]

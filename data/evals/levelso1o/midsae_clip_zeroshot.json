@@ -1,0 +1,22 @@
+{
+  "experiment_name": "midsae",
+  "backbone_name": "clip",
+  "base_acc": 0.6018708906642394,
+  "metalign_acc": 0.5919800394983867,
+  "main_acc": 0.6260250481538974,
+  "between_class": {
+    "base_acc": 0.5098175145274748,
+    "metalign_acc": 0.5132837190335406,
+    "main_acc": 0.5629116117850953
+  },
+  "class_border": {
+    "base_acc": 0.855772384388324,
+    "metalign_acc": 0.8411774352246638,
+    "main_acc": 0.8657346671039685
+  },
+  "within_class": {
+    "base_acc": 0.5680361246623392,
+    "metalign_acc": 0.5472523485062291,
+    "main_acc": 0.5705559811313148
+  }
+}

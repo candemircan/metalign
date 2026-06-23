@@ -1,0 +1,22 @@
+{
+  "experiment_name": "lstm",
+  "backbone_name": "mae",
+  "base_acc": 0.4061181863251059,
+  "metalign_acc": 0.5589671903318352,
+  "main_acc": 0.5496208642507091,
+  "between_class": {
+    "base_acc": 0.39102864716077074,
+    "metalign_acc": 0.5227240289530023,
+    "main_acc": 0.5081251911509838
+  },
+  "class_border": {
+    "base_acc": 0.4581830108232207,
+    "metalign_acc": 0.7305264020990488,
+    "main_acc": 0.7311823548704494
+  },
+  "within_class": {
+    "base_acc": 0.39543603596339155,
+    "metalign_acc": 0.5104422852074346,
+    "main_acc": 0.5013708019191226
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "experiment_name": "8heads",
+  "backbone_name": "mae",
+  "base_acc": 0.37651154674452453,
+  "metalign_acc": 0.4804582095523455,
+  "main_acc": 0.48065611726351093
+}

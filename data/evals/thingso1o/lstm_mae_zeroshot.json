@@ -1,0 +1,7 @@
+{
+  "experiment_name": "lstm",
+  "backbone_name": "mae",
+  "base_acc": 0.37651175954851507,
+  "metalign_acc": 0.47804862996790914,
+  "main_acc": 0.48065590445952044
+}

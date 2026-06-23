@@ -1,0 +1,22 @@
+{
+  "experiment_name": "mlp",
+  "backbone_name": "dinov3",
+  "base_acc": 0.5758881041587087,
+  "metalign_acc": 0.6186698958900547,
+  "main_acc": 0.6187105320904074,
+  "between_class": {
+    "base_acc": 0.4562340707513508,
+    "metalign_acc": 0.5340401671933939,
+    "main_acc": 0.5404220613722092
+  },
+  "class_border": {
+    "base_acc": 0.8471220072154805,
+    "metalign_acc": 0.875696949819613,
+    "main_acc": 0.8709412922269597
+  },
+  "within_class": {
+    "base_acc": 0.5608192557351933,
+    "metalign_acc": 0.5759585534007983,
+    "main_acc": 0.5720880538644518
+  }
+}

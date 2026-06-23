@@ -1,0 +1,7 @@
+{
+  "experiment_name": "static_linear",
+  "backbone_name": "clip",
+  "base_acc": 0.49536619310685315,
+  "metalign_acc": 0.4684143549059832,
+  "main_acc": 0.5401329173724666
+}

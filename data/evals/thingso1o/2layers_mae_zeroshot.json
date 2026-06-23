@@ -1,0 +1,7 @@
+{
+  "experiment_name": "2layers",
+  "backbone_name": "mae",
+  "base_acc": 0.37651154674452453,
+  "metalign_acc": 0.4850090228891972,
+  "main_acc": 0.48065611726351093
+}

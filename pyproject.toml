@@ -1,0 +1,57 @@
+[project]
+name = "metalign"
+requires-python = "==3.12.5"
+version = "0.0.1"
+dependencies = [
+    "torch",
+    "seaborn",
+    "schedulefree",
+    "fastcore",
+    "einops",
+    "torchvision",
+    "scikit-learn",
+    "h5py",
+    "wandb",
+    "tomli-w",
+    "timm",
+    "tables",
+    "vit_prisma @ git+https://github.com/Prisma-Multimodal/ViT-Prisma.git@97dd26fc01dfd856060c4a234b882c6f16836c15",
+    "groupBMC @ git+https://github.com/candemircan/group-bayesian-model-comparison.git@a82e59d41c2f8df7bb69d46cbb73e4852b0ccc06",
+    "nilearn",
+    "pycortex"
+]
+
+[dependency-groups]
+dev = [
+    "pre-commit",
+    "ruff",
+    "shiny",
+    "ipdb",
+    "nbclassic",
+    "datalad",
+    "datalad-osf",
+]
+
+[project.optional-dependencies]
+cuda = ["flash-attn"]
+
+[tool.setuptools]
+packages = ["metalign"]
+
+[build-system]
+requires = ["uv_build>=0.7.21,<0.8.0"]
+build-backend = "uv_build"
+
+[tool.uv]
+no-build-isolation-package = ["flash-attn"]
+default-groups = "all"
+
+[tool.uv.build-backend]
+module-name = "metalign"
+module-root = ""
+
+[tool.ruff.lint.isort]
+extra-standard-library = ["tomllib"]
+known-third-party = ["wandb"]
+[tool.ruff.lint]
+ignore = ["E701"]

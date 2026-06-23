@@ -1,0 +1,6 @@
+{
+  "experiment_name": "main",
+  "backbone_name": "clip",
+  "base_acc": 0.49536619310685315,
+  "metalign_acc": 0.5401329173724666
+}

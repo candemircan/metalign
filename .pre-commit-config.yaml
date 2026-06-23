@@ -1,0 +1,20 @@
+repos:
+- repo: local
+  hooks:
+    - id: uv
+      name: uv
+      entry: bash -c 'if command -v nvidia-smi >/dev/null 2>&1; then uv sync --extra cuda; else uv sync; fi'
+      language: system
+      pass_filenames: false
+    - id: ruff
+      name: ruff
+      entry: uv run ruff check --fix --select F401,I .
+      language: system
+      pass_filenames: false
+    - id: tests
+      name: tests
+      language: system
+      entry: bash bin/run_tests.sh
+      types: [ python ]
+      files: ^metalign/.*\.py$      
+      pass_filenames: true

@@ -1,0 +1,14 @@
+* annex.backend=MD5E
+**/.git* annex.largefiles=nothing
+data/backbone_reps/** annex.largefiles=anything
+data/cache/** annex.largefiles=anything
+data/checkpoints/** annex.largefiles=anything
+data/evals/** annex.largefiles=anything
+data/sae/** annex.largefiles=anything
+*.json annex.largefiles=nothing
+*.md annex.largefiles=nothing
+*.py annex.largefiles=nothing
+*.sh annex.largefiles=nothing
+*.slurm annex.largefiles=nothing
+*.toml annex.largefiles=nothing
+*.txt annex.largefiles=nothing

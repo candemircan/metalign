@@ -1,0 +1,7 @@
+{
+  "experiment_name": "32heads",
+  "backbone_name": "dinov3",
+  "base_acc": 0.45219996765379344,
+  "metalign_acc": 0.5156970607512832,
+  "main_acc": 0.5141067765302735
+}

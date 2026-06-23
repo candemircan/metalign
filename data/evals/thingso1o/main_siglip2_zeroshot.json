@@ -1,0 +1,6 @@
+{
+  "experiment_name": "main",
+  "backbone_name": "siglip2",
+  "base_acc": 0.4861381608627925,
+  "metalign_acc": 0.535856833987351
+}

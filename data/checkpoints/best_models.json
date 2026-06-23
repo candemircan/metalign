@@ -1,0 +1,62 @@
+{
+    "[32heads]": {
+        "siglip2": "data/checkpoints/[32heads]_siglip2/model.pt",
+        "dinov3": "data/checkpoints/[32heads]_dinov3/model.pt",
+        "mae": "data/checkpoints/[32heads]_mae/model.pt",
+        "clip": "data/checkpoints/[32heads]_clip/model.pt"
+    },
+    "[mlp]": {
+        "dinov3": "data/checkpoints/[mlp]_dinov3/model.pt",
+        "mae": "data/checkpoints/[mlp]_mae/model.pt",
+        "siglip2": "data/checkpoints/[mlp]_siglip2/model.pt",
+        "clip": "data/checkpoints/[mlp]_clip/model.pt"
+    },
+    "[midsae]": {
+        "mae": "data/checkpoints/[midsae]_mae/model.pt",
+        "siglip2": "data/checkpoints/[midsae]_siglip2/model.pt",
+        "clip": "data/checkpoints/[midsae]_clip/model.pt",
+        "dinov3": "data/checkpoints/[midsae]_dinov3/model.pt"
+    },
+    "[wd]": {
+        "dinov3": "data/checkpoints/[wd]_dinov3/model.pt",
+        "clip": "data/checkpoints/[wd]_clip/model.pt",
+        "mae": "data/checkpoints/[wd]_mae/model.pt",
+        "siglip2": "data/checkpoints/[wd]_siglip2/model.pt"
+    },
+    "[raw]": {
+        "clip": "data/checkpoints/[raw]_clip/model.pt",
+        "mae": "data/checkpoints/[raw]_mae/model.pt",
+        "siglip2": "data/checkpoints/[raw]_siglip2/model.pt",
+        "dinov3": "data/checkpoints/[raw]_dinov3/model.pt"
+    },
+    "[8heads]": {
+        "siglip2": "data/checkpoints/[8heads]_siglip2/model.pt",
+        "mae": "data/checkpoints/[8heads]_mae/model.pt",
+        "dinov3": "data/checkpoints/[8heads]_dinov3/model.pt",
+        "clip": "data/checkpoints/[8heads]_clip/model.pt"
+    },
+    "[lstm]": {
+        "dinov3": "data/checkpoints/[lstm]_dinov3/model.pt",
+        "mae": "data/checkpoints/[lstm]_mae/model.pt",
+        "siglip2": "data/checkpoints/[lstm]_siglip2/model.pt",
+        "clip": "data/checkpoints/[lstm]_clip/model.pt"
+    },
+    "[2layers]": {
+        "dinov3": "data/checkpoints/[2layers]_dinov3/model.pt",
+        "siglip2": "data/checkpoints/[2layers]_siglip2/model.pt",
+        "clip": "data/checkpoints/[2layers]_clip/model.pt",
+        "mae": "data/checkpoints/[2layers]_mae/model.pt"
+    },
+    "[static_linear]": {
+        "clip": "data/checkpoints/[static_linear]_clip/model.pt",
+        "mae": "data/checkpoints/[static_linear]_mae/model.pt",
+        "dinov3": "data/checkpoints/[static_linear]_dinov3/model.pt",
+        "siglip2": "data/checkpoints/[static_linear]_siglip2/model.pt"
+    },
+    "[main]": {
+        "dinov3": "data/checkpoints/[main]_dinov3/model.pt",
+        "mae": "data/checkpoints/[main]_mae/model.pt",
+        "siglip2": "data/checkpoints/[main]_siglip2/model.pt",
+        "clip": "data/checkpoints/[main]_clip/model.pt"
+    }
+}

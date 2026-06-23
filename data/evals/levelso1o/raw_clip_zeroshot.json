@@ -1,0 +1,22 @@
+{
+  "experiment_name": "raw",
+  "backbone_name": "clip",
+  "base_acc": 0.6018708906642394,
+  "metalign_acc": 0.58635598936957,
+  "main_acc": 0.6260250481538974,
+  "between_class": {
+    "base_acc": 0.5098175145274748,
+    "metalign_acc": 0.5287185238046692,
+    "main_acc": 0.5629116117850953
+  },
+  "class_border": {
+    "base_acc": 0.855772384388324,
+    "metalign_acc": 0.815062315513283,
+    "main_acc": 0.8657346671039685
+  },
+  "within_class": {
+    "base_acc": 0.5680361246623392,
+    "metalign_acc": 0.5308833608837641,
+    "main_acc": 0.5705559811313148
+  }
+}

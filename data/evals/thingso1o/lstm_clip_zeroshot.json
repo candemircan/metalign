@@ -1,0 +1,7 @@
+{
+  "experiment_name": "lstm",
+  "backbone_name": "clip",
+  "base_acc": 0.49536619310685315,
+  "metalign_acc": 0.49443623966836625,
+  "main_acc": 0.5401329173724666
+}

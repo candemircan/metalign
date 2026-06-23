@@ -1,0 +1,6 @@
+{
+  "experiment_name": "main",
+  "backbone_name": "dinov3",
+  "base_acc": 0.45219996765379344,
+  "metalign_acc": 0.5141067765302735
+}
