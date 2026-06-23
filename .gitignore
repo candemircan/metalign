@@ -165,6 +165,9 @@ bin/matplotlibrc
 *png
 *pdf
 *svg
+!figures/*.png
+!figures/*.pdf
+!figures/*.svg
 *sif
 plot_fig*
 bin/get_checkpoints.sh

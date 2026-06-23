@@ -5,6 +5,7 @@ data/cache/** annex.largefiles=anything
 data/checkpoints/** annex.largefiles=anything
 data/evals/** annex.largefiles=anything
 data/sae/** annex.largefiles=anything
+figures/** annex.largefiles=anything
 *.json annex.largefiles=nothing
 *.md annex.largefiles=nothing
 *.py annex.largefiles=nothing
