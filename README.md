@@ -21,7 +21,7 @@ The project uses Python 3.12.5. Most experiment scripts should be run with `uv r
 There are two kinds of data:
 
 - External source datasets are downloaded into `data/external/` and are not tracked.
-- Derived artifacts, such as extracted features, checkpoints, configs, and evaluation outputs, are tracked with DataLad/git-annex and stored on OSF.
+- Derived artifacts, such as extracted features, checkpoints, configs, evaluation outputs, and generated figures, are tracked with DataLad/git-annex and stored on OSF.
 
 To download external source datasets:
 
@@ -38,10 +38,8 @@ bash bin/get_data.sh --skip-pycortex-config
 To retrieve DataLad-tracked derived artifacts:
 
 ```bash
-uv run datalad get data/backbone_reps data/checkpoints data/configs data/evals data/sae
+uv run datalad get data/backbone_reps data/checkpoints data/configs data/evals data/sae figures
 ```
-
-`figures/` is kept local for now; canonical paper figures will be added with the preprint release.
 
 ## Running Experiments
 
@@ -68,7 +66,7 @@ uv run -m metalign.model
 ```text
 bin/       experiment, evaluation, comparison, extraction, and plotting scripts
 data/      configs, DataLad-tracked derived artifacts, and local external data
-figures/   local generated figures
+figures/   generated figures (DataLad-tracked, stored on OSF)
 logs/      local job logs
 metalign/  package code and module test harnesses
 ```
