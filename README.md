@@ -43,13 +43,17 @@ uv run datalad get data figures
 
 ## Running Experiments
 
-Generate configs, train models, evaluate them, and compare model families:
+The artifacts fetched above already include the extracted features and the paper figures, so feature extraction and plotting are only needed to regenerate them from scratch.
+
+Extract features, generate configs, train, evaluate, compare, and plot:
 
 ```bash
+sbatch bin/extract.slurm
 uv run bin/generate_configs.py
 bash bin/train.sh
 bash bin/eval.sh
 bash bin/compare.sh
+bash bin/plot.sh
 ```
 
 The `*.sh` and `*.slurm` wrappers reflect my SLURM setup and may need local adjustment. For non-SLURM runs, call the corresponding Python scripts directly with `uv run`.
