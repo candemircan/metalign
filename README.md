@@ -38,7 +38,8 @@ bash bin/get_data.sh --skip-pycortex-config
 To retrieve DataLad-tracked derived artifacts:
 
 ```bash
-uv run datalad get data/backbone_reps data/checkpoints data/configs data/evals data/sae figures
+git annex enableremote osf-storage
+uv run datalad get data figures
 ```
 
 ## Running Experiments
