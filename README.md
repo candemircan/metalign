@@ -1,6 +1,6 @@
 # metalign
 
-> Are human visual representations the result of meta-learning?
+> Meta-learning as a principle for human-like visual representations
 
 `metalign` trains a causal transformer on visual features from pretrained vision models and sparse autoencoders. The model performs online category and reward learning, and its learned representations are compared against human behavioral benchmarks and fMRI responses. The repository contains the model code, experiment scripts, configs, and DataLad-tracked derived artifacts needed to reproduce the main analyses.
 
