@@ -4,13 +4,6 @@
 
 `metalign` trains a causal transformer on visual features from pretrained vision models and sparse autoencoders. The model performs online category and reward learning, and its learned representations are compared against human behavioral benchmarks and fMRI responses. The repository contains the model code, experiment scripts, configs, and DataLad-tracked derived artifacts needed to reproduce the main analyses.
 
-## System requirements
-
-- **Python** 3.12.5.
-- **Dependencies** are managed with `uv` and fully pinned in `uv.lock`.
-- **Operating systems tested:** macOS 15 (Apple Silicon) for evaluation, comparison, and plotting; Linux (SLURM cluster) for feature extraction and training.
-- **Non-standard hardware:** an NVIDIA CUDA GPU is required for feature extraction and model training (an optional `flash-attn` extra is installed automatically when a GPU is detected). Evaluation, comparison, and plotting run on CPU.
-
 ## Installation
 
 Clone the repository and install dependencies with `uv`:
@@ -50,25 +43,6 @@ To retrieve DataLad-tracked derived artifacts:
 uv run datalad get data figures
 ```
 
-## Demo
-
-The core modules ship self-contained test harnesses that run on small synthetic tensors, requiring no data download and no GPU:
-
-```bash
-uv run -m metalign.model          # single module
-bash bin/run_tests.sh metalign/*.py   # all modules
-```
-
-**Expected output:** each harness runs forward/loss passes and shape/value assertions; a successful run completes silently and exits 0 (a failed assertion raises and exits non-zero). **Expected run time:** a few seconds per module on CPU.
-
-For a demo on real data, fetch the DataLad artifacts (above) and regenerate a paper figure — this needs no GPU or SLURM:
-
-```bash
-uv run bin/plot_evals.py
-```
-
-**Expected output:** the corresponding figure files written under `figures/`. **Expected run time:** under a minute on CPU.
-
 ## Instructions for use
 
 To run the full pipeline on your data — extract features, generate configs, train, evaluate, compare, and plot:
@@ -95,6 +69,32 @@ figures/   generated figures (DataLad-tracked, stored on OSF)
 logs/      local job logs
 metalign/  package code and module test harnesses
 ```
+
+## System requirements
+
+- **Python** 3.12.5.
+- **Dependencies** are managed with `uv` and fully pinned in `uv.lock`.
+- **Operating systems:** designed for \*nix systems (the setup script and `bin/` wrappers are bash; Windows requires WSL). The Python code itself is platform-agnostic. Tested on macOS 15 (Apple Silicon) for evaluation, comparison, and plotting, and on Linux (SLURM cluster) for feature extraction and training.
+- **Non-standard hardware:** an NVIDIA CUDA GPU is required for feature extraction and model training (an optional `flash-attn` extra is installed automatically when a GPU is detected). Evaluation, comparison, and plotting run on CPU.
+
+## Demo
+
+The core modules ship self-contained test harnesses that run on small synthetic tensors, requiring no data download and no GPU:
+
+```bash
+uv run -m metalign.model          # single module
+bash bin/run_tests.sh metalign/*.py   # all modules
+```
+
+**Expected output:** each harness runs forward/loss passes and shape/value assertions; a successful run completes silently and exits 0 (a failed assertion raises and exits non-zero). **Expected run time:** a few seconds per module on CPU.
+
+For a demo on real data, fetch the DataLad artifacts (above) and regenerate a paper figure — this needs no GPU or SLURM:
+
+```bash
+uv run bin/plot_evals.py
+```
+
+**Expected output:** the corresponding figure files written under `figures/`. **Expected run time:** under a minute on CPU.
 
 ## License
 
