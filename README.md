@@ -1,6 +1,6 @@
 # metalign
 
-> Meta-learning as a principle for human-like visual representations
+> Code and data for [Meta-learning as a principle for human-like visual representations](https://arxiv.org/abs/2606.28399)
 
 `metalign` trains a causal transformer on visual features from pretrained vision models and sparse autoencoders. The model performs online category and reward learning, and its learned representations are compared against human behavioral benchmarks and fMRI responses. The repository contains the model code, experiment scripts, configs, and DataLad-tracked derived artifacts needed to reproduce the main analyses.
 
@@ -102,4 +102,11 @@ Released under the [MIT License](LICENSE).
 
 ## Citation
 
-Citation coming soon.
+```bibtex
+@article{demircan2026meta,
+  title={Meta-learning as a principle for human-like visual representations},
+  author={Demircan, Can and Binz, Marcel and Modirshanechi, Alireza and Schulz, Eric},
+  journal={arXiv preprint arXiv:2606.28399},
+  year={2026}
+}
+```
